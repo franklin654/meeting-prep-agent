@@ -11,7 +11,7 @@
 
 services:
   hindsight:
-    image: ghcr.io/vectorize-io/hindsight:latest # TODO: pin a version tag once chosen
+    image: ghcr.io/vectorize-io/hindsight@sha256:b4d3b76f363aa40cf348450e7f8f52a50653008731b99824b14623a196182e73 # Hindsight 0.10.1 (built 2026-09-21); pinned by digest so :latest cannot change demo behaviour
     ports:
       - "8888:8888" # API
       - "9999:9999" # UI
