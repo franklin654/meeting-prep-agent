@@ -1,0 +1,111 @@
+[2026-03-10T09:00:04+05:30] Priya Nair (Account Executive, Tracewise): Hi, Meera. Good morning! Can you hear me all right? Thanks for making the time; I know mornings can get swallowed by internal meetings.
+
+[2026-03-10T09:00:32+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Morning, Priya. Yes, all good. And no worries, I’ve got a little breathing room before my next call. How’s your day starting?
+
+[2026-03-10T09:01:01+05:30] Priya Nair (Account Executive, Tracewise): Pretty well, thanks. I’ve got coffee, so I’m optimistic. I’m in Bengaluru too, by the way, so I’ll try not to blame traffic for anything today.
+
+[2026-03-10T09:01:33+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Ha, fair. It’s been a surprisingly calm commute for me. I’m glad we could connect. I don’t think we’ve spoken before, have we?
+
+[2026-03-10T09:02:02+05:30] Priya Nair (Account Executive, Tracewise): Not directly, no. This is our first conversation with Nimbus. I’ll keep it exploratory: I’d love to understand your setup, what’s creating friction, and whether there’s a useful fit.
+
+[2026-03-10T09:02:35+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That works. I heard about Tracewise from someone in my network, but I’m still figuring out what you actually do and where it might fit.
+
+[2026-03-10T09:03:04+05:30] Priya Nair (Account Executive, Tracewise): Totally fair. We help data teams see and troubleshoot issues across their pipelines, especially when a breakage reaches a report or a downstream team before anyone spots it.
+
+[2026-03-10T09:03:39+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Okay. The broad problem is familiar. We have data coming from a lot of operational systems, and ownership gets fuzzy once it moves downstream.
+
+[2026-03-10T09:04:08+05:30] Priya Nair (Account Executive, Tracewise): When something goes wrong, what usually happens first? Is it an alert from the platform, a message from an analyst, or someone noticing a strange number in a report?
+
+[2026-03-10T09:04:43+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Usually somebody notices the number. Late shipment data breaks weekly reports, and the first signal is often a business user asking why the totals look off.
+
+[2026-03-10T09:05:16+05:30] Priya Nair (Account Executive, Tracewise): Got it. So the issue is not only detecting a failure; it’s that the information can be late, and then people need to work out what changed.
+
+[2026-03-10T09:05:47+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Exactly. Sometimes the pipeline itself is technically green. The underlying source arrives late, or a field changes, and then the report quietly becomes misleading.
+
+[2026-03-10T09:06:21+05:30] Priya Nair (Account Executive, Tracewise): How do you investigate now? I’m curious about the handoffs too: who gets pulled in, and where does the trail tend to go cold?
+
+[2026-03-10T09:06:58+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): An analyst checks the report, then usually asks our data engineering group. They inspect logs, look at recent changes, and may go back to the source-system owner.
+
+[2026-03-10T09:07:31+05:30] Priya Nair (Account Executive, Tracewise): That sounds like a lot of context switching. Do you have a shared place for ownership and dependencies, or is it mostly knowledge held by the people involved?
+
+[2026-03-10T09:08:04+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): A bit of both, honestly. Some ownership is documented, but it doesn’t always stay current. The people who know the quirks are often the ones everyone messages.
+
+[2026-03-10T09:08:38+05:30] Priya Nair (Account Executive, Tracewise): And your team’s size and scope? I don’t need an org chart, just a sense of how many people are supporting the data environment.
+
+[2026-03-10T09:09:09+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): The core data group is fairly lean, with people covering engineering, analytics, and platform work. We have about 70 pipelines across the broader environment.
+
+[2026-03-10T09:09:43+05:30] Priya Nair (Account Executive, Tracewise): Thanks, that helps. Are those mostly supporting internal reporting, or are there operational workflows that depend on the same data being timely and accurate?
+
+[2026-03-10T09:10:14+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Both. Reporting is visible, so people complain when it’s wrong. But some planning and dispatch decisions use the same feeds, and those consequences are less obvious at first.
+
+[2026-03-10T09:10:48+05:30] Priya Nair (Account Executive, Tracewise): That distinction is useful. How do you prioritize when several issues land at once? Do you have agreed severity levels, or does it depend on who shouts loudest?
+
+[2026-03-10T09:11:18+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): We try to prioritize by business impact, but the impact isn’t always clear immediately. If a senior person is waiting on a report, that tends to move things up.
+
+[2026-03-10T09:11:54+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. And what would a better experience look like for you? Not a product wish list necessarily, but what would feel noticeably easier in a normal week?
+
+[2026-03-10T09:12:27+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I’d like us to know something is wrong before people start forwarding screenshots. Then, when we investigate, the team should be able to see where the issue started.
+
+[2026-03-10T09:13:02+05:30] Priya Nair (Account Executive, Tracewise): So earlier detection and a shorter path from symptom to cause. Would it also help to make the owner clear, so the right person gets involved without a round of guessing?
+
+[2026-03-10T09:13:36+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes, definitely. I don’t want another tool that just creates noise. Alerts need enough context to tell someone why they should care and what to check.
+
+[2026-03-10T09:14:10+05:30] Priya Nair (Account Executive, Tracewise): That’s a good bar. How are you monitoring freshness and data quality today? Are those checks built into jobs, handled through dashboards, or some combination?
+
+[2026-03-10T09:14:46+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): It’s a combination. There are job alerts and some checks around important tables. Coverage varies, though, and people have different ideas about what needs monitoring.
+
+[2026-03-10T09:15:20+05:30] Priya Nair (Account Executive, Tracewise): Understood. When you say coverage varies, is the harder part deciding what matters, implementing checks, or maintaining them as the business and data change?
+
+[2026-03-10T09:15:54+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Maintenance is a big part of it. A check can be useful when someone creates it, then the process changes and nobody remembers to revisit the assumption.
+
+[2026-03-10T09:16:29+05:30] Priya Nair (Account Executive, Tracewise): Right. I should ask about your current stack too, just enough to understand what we’d need to connect with. What are the main systems in the path?
+
+[2026-03-10T09:17:03+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): We have a cloud warehouse, orchestration for the scheduled work, and a mix of operational databases and vendor feeds. I can share the specific names later.
+
+[2026-03-10T09:17:36+05:30] Priya Nair (Account Executive, Tracewise): That’s plenty for now. We generally look at the flow across those pieces, then surface unusual delays, failures, or changes and connect them to affected downstream assets.
+
+[2026-03-10T09:18:12+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): And does it need a lot of instrumentation? That’s usually where we get cautious, because the team is already maintaining a lot of integrations.
+
+[2026-03-10T09:18:45+05:30] Priya Nair (Account Executive, Tracewise): Fair concern. The goal is to start with the connections and metadata you already have, then validate what’s visible. We’d want to be specific about any extra setup rather than promise magic.
+
+[2026-03-10T09:19:19+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I appreciate that. We’ve had demos where everything looks effortless, then the real work appears after the meeting. I’d rather understand the limits early.
+
+[2026-03-10T09:19:53+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. We can map one meaningful workflow and test the practical questions: what we can detect, how much setup it takes, and whether the alert would help your team act.
+
+[2026-03-10T09:20:27+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That sounds sensible. I’d probably start with the shipment reporting path, since it’s a recurring pain and people already know what a bad outcome looks like.
+
+[2026-03-10T09:21:00+05:30] Priya Nair (Account Executive, Tracewise): Great candidate. Sorry, I think I talked over the end of your sentence there—go ahead if there was more.
+
+[2026-03-10T09:21:31+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): No, that was it. I was going to add that the source team may need to join, because they know when those feeds normally arrive.
+
+[2026-03-10T09:22:04+05:30] Priya Nair (Account Executive, Tracewise): That would help. Before we get into a possible follow-up, is there anything driving this now, like a planned platform change or a team initiative?
+
+[2026-03-10T09:22:37+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): We’re reviewing how we support the data estate, but there isn’t a forced deadline. I’m trying to find improvements that reduce interruptions without adding process for its own sake.
+
+[2026-03-10T09:23:11+05:30] Priya Nair (Account Executive, Tracewise): That’s helpful context. One quick tangent before I forget: your background on the call looked like a very convincing café. Is that a real place, or a virtual one?
+
+[2026-03-10T09:23:44+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): It’s real, but only just. I’ve been trying to grow a basil plant near the window, and it’s doing better than some of my dashboards.
+
+[2026-03-10T09:24:18+05:30] Priya Nair (Account Executive, Tracewise): I know that feeling. I once managed to keep a pothos alive through a product launch, so I consider that a personal best. Back to data—who else would want to weigh in?
+
+[2026-03-10T09:24:52+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): An engineering lead would be useful, and probably the analyst who owns the weekly report. I can ask them to join if we keep the session focused.
+
+[2026-03-10T09:25:26+05:30] Priya Nair (Account Executive, Tracewise): Perfect. I’ll send a short recap with the workflow we discussed and a few questions about its source, checks, and ownership. No lengthy questionnaire.
+
+[2026-03-10T09:25:59+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good. I can share a simplified diagram or a sanitized example beforehand, as long as it doesn’t turn into a big preparation exercise.
+
+[2026-03-10T09:26:33+05:30] Priya Nair (Account Executive, Tracewise): A simplified diagram would be great, but only if it’s easy to pull together. We can also use the meeting to sketch the flow live and correct our understanding as we go.
+
+[2026-03-10T09:27:07+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Let’s do that. I’ll check with the two people I mentioned and send you a couple of windows that work for them.
+
+[2026-03-10T09:27:41+05:30] Priya Nair (Account Executive, Tracewise): Sounds good. I’ll follow up today with the recap and an outline for that working session. We’ll keep it centered on the shipment path and the questions you raised.
+
+[2026-03-10T09:28:15+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Thanks, Priya. This was useful. I have a clearer sense of what you’re exploring, and I like starting with a real workflow rather than a broad presentation.
+
+[2026-03-10T09:28:49+05:30] Priya Nair (Account Executive, Tracewise): Glad to hear it. Thanks for being candid about the current process, especially the alert noise concern. We’ll make sure the next conversation gets into the practical details.
+
+[2026-03-10T09:29:23+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Great. I’ll coordinate with the team and get back to you. And good luck with the coffee and the pothos.
+
+[2026-03-10T09:29:56+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Meera. Good luck to the basil. I’ll send that note shortly. Have a good rest of your morning.
+
+[2026-03-10T09:30:02+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): You too. Bye, Priya.
