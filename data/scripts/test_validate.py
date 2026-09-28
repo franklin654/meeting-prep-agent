@@ -35,7 +35,7 @@ def _good_m1() -> str:
 
 def _check(seed, text, meeting="m1_test", **kw):
     m = next(x for x in seed.meetings if x["id"] == meeting)
-    return check_transcript(seed, m, text, words=(900, 2000), duration=(20, 40), **kw)
+    return check_transcript(seed, m, text, words=(400, 6000), duration=(20, 40), **kw)
 
 
 def test_good_transcript_passes():
@@ -80,6 +80,8 @@ def test_timestamps_must_be_on_meeting_date_and_increase():
 
 
 def test_word_count_range():
+    # 400 minimum; 6,000 is only a runaway cap; 2,500 spoken words is fine
+
     short = make_transcript(
         "2026-07-14",
         [(*PRIYA, "case study Jul 17"), (*KARAN, "40 pipelines")],
@@ -90,14 +92,14 @@ def test_word_count_range():
     long = make_transcript(
         "2026-07-14",
         [(*PRIYA, "I'll send the case study by Jul 17."), (*KARAN, "About 40 pipelines.")],
-        words=2100,
+        words=6100,
         step_minutes=25,
     )
     assert any("word count" in p for p in _check(make_seed(), long))
     mid = make_transcript(
         "2026-07-14",
         [(*PRIYA, "I'll send the case study by Jul 17."), (*KARAN, "About 40 pipelines.")],
-        words=1900,
+        words=2500,
         step_minutes=25,
     )
     assert _check(make_seed(), mid) == []

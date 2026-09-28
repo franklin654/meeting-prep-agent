@@ -6,13 +6,16 @@ from the root .env like the app does. No provider SDK is imported here and no ke
 or logged here.
 
 Rules enforced (docs/synthetic-data-spec.md "Generation rules"; AGENTS.md hard rule 12):
-- one meeting at a time, in date order; strictly one request in flight; a configurable
-  pause between calls; 429 backoff is the client's job;
-- ANY `llm.rate_limited` log line or typed LLM error stops the run immediately;
-- temperature 0.8 (prompt-specs.md: G1 at 0.8);
-- a transcript failing validation is regenerated (bounded), never patched, never written;
-- the live-demo transcript (m6) is generated only with --include-m6, at most once, as a
-  DRAFT for hand-editing, and this script REFUSES to write over it once it exists.
+- accounts run as parallel lanes (at most 4 requests in flight, one per account); within an
+  account meetings are generated strictly in date order, one request at a time;
+- a 429 / RateLimitedError is backed off (exponential, bounded) and retried, never fatal;
+- any other typed LLM error (timeout, invalid output) or validation failure is retried up to
+  4 attempts per transcript; the run then continues and lists the failures;
+- temperature 0.8 (prompt-specs.md: G1 at 0.8); no length instruction beyond "natural length";
+- a transcript failing validation is never written or patched; only non-length reasons are
+  fed back into the retry prompt;
+- the live-demo transcript (m6) is generated only with --include-m6, in a single attempt, as
+  a DRAFT for hand-editing, and this script REFUSES to write over it once it exists.
 
 Usage:
     cd backend && uv run python ../data/scripts/generate.py            # the 15 generated
@@ -28,8 +31,7 @@ import re
 import statistics
 import sys
 import time
-from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,10 +50,11 @@ from validate import (  # noqa: E402
     Seed,
     check_transcript,
     load_seed,
+    spoken_words,
     transcript_filename,
 )
 
-from app.core.errors import AppError  # noqa: E402
+from app.core.errors import AppError, RateLimitedError  # noqa: E402
 from app.llm.client import LLMClient  # noqa: E402
 
 PROMPT_PATH = _BACKEND / "app" / "llm" / "prompts" / "generate_transcript.md"
@@ -60,10 +63,11 @@ TEMPERATURE = 0.8  # prompt-specs.md: G1 at 0.8
 DEFAULT_MINUTES = 30
 LIVE_MINUTES = 10
 DEFAULT_PAUSE_SECONDS = 0.0
-CALL_TIMEOUT_SECONDS = 180.0  # per-call ceiling; a call exceeding it stops the run
 DEFAULT_MAX_ATTEMPTS = 4  # 1 try + at most 3 regenerations
-GENERATED_LENGTH = (1300, 1800)  # prompt target and hard cap, spoken words
-LIVE_LENGTH = (700, 800)
+CALL_TIMEOUT_SECONDS = 300.0  # per-call ceiling passed to get_llm_client
+MAX_PARALLEL_LANES = 4
+DEFAULT_RATE_LIMIT_BACKOFF_SECONDS = 20.0
+DEFAULT_MAX_RATE_LIMIT_RETRIES = 5
 NO_STYLE_REFS = "(none provided; use ordinary, casual business speech between colleagues)"
 
 logger = logging.getLogger("data.generate")
@@ -73,21 +77,13 @@ class RefuseOverwriteError(Exception):
     """Raised instead of overwriting the hand-edited live-demo transcript."""
 
 
-class GenerationAborted(Exception):  # noqa: N818 - reads better than GenerationAbortedError
-    """The run was stopped on purpose (rate limit or typed LLM error); carries partial results."""
-
-    def __init__(self, reason: str, result: GenerationResult) -> None:
-        super().__init__(reason)
-        self.reason = reason
-        self.result = result
-
-
 @dataclass
 class CallTiming:
     meeting_id: str
     attempt: int
     seconds: float
     words: int
+    error: str | None = None
 
 
 @dataclass
@@ -99,7 +95,8 @@ class GenerationResult:
     draft_problems: list[str] = field(default_factory=list)
     failure_details: dict[str, list[str]] = field(default_factory=dict)
     attempt_problems: dict[str, list[list[str]]] = field(default_factory=dict)
-    rate_limit_evidence: list[str] = field(default_factory=list)
+    rate_limit_events: list[str] = field(default_factory=list)
+    total_seconds: float = 0.0
 
 
 # --------------------------------------------------------------------------- prompt
@@ -163,8 +160,6 @@ def render_prompt(
     seed: Seed,
     meeting: dict[str, object],
     *,
-    target_words: int,
-    max_words: int,
     minutes: int,
 ) -> str:
     entry = seed.beats[str(meeting["id"])]
@@ -181,8 +176,6 @@ def render_prompt(
         style_refs=_style_refs(),
         required_facts=facts,
         forbidden=forbidden,
-        target_words=f"{target_words:,}",
-        max_words=f"{max_words:,}",
     )
 
 
@@ -204,75 +197,48 @@ def write_transcript(path: Path, text: str, *, overwrite: bool) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-# --------------------------------------------------------------------------- rate-limit watch
-
-
-class RateLimitWatch(logging.Handler):
-    """Cancels the in-flight call the moment the client logs `llm.rate_limited`."""
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.INFO)
-        self.evidence: list[str] = []
-        self.task: asyncio.Future[str] | None = None
-
-    def emit(self, record: logging.LogRecord) -> None:
-        message = record.getMessage()
-        if "llm.rate_limited" not in message:
-            return
-        self.evidence.append(message)
-        if self.task is not None and not self.task.done():
-            self.task.cancel()
-
-    @property
-    def tripped(self) -> bool:
-        return bool(self.evidence)
-
-
-@contextmanager
-def watching_rate_limits() -> Iterator[RateLimitWatch]:
-    watch = RateLimitWatch()
-    llm_logger = logging.getLogger("app.llm")
-    previous_level = llm_logger.level
-    if previous_level == logging.NOTSET or previous_level > logging.INFO:
-        llm_logger.setLevel(logging.INFO)
-    llm_logger.addHandler(watch)
-    try:
-        yield watch
-    finally:
-        llm_logger.removeHandler(watch)
-        llm_logger.setLevel(previous_level)
-
-
 # --------------------------------------------------------------------------- generation
 
 
-def _abort(reason: str, result: GenerationResult, watch: RateLimitWatch) -> GenerationAborted:
-    result.rate_limit_evidence = list(watch.evidence)
-    return GenerationAborted(reason, result)
+def _is_length_problem(problem: str) -> bool:
+    return problem.startswith("word count:")
 
 
-async def _one_call(
-    client: LLMClient, prompt: str, watch: RateLimitWatch, result: GenerationResult
-) -> str:
-    task: asyncio.Future[str] = asyncio.ensure_future(
-        client.complete_text(prompt, temperature=TEMPERATURE)
-    )
-    watch.task = task
-    try:
-        text = await task
-    except asyncio.CancelledError:
-        if watch.tripped:
-            raise _abort(
-                f"rate limit hit ({watch.evidence[0]}); run stopped", result, watch
-            ) from None
-        raise
-    except AppError as exc:
-        raise _abort(f"{type(exc).__name__}: {exc}", result, watch) from exc
-    finally:
-        watch.task = None
-    if watch.tripped:
-        raise _abort(f"rate limit hit ({watch.evidence[0]}); run stopped", result, watch)
-    return text
+async def _call_with_backoff(
+    client: LLMClient,
+    meeting_id: str,
+    attempt: int,
+    prompt: str,
+    result: GenerationResult,
+    *,
+    sleep: Callable[[float], Awaitable[None]],
+    clock: Callable[[], float],
+    backoff_seconds: float,
+    max_retries: int,
+) -> tuple[str, float]:
+    """One request; a 429 is backed off (exponential, bounded) and retried, then re-raised."""
+    retries = 0
+    while True:
+        started = clock()
+        try:
+            text = await client.complete_text(prompt, temperature=TEMPERATURE)
+        except RateLimitedError:
+            result.timings.append(
+                CallTiming(meeting_id, attempt, clock() - started, 0, "RateLimitedError")
+            )
+            if retries >= max_retries:
+                raise
+            delay = backoff_seconds * (2**retries)
+            retries += 1
+            event = (
+                f"llm.rate_limited meeting={meeting_id} attempt={attempt} "
+                f"retry={retries}/{max_retries} backoff={delay:.0f}s"
+            )
+            result.rate_limit_events.append(event)
+            logger.warning(event)
+            await sleep(delay)
+            continue
+        return text, clock() - started
 
 
 def _select(seed: Seed, only: set[str] | None, include_m6: bool) -> list[dict[str, object]]:
@@ -297,9 +263,12 @@ async def generate_transcripts(
     include_m6: bool = False,
     force: bool = False,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    rate_limit_backoff_seconds: float = DEFAULT_RATE_LIMIT_BACKOFF_SECONDS,
+    max_rate_limit_retries: int = DEFAULT_MAX_RATE_LIMIT_RETRIES,
+    max_parallel: int = MAX_PARALLEL_LANES,
     clock: Callable[[], float] = time.monotonic,
 ) -> GenerationResult:
-    """Generate the selected transcripts one request at a time. See module docstring."""
+    """Generate the selected transcripts. See the module docstring for the rules."""
     result = GenerationResult()
     meetings = _select(seed, only, include_m6)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -308,73 +277,100 @@ async def generate_transcripts(
     if any(m["id"] == LIVE_MEETING_ID for m in meetings) and live_path.exists():
         raise RefuseOverwriteError(f"{live_path.name} already exists; refusing to overwrite it.")
 
-    first_call = True
-    with watching_rate_limits() as watch:
-        for meeting in meetings:
-            mid = str(meeting["id"])
-            is_live = mid == LIVE_MEETING_ID
-            path = out_dir / transcript_filename(meeting)
-            if path.exists() and not is_live and not force:
-                result.skipped.append(mid)
-                continue
-            word_range = LIVE_WORDS if is_live else DEFAULT_WORDS
-            duration = None if is_live else DEFAULT_DURATION_MINUTES
-            base_prompt = render_prompt(
-                seed,
-                meeting,
-                target_words=(LIVE_LENGTH if is_live else GENERATED_LENGTH)[0],
-                max_words=(LIVE_LENGTH if is_live else GENERATED_LENGTH)[1],
-                minutes=LIVE_MINUTES if is_live else DEFAULT_MINUTES,
-            )
-            attempts = 1 if is_live else max_attempts
-            prompt = base_prompt
-            problems: list[str] = []
-            for attempt in range(1, attempts + 1):
-                if not first_call and pause_seconds > 0:
-                    await sleep(pause_seconds)
-                first_call = False
-                started = clock()
-                try:
-                    text = await _one_call(client, prompt, watch, result)
-                except GenerationAborted:
-                    result.timings.append(CallTiming(mid, attempt, clock() - started, 0))
-                    raise
-                seconds = clock() - started
-                text = text.strip() + "\n"
-                problems = check_transcript(
-                    seed, seed.meeting(mid), text, words=word_range, duration=duration
-                )
-                result.attempt_problems.setdefault(mid, []).append(problems)
-                words = sum(len(line.split(": ", 1)[-1].split()) for line in text.splitlines())
-                result.timings.append(CallTiming(mid, attempt, seconds, words))
-                logger.info(
-                    "gen.call meeting=%s attempt=%d seconds=%.1f words=%d problems=%d",
+    async def process(meeting: dict[str, object], first: bool) -> None:
+        mid = str(meeting["id"])
+        is_live = mid == LIVE_MEETING_ID
+        path = out_dir / transcript_filename(meeting)
+        word_range = LIVE_WORDS if is_live else DEFAULT_WORDS
+        duration = None if is_live else DEFAULT_DURATION_MINUTES
+        base_prompt = render_prompt(
+            seed, meeting, minutes=LIVE_MINUTES if is_live else DEFAULT_MINUTES
+        )
+        prompt = base_prompt
+        history = result.attempt_problems.setdefault(mid, [])
+        for attempt in range(1, (1 if is_live else max_attempts) + 1):
+            if (attempt > 1 or not first) and pause_seconds > 0:
+                await sleep(pause_seconds)
+            started = clock()
+            try:
+                text, seconds = await _call_with_backoff(
+                    client,
                     mid,
                     attempt,
-                    seconds,
-                    words,
-                    len(problems),
+                    prompt,
+                    result,
+                    sleep=sleep,
+                    clock=clock,
+                    backoff_seconds=rate_limit_backoff_seconds,
+                    max_retries=max_rate_limit_retries,
                 )
-                if is_live:
-                    write_transcript(path, text, overwrite=False)
-                    result.written.append(mid)
-                    result.draft_problems = problems
-                    break
-                if not problems:
-                    write_transcript(path, text, overwrite=force)
-                    result.written.append(mid)
-                    break
-                prompt = (
-                    base_prompt
-                    + "\n\nPrevious attempt was rejected for these reasons; fix them:\n"
-                    + "\n".join(f"- {p}" for p in problems[:8])
+            except AppError as exc:
+                if not isinstance(exc, RateLimitedError):
+                    result.timings.append(
+                        CallTiming(mid, attempt, clock() - started, 0, type(exc).__name__)
+                    )
+                logger.warning(
+                    "gen.error meeting=%s attempt=%d error=%s", mid, attempt, type(exc).__name__
                 )
-            else:
-                result.failed.append(mid)
-                result.failure_details[mid] = problems
-                raise GenerationAborted(
-                    f"{mid} failed validation after {max_attempts} attempts; run stopped", result
+                history.append([f"{type(exc).__name__}: {exc}"])
+                prompt = base_prompt
+                continue
+            text = text.strip() + "\n"
+            problems = check_transcript(
+                seed, seed.meeting(mid), text, words=word_range, duration=duration
+            )
+            words = spoken_words(text)
+            history.append(problems)
+            result.timings.append(CallTiming(mid, attempt, seconds, words))
+            logger.info(
+                "gen.call meeting=%s attempt=%d seconds=%.1f words=%d problems=%d",
+                mid,
+                attempt,
+                seconds,
+                words,
+                len(problems),
+            )
+            if is_live:
+                write_transcript(path, text, overwrite=False)
+                result.written.append(mid)
+                result.draft_problems = problems
+                return
+            if not problems:
+                write_transcript(path, text, overwrite=force)
+                result.written.append(mid)
+                return
+            feedback = [p for p in problems if not _is_length_problem(p)]
+            prompt = base_prompt
+            if feedback:
+                prompt += (
+                    "\n\nPrevious attempt was rejected for these reasons; fix them:\n"
+                    + "\n".join(f"- {p}" for p in feedback[:8])
                 )
+        result.failed.append(mid)
+        result.failure_details[mid] = history[-1] if history else []
+
+    lanes: dict[str, list[dict[str, object]]] = {}
+    for meeting in meetings:
+        mid = str(meeting["id"])
+        if (
+            (out_dir / transcript_filename(meeting)).exists()
+            and mid != LIVE_MEETING_ID
+            and not force
+        ):
+            result.skipped.append(mid)
+            continue
+        lanes.setdefault(str(meeting["account_id"]), []).append(meeting)
+
+    semaphore = asyncio.Semaphore(max_parallel)
+
+    async def lane(items: list[dict[str, object]]) -> None:
+        async with semaphore:
+            for index, meeting in enumerate(items):
+                await process(meeting, first=index == 0)
+
+    started_all = clock()
+    await asyncio.gather(*(lane(items) for items in lanes.values()))
+    result.total_seconds = clock() - started_all
     return result
 
 
@@ -387,10 +383,11 @@ def timing_summary(result: GenerationResult) -> str:
     secs = [t.seconds for t in result.timings]
     lines = [
         f"calls={len(secs)} min={min(secs):.1f}s median={statistics.median(secs):.1f}s "
-        f"max={max(secs):.1f}s total={sum(secs):.1f}s"
+        f"max={max(secs):.1f}s sum={sum(secs):.1f}s wall_clock={result.total_seconds:.1f}s"
     ]
     for t in result.timings:
-        lines.append(f"  {t.meeting_id} attempt={t.attempt} {t.seconds:.1f}s words={t.words}")
+        note = f" error={t.error}" if t.error else ""
+        lines.append(f"  {t.meeting_id} attempt={t.attempt} {t.seconds:.1f}s words={t.words}{note}")
     return "\n".join(lines)
 
 
@@ -432,23 +429,15 @@ def main(argv: list[str] | None = None) -> int:
     except RefuseOverwriteError as exc:
         print(f"REFUSED: {exc}")
         return 3
-    except GenerationAborted as exc:
-        print(f"ABORTED: {exc.reason}")
-        for line in exc.result.rate_limit_evidence:
-            print(f"evidence: {line}")
-        for mid, attempts in exc.result.attempt_problems.items():
-            if mid in exc.result.failure_details:
-                for n, reasons in enumerate(attempts, start=1):
-                    print(f"  {mid} attempt {n}: {reasons}")
-        print(f"written before abort: {exc.result.written}")
-        print(timing_summary(exc.result))
-        return 2
 
     print(f"written: {result.written}")
     print(f"skipped (already exist): {result.skipped}")
     print(f"failed validation after retries (not written): {result.failed}")
-    for mid, details in result.failure_details.items():
-        print(f"  {mid}: {details}")
+    for mid in result.failed:
+        for n, reasons in enumerate(result.attempt_problems.get(mid, []), start=1):
+            print(f"  {mid} attempt {n}: {reasons}")
+    for event in result.rate_limit_events:
+        print(f"rate limit: {event}")
     if result.draft_problems:
         print(f"{LIVE_MEETING_ID} draft findings (not fixed): {result.draft_problems}")
     print(timing_summary(result))

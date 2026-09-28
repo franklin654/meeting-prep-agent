@@ -34,7 +34,7 @@ SEED_DIR = _HERE.parent / "seed"
 TRANSCRIPTS_DIR = SEED_DIR / "transcripts"
 
 LIVE_MEETING_ID = "m6_finedge"
-DEFAULT_WORDS = (900, 2000)  # accepted spoken words (spec generation rule 6, widened)
+DEFAULT_WORDS = (400, 6000)  # spoken words: minimum 400; 6,000 is only a runaway-output cap
 LIVE_WORDS = (600, 800)  # spec: "Live demo meeting" (about 600-800 words)
 DEFAULT_DURATION_MINUTES = (20, 40)  # spec: generation rule 6
 EXPECTED_MEETINGS = 17
@@ -132,6 +132,12 @@ def parse_transcript(text: str) -> tuple[list[Utterance], list[str]]:
     return utterances, bad
 
 
+def spoken_words(text: str) -> int:
+    """Spoken-word count: words in utterance text only (no timestamps or speaker labels)."""
+    utterances, _ = parse_transcript(text)
+    return sum(len(u.text.split()) for u in utterances)
+
+
 def _term_regex(term: str) -> re.Pattern[str]:
     return re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)", re.IGNORECASE)
 
@@ -180,7 +186,7 @@ def check_transcript(
                 f"duration: {minutes:.0f} min of timestamps, expected {duration[0]}-{duration[1]}"
             )
 
-    count = sum(len(u.text.split()) for u in utterances)
+    count = sum(len(u.text.split()) for u in utterances)  # spoken words only
     if not words[0] <= count <= words[1]:
         problems.append(f"word count: {count} words, expected {words[0]}-{words[1]}")
 

@@ -240,7 +240,7 @@ It must NOT mention: {forbidden}
 Format: one utterance per line:
 [{date}T<hh:mm:ss>+05:30] <Full Name> (<Role>, <Company>): <words>
 Include greetings, small talk, filler words, interruptions, one tangent, and a
-next-steps wrap-up. Aim for about {target_words} words of spoken dialogue; never exceed {max_words}.
+next-steps wrap-up. Write the meeting at its natural length; do not shorten it or pad it.
 ```
 
 ## Prompt rules and testing

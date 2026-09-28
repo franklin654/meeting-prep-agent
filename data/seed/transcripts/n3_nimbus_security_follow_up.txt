@@ -1,0 +1,111 @@
+[2026-04-14T09:00:00+05:30] Priya Nair (Account Executive, Tracewise): Morning, Deepak. Thanks for making the time. How are you doing? Is this still a good half hour, or has something landed on your calendar?
+
+[2026-04-14T09:00:35+05:30] Deepak Joshi (CISO, Nimbus Logistics): Morning, Priya. Half hour is good. A dispatch review just finished, so I’m finally in a room with a door that closes. How about you?
+
+[2026-04-14T09:01:06+05:30] Priya Nair (Account Executive, Tracewise): Not bad. Bengaluru’s doing that thing where it looks sunny from the window and then you step outside and immediately regret not carrying an umbrella.
+
+[2026-04-14T09:01:39+05:30] Deepak Joshi (CISO, Nimbus Logistics): We had the same yesterday. I got caught between the parking area and the office, which is not far enough to justify an umbrella but somehow far enough to get soaked.
+
+[2026-04-14T09:02:12+05:30] Priya Nair (Account Executive, Tracewise): That’s the worst distance. Anyway, I’ll keep us focused. I have the security follow-up, then a quick check on the operations use case and what a sensible next step looks like.
+
+[2026-04-14T09:02:45+05:30] Deepak Joshi (CISO, Nimbus Logistics): Sounds right. I’ve got my notes from the last review, and I can give you a direct read on where we are.
+
+[2026-04-14T09:03:18+05:30] Priya Nair (Account Executive, Tracewise): Great. On March 10, we talked about late shipment data breaking the weekly reports and the roughly 70 pipelines your team has to keep an eye on. Is that still the right starting point?
+
+[2026-04-14T09:03:53+05:30] Deepak Joshi (CISO, Nimbus Logistics): Yes. The underlying issue hasn’t changed. When updates arrive late, the report can look complete while it’s actually missing a chunk of shipment activity. Then people spend the morning reconciling it.
+
+[2026-04-14T09:04:26+05:30] Priya Nair (Account Executive, Tracewise): And the intention is still to catch the delay and show its impact before the weekly report goes out, rather than add another dashboard someone has to remember to check?
+
+[2026-04-14T09:04:59+05:30] Deepak Joshi (CISO, Nimbus Logistics): Exactly. If it just creates another screen, adoption will be a struggle. We need an alert that points to the affected data flow and tells the team what needs attention.
+
+[2026-04-14T09:05:31+05:30] Priya Nair (Account Executive, Tracewise): That matches what I captured. We can start with the shipment feeds connected to that report, set thresholds with your team, and avoid turning on broad notifications before anyone has agreed what’s actionable.
+
+[2026-04-14T09:06:05+05:30] Deepak Joshi (CISO, Nimbus Logistics): Good. The other thing I wanted to settle today is the review from March 24. SOC 2 Type II and India data residency were blockers for me then.
+
+[2026-04-14T09:06:38+05:30] Priya Nair (Account Executive, Tracewise): Right. I said I’d get you access to our trust portal and send the pen-test summary by Mar 31. I want to make sure we close the loop on those materials before I assume anything.
+
+[2026-04-14T09:07:12+05:30] Deepak Joshi (CISO, Nimbus Logistics): I can confirm I received access to the trust portal and the pen-test summary. I’ve been through the relevant sections, and I shared the material with our security reviewers.
+
+[2026-04-14T09:07:46+05:30] Priya Nair (Account Executive, Tracewise): Thanks for confirming. What did they focus on most? I’d rather hear where they still have questions than guess from the document views or send you a pile of generic follow-up material.
+
+[2026-04-14T09:08:18+05:30] Deepak Joshi (CISO, Nimbus Logistics): Their main focus was the control evidence and how the hosting arrangement works for our data. They also wanted to know who can access production and how that access is reviewed.
+
+[2026-04-14T09:08:51+05:30] Priya Nair (Account Executive, Tracewise): Understood. The portal lays out the controls and the review cadence, and the architecture material describes the data location. For any specific point, I can route it to the right owner instead of paraphrasing.
+
+[2026-04-14T09:09:25+05:30] Deepak Joshi (CISO, Nimbus Logistics): That’s helpful. I also wanted to say directly that the trust portal and the pen-test summary were exactly what I needed. The information was clear enough to review without a long round of interpretation.
+
+[2026-04-14T09:09:58+05:30] Priya Nair (Account Executive, Tracewise): I’m glad they were useful. I’ll pass that feedback to the team. Did the reviewers flag anything in the test summary that needs a written response, or were they comfortable with the explanation provided?
+
+[2026-04-14T09:10:31+05:30] Deepak Joshi (CISO, Nimbus Logistics): They were comfortable with it. One reviewer asked me to confirm that the scope was clear, but the summary states what was tested and when. I don’t need a separate response on that.
+
+[2026-04-14T09:11:04+05:30] Priya Nair (Account Executive, Tracewise): Great. On residency, I want to be precise. Your requirement is that Nimbus shipment data stays in India, including the stored data used by the service. Is that an accurate summary?
+
+[2026-04-14T09:11:37+05:30] Deepak Joshi (CISO, Nimbus Logistics): Yes, that’s the key requirement. We also need the implementation team to understand what data is sent, where it’s processed, and what metadata is retained.
+
+[2026-04-14T09:12:10+05:30] Priya Nair (Account Executive, Tracewise): I’ll make sure we walk through those details in implementation planning, not leave it as a sentence in a security document. We can map the actual fields with your technical owner.
+
+[2026-04-14T09:12:43+05:30] Deepak Joshi (CISO, Nimbus Logistics): That would work. I don’t want us to discover later that a field we considered harmless is actually sensitive or needs different handling.
+
+[2026-04-14T09:13:16+05:30] Priya Nair (Account Executive, Tracewise): Agreed. We can begin with the minimum fields needed to detect freshness and pipeline health, then validate the mapping before anyone connects a production source.
+
+[2026-04-14T09:13:49+05:30] Deepak Joshi (CISO, Nimbus Logistics): Good. I’d also like the access model included in that conversation. Our platform team will want to know how roles are assigned and how we remove access when someone changes teams.
+
+[2026-04-14T09:14:23+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. We’ll cover roles, provisioning, and offboarding with them. I’ll bring our implementation lead, and we can document the decisions so both teams have the same version.
+
+[2026-04-14T09:14:56+05:30] Deepak Joshi (CISO, Nimbus Logistics): That’s sensible. I can bring our platform lead and the person who owns the weekly reporting process. They’ll be able to answer the practical questions.
+
+[2026-04-14T09:15:28+05:30] Priya Nair (Account Executive, Tracewise): Perfect. Before I jump ahead, is there anything else your reviewers need from me? I can organize a technical follow-up if that’s better than trying to resolve detailed questions in this meeting.
+
+[2026-04-14T09:16:02+05:30] Deepak Joshi (CISO, Nimbus Logistics): No additional security document is needed right now. If something comes up as we plan the data mapping, I’ll send it over. The current review is complete on my side.
+
+[2026-04-14T09:16:35+05:30] Priya Nair (Account Executive, Tracewise): Thanks, that’s clear. I’ll note that the evidence review is complete and keep any remaining implementation questions separate, so they don’t get mistaken for unresolved security concerns.
+
+[2026-04-14T09:17:08+05:30] Deepak Joshi (CISO, Nimbus Logistics): Yes, please. It’s useful to distinguish a control review from the normal design questions. That makes it easier for me to give the other stakeholders an accurate update.
+
+[2026-04-14T09:17:41+05:30] Priya Nair (Account Executive, Tracewise): On the operations side, would it help to use one weekly report as the initial example? We could trace the shipment feeds behind it and agree what “late” means for each one.
+
+[2026-04-14T09:18:14+05:30] Deepak Joshi (CISO, Nimbus Logistics): Yes. One report is manageable. There are feeds where a short delay is normal, so we shouldn’t use one universal threshold and end up alarming the team every day.
+
+[2026-04-14T09:18:47+05:30] Priya Nair (Account Executive, Tracewise): Right, thresholds should reflect the feed’s schedule and the report deadline. We can also decide who receives an alert and what context they need before they start investigating.
+
+[2026-04-14T09:19:20+05:30] Deepak Joshi (CISO, Nimbus Logistics): Could the notification identify whether the delay is upstream or whether the pipeline itself failed? That distinction changes who we call first.
+
+[2026-04-14T09:19:53+05:30] Priya Nair (Account Executive, Tracewise): We can show the observed status and the dependencies that Tracewise can see. I’ll have our technical lead confirm the exact level of cause information for your setup rather than overpromise.
+
+[2026-04-14T09:20:26+05:30] Deepak Joshi (CISO, Nimbus Logistics): Good answer. I’d rather have a clear boundary on what it can tell us than a promise that turns into a surprise during the pilot.
+
+[2026-04-14T09:20:59+05:30] Priya Nair (Account Executive, Tracewise): Same here. Quick tangent before I forget: you mentioned the dispatch review. Is that the meeting where everyone tries to fix the spreadsheet while the meeting is still happening?
+
+[2026-04-14T09:21:32+05:30] Deepak Joshi (CISO, Nimbus Logistics): That’s the one. Someone usually shares a screen, notices a mismatch, and then three people start checking different copies. We’ve improved it, but it still happens.
+
+[2026-04-14T09:22:05+05:30] Priya Nair (Account Executive, Tracewise): I can picture it. We’ll spare that meeting the product pitch for now, but it’s a useful example of why the report needs a trustworthy freshness signal. Back to the plan.
+
+[2026-04-14T09:22:38+05:30] Deepak Joshi (CISO, Nimbus Logistics): Yes, let’s keep the first step narrow. If we can show the right people what’s stale before that meeting, we’ll have a fair way to judge whether this helps.
+
+[2026-04-14T09:23:11+05:30] Priya Nair (Account Executive, Tracewise): For the working session, I’ll send an agenda with three items: the data-field map, access roles, and the report’s feed schedule and alert rules. Anything you’d add?
+
+[2026-04-14T09:23:44+05:30] Deepak Joshi (CISO, Nimbus Logistics): Add ownership. We should name who maintains the thresholds and who reviews an alert when the usual person is away. Otherwise, a good setup can drift.
+
+[2026-04-14T09:24:17+05:30] Priya Nair (Account Executive, Tracewise): Good catch. I’ll add owners and backup coverage. I’ll also ask our implementation lead to share the checklist beforehand, so your platform team can point out gaps in advance.
+
+[2026-04-14T09:24:50+05:30] Deepak Joshi (CISO, Nimbus Logistics): That would make the session more efficient. I can send you the platform lead’s name and the reporting owner after this call, once I check their availability.
+
+[2026-04-14T09:25:23+05:30] Priya Nair (Account Executive, Tracewise): Thanks. I’ll send a couple of time options and the agenda today. If neither works, we can adjust; I won’t put something on their calendars without checking first.
+
+[2026-04-14T09:25:56+05:30] Deepak Joshi (CISO, Nimbus Logistics): Appreciate that. I’ll coordinate with them and come back with a preferred slot. Please include me, but I may only need to join for the security and data-handling portion.
+
+[2026-04-14T09:26:29+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. We can structure the session so you can step out after that, if the rest is just threshold tuning and report behavior. No need to keep you through every detail.
+
+[2026-04-14T09:27:02+05:30] Deepak Joshi (CISO, Nimbus Logistics): That works. And just so it’s unambiguous for your team, I’m giving security sign-off for Nimbus to proceed to the implementation planning stage.
+
+[2026-04-14T09:27:35+05:30] Priya Nair (Account Executive, Tracewise): Thank you, Deepak. I’ll record that clearly. We’ll keep the data mapping and access decisions as implementation tasks, with the owners and outcomes written down.
+
+[2026-04-14T09:28:08+05:30] Deepak Joshi (CISO, Nimbus Logistics): Good. I’ll send the two names, and I’ll flag any new questions if they come up. For now, the security review itself is not holding us up.
+
+[2026-04-14T09:28:41+05:30] Priya Nair (Account Executive, Tracewise): Great. I’ll send the agenda and time options today, then follow up with the confirmed session details once you’ve checked with them. I’ll include the checklist as well.
+
+[2026-04-14T09:29:14+05:30] Deepak Joshi (CISO, Nimbus Logistics): Sounds good. Thanks for keeping the follow-up practical, Priya. It’s helpful to have a clear distinction between what we’ve settled and what the working team still needs to design.
+
+[2026-04-14T09:29:47+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Deepak. I’ll do that, and I’ll make sure the technical lead is ready to answer the cause-detail question. Appreciate your time; have a good rest of the morning.
+
+[2026-04-14T09:30:00+05:30] Deepak Joshi (CISO, Nimbus Logistics): You too. Thanks, Priya. Talk soon.
