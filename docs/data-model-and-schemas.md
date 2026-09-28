@@ -173,7 +173,7 @@ The fixed ungrounded reply is `"Nothing in memory covers that yet."`, defined on
 
 ## Hindsight model
 
-One bank per user, a fixed tag vocabulary built only by `memory/tags.py`, and a `fact_kind` entity label that turns each extracted fact into a filterable tag. SDK call shapes below are illustrative; confirm them against the Hindsight Python SDK docs (version 0.10) before coding.
+One bank per user, a fixed tag vocabulary built only by `memory/tags.py`, and a `fact_kind` entity label that turns each extracted fact into a filterable tag. SDK call shapes below match `hindsight-client` 0.10.1 (checked with `inspect.signature`); the client is async, so calls are `aretain`, `arecall`, `areflect`.
 
 ### Bank config
 
@@ -211,20 +211,25 @@ The Hindsight FAQ shows `entity_labels` with `key`, `type`, `tag` and `descripti
 
 ```python
 # transcript: one document per meeting, stable id => re-ingest replaces it
-retain(bank_id=BANK_ID, documents=[{
-    "id": "meeting-m4_finedge",
-    "content": transcript_text,                 # timestamped, speaker-prefixed lines
-    "tags": ["account:acc_finedge", "contact:c_rahul", "contact:c_karan",
-             "meeting:m4_finedge", "kind:transcript"],
-    "metadata": {"meeting_id": "m4_finedge", "meeting_date": "2026-08-27",
-                 "title": "Pilot scoping", "source": "seed"},
-}])
+await client.aretain(
+    bank_id=BANK_ID,
+    content=transcript_text,                    # timestamped, speaker-prefixed lines
+    document_id="meeting-m4_finedge",
+    tags=["account:acc_finedge", "contact:c_rahul", "contact:c_karan",
+          "meeting:m4_finedge", "kind:transcript"],
+    metadata={"meeting_id": "m4_finedge", "meeting_date": "2026-08-27",
+              "title": "Pilot scoping", "source": "seed"},
+    timestamp=datetime(2026, 8, 27),
+    context="sales meeting transcript",
+)
 
 # preference: short sentence, no account tag
-retain(bank_id=BANK_ID, items=[{
-    "content": "On 2026-09-28 the user collapsed the personal touchpoints section.",
-    "tags": ["kind:preference"],
-}])
+await client.aretain(
+    bank_id=BANK_ID,
+    content="On 2026-09-28 the user collapsed the personal touchpoints section.",
+    tags=["kind:preference"],
+    context="brief feedback",
+)
 ```
 
 ### Recall plan per brief section
@@ -399,7 +404,7 @@ class ErrorResponse(BaseModel):
 | `memory_unavailable` | 503 | Hindsight unreachable or timing out |
 | `llm_timeout` | 504 | LLM call exceeded 30 s |
 | `llm_invalid_output` | 502 | LLM output failed validation after one retry |
-| `rate_limited` | 429 | Groq returned 429 after retries |
+| `rate_limited` | 429 | LLM provider (app or Hindsight) returned 429 after retries |
 
 ## Change rules
 

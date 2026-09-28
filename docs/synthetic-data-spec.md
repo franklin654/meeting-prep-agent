@@ -12,7 +12,7 @@ This spec defines 17 synthetic meetings across 4 accounts, built so the demo's s
 - **One source of truth:** Names, dates, numbers and promises in this doc win over anything a generated transcript says.
 - **Fixed clock:** The app reads `DEMO_TODAY=2026-09-28` so "overdue" and "3 weeks ago" give the same answer at every rehearsal.
 - **Fictional everything:** All companies, people and competitors are invented. No real brands, to avoid judges wondering about real customer data.
-- **Groq-friendly size:** Seeded transcripts are 900–1,500 words (about 8–12 minutes of talk), small enough to seed on the free tier.
+- **Free-tier-friendly size:** Seeded transcripts are 900–1,500 words (about 8–12 minutes of talk), small enough to seed on the free tier.
 
 ## Our company and persona
 
@@ -122,7 +122,7 @@ M6 is a short, fixed transcript (about 600–800 words) pasted on stage after th
 
 **After logging, the UI must show:** a "learned" toast listing the new budget, 2 new commitments and the updated deck due date; the contradiction alert on the account; and the contact timeline for Anita with today's entries.
 
-**Backup:** Keep a pre-ingested snapshot of the bank after M6 (`make demo-after-m6`) in case Groq rate limits hit on stage.
+**Backup:** Keep a pre-ingested snapshot of the bank after M6 (`make demo-after-m6`) in case provider rate limits hit on stage.
 
 ## File format and layout
 
@@ -163,7 +163,7 @@ data/seed/
 
 ## Generation rules for the coding agent
 
-The agent writes a script, `data/scripts/generate.py`, that turns `beats.json` into transcripts with Groq, one meeting at a time.
+The agent writes a script, `data/scripts/generate.py`, that turns `beats.json` into transcripts through the app's LLM client (`complete_text` for prompt G1, same `LLM_PROVIDER` as the app), one meeting at a time.
 
 1. Generate in date order. Each prompt includes the cast, the meeting's required facts, the previous meetings' one-line summaries, and 1–2 style reference excerpts.
 2. Required facts appear once, in natural speech, from the named speaker. Numbers and dates must match exactly.
@@ -196,7 +196,7 @@ AMI is used only to show the memory layer works on real, unscripted meetings; it
 
 **Why AMI:** Its scenario meetings are role-played by a four-person design team building a TV remote control prototype over a series of four meetings, so decisions and action items carry across meetings. [source](https://arxiv.org/pdf/2604.17260) Scenario meeting IDs end in a, b, c or d for the first to fourth meeting of a series. [source](https://groups.inf.ed.ac.uk/ami/corpus/meetingids.shtml) Action items are annotated too: 381 across 101 meetings. [source](https://arxiv.org/pdf/2303.16763) The corpus and its annotations are released under CC BY 4.0, so credit the corpus in the README and pitch. [source](https://groups.inf.ed.ac.uk/ami/corpus/license.shtml)
 
-**Why not demo data:** internal design team rather than a sales rep and a prospect, no budget or competitor facts, generic speaker labels instead of names, and long, disfluent transcripts that cost Groq quota.
+**Why not demo data:** internal design team rather than a sales rep and a prospect, no budget or competitor facts, generic speaker labels instead of names, and long, disfluent transcripts that cost LLM quota.
 
 ### Uses
 
@@ -210,6 +210,6 @@ AMI is used only to show the memory layer works on real, unscripted meetings; it
 
 - [ ] Use the manual transcripts and annotations, not audio
 - [ ] Map speaker letters to role names ("Project Manager", "Industrial Designer", "UI Designer", "Marketing Expert") before ingest so briefs read naturally
-- [ ] Trim each meeting to its first 2,000 words if Groq limits bite, and note the trimming in results
+- [ ] Trim each meeting to its first 2,000 words if provider limits bite, and note the trimming in results
 - [ ] Keep AMI data under `data/validation/ami/` and the bank `ami-test`; `make reset-demo` never touches it
-- [ ] Run as a script (`data/scripts/eval_ami.py`), not in CI, since it uses real Hindsight and Groq calls
+- [ ] Run as a script (`data/scripts/eval_ami.py`), not in CI, since it uses real Hindsight and LLM provider calls

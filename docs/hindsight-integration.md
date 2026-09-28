@@ -6,7 +6,7 @@ Companion to the [Data Model & Schemas](https://claude.ai/code/artifact/2a411140
 
 ## Setup
 
-Hindsight runs as one Docker service using Groq; the backend talks to it only through `hindsight-client`, and coding agents install the official `hindsight-docs` skill so they read real signatures instead of guessing.
+Hindsight runs as one Docker service; its LLM provider (`openai`, `groq` or `anthropic`) and model are set in `.env` via `HINDSIGHT_LLM_PROVIDER`, `HINDSIGHT_LLM_MODEL` and `HINDSIGHT_LLM_API_KEY`, independently of the app's provider; the backend talks to it only through `hindsight-client`, and coding agents install the official `hindsight-docs` skill so they read real signatures instead of guessing.
 
 ```yaml
 # docker-compose.yml (excerpt)
@@ -14,14 +14,15 @@ hindsight:
   image: ghcr.io/vectorize-io/hindsight:latest   # pin a version tag once chosen
   ports: ["8888:8888", "9999:9999"]              # API, UI
   environment:
-    HINDSIGHT_API_LLM_PROVIDER: groq             # verify name in Configuration docs
-    HINDSIGHT_API_LLM_API_KEY: ${GROQ_API_KEY}
+    HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER}   # openai | groq | anthropic
     HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_LLM_MODEL}
+    HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY}
+    HINDSIGHT_API_LLM_GROQ_SERVICE_TIER: on_demand         # only applies when the provider is groq
     HINDSIGHT_API_WORKER_ID: hindsight-demo-1    # stable, prevents stuck jobs
   volumes: ["hindsight-data:/home/hindsight/.pg0"]
 ```
 
-- **Model choice:** Reflect is driven by structured tool calls and fails loudly if the model or transport can't do tool calling, so the Groq model must support tool use. [source](https://hindsight.vectorize.io/developer/api/reflect) Pick it from the Hindsight model leaderboard. [source](https://hindsight.vectorize.io/faq)
+- **Model choice:** Reflect is driven by structured tool calls and fails loudly if the model or transport can't do tool calling, so Hindsight's model must support tool use, whatever the provider. [source](https://hindsight.vectorize.io/developer/api/reflect) Pick it from the Hindsight model leaderboard. [source](https://hindsight.vectorize.io/faq)
 - **Client:** `hindsight-client` pinned in `pyproject.toml`; one async client created at app startup and closed on shutdown (`aclose()`).
 - **Agent skill:** `npx skills add vectorize-io/hindsight-skills --skill hindsight-docs` in the repo, referenced from AGENTS.md. [source](https://github.com/vectorize-io/hindsight-skills)
 - **Health:** `GET /api/health` calls a cheap bank-stats request with a 2 s timeout.
@@ -34,12 +35,12 @@ Services call only these functions; each hides SDK details, builds tags through 
 | --- | --- | --- | --- |
 | `ensure_bank()` | app startup, seed | create/update bank with `BANK_CONFIG` | None |
 | `ensure_mental_models(accounts)` | startup, seed | create mental models if missing | None |
-| `retain_meeting(meeting, attendees, transcript)` | ingest | retain one document, id `meeting-<id>` | None |
-| `retain_note(text, scope)` | ask | retain item with scope tags + `kind:note` | None |
+| `retain_meeting(*, meeting_id, account_id, contact_ids, meeting_date, title, transcript, source="ingest")` | ingest | retain one document, id `meeting-<id>` | None |
+| `retain_note(*, text, scope_type, scope_id)` | ask | retain item with scope tags + `kind:note` | None |
 | `retain_preference(sentence)` | preferences | retain item tagged `kind:preference` | None |
-| `recall_facts(query, tags, fact_kind)` | brief | recall, `any_strict` tags, budget `mid` | `list[MemoryHit]` |
-| `reflect_structured(query, tags, schema)` | brief, reasoning, ask | reflect with `response_schema`, `include_facts=True` | `ReflectResult` |
-| `get_mental_model(name)` | brief | read mental model | `MentalModelText` |
+| `recall_facts(*, query, tags, fact_kind=None)` | brief | recall, `all_strict` tags, budget `mid` | `list[MemoryHit]` |
+| `reflect_structured(*, query, tags, schema, budget="mid")` | brief, reasoning, ask | reflect with `response_schema`, `include_facts=True`, `any_strict` tags, caller-supplied `budget` | `ReflectResult` |
+| `get_mental_model(name)` | brief | read mental model | `MentalModelText \| None` |
 | `timeline(contact_id)` | contacts API | recall scoped to `contact:<id>`, sorted by date | `list[MemoryHit]` |
 | `wait_until_idle(timeout_s)` | seed, golden tests | poll bank stats until no pending operations | bool |
 
@@ -117,7 +118,7 @@ Every Hindsight failure becomes a typed error the API maps to `memory_unavailabl
 | Reflect returns 500 (a retrieval tool failed or the model gave no answer) | Retry once after 2 s, then `MemoryUnavailable`. The docs say reflect fails rather than answering without evidence. [source](https://hindsight.vectorize.io/developer/api/reflect) |
 | `structured_output_error` present | Retry once; if it persists, drop that brief section and log it. The docs call this field retryable. [source](https://hindsight.vectorize.io/developer/api/reflect) |
 | Reflect found nothing relevant | Not an error: empty section, or the Ask "nothing in memory" reply |
-| Groq 429 inside Hindsight | Surfaces as slow or failed operations; seed script retains one at a time with backoff |
+| Provider 429 inside Hindsight (any provider) | Surfaces as slow or failed operations; seed script retains one at a time with backoff |
 | Retain still processing when a brief is requested | Brief proceeds; the UI shows "memory still updating" while the ingest job is pending |
 | Container restarted mid-operation | Stable `HINDSIGHT_API_WORKER_ID` prevents stuck operations. [source](https://hindsight.vectorize.io/faq) |
 

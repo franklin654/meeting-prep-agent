@@ -6,20 +6,20 @@ Companion to [Data Model & Schemas](https://claude.ai/code/artifact/2a411140-fa5
 
 ## Prompt inventory
 
-Four Groq prompts, five Hindsight reflect queries, and one offline generator prompt.
+Four app LLM prompts, five Hindsight reflect queries, and one offline generator prompt.
 
 | ID | File | Runs via | Called from | Output |
 | --- | --- | --- | --- | --- |
-| P1 | `extract_meeting.md` | Groq `complete_json` | ingest | `MeetingExtraction` |
-| P2 | `match_acknowledgements.md` | Groq `complete_json` | ingest | `AckMatches` |
-| P3 | `assemble_brief.md` | Groq `complete_json` | brief | `BriefDraft` |
-| P4 | `suggest_questions.md` | Groq `complete_json` | brief (for Ask panel) | `SuggestedQuestions` |
+| P1 | `extract_meeting.md` | LLM client `complete_json` | ingest | `MeetingExtraction` |
+| P2 | `match_acknowledgements.md` | LLM client `complete_json` | ingest | `AckMatches` |
+| P3 | `assemble_brief.md` | LLM client `complete_json` | brief | `BriefDraft` |
+| P4 | `suggest_questions.md` | LLM client `complete_json` | brief (for Ask panel) | `SuggestedQuestions` |
 | R1 | `reflect_objections.md` | Hindsight reflect | brief | `ObjectionReport` |
 | R2 | `reflect_contradictions.md` | Hindsight reflect | reasoning (after ingest) | `ContradictionReport` |
 | R3 | `reflect_cross_contact.md` | Hindsight reflect | brief | `GapReport` |
 | R4 | `reflect_patterns.md` | Hindsight reflect | brief | `PatternReport` |
 | R5 | `reflect_ask.md` | Hindsight reflect | ask | `ReflectAnswer` |
-| G1 | `generate_transcript.md` | Groq, offline script | `data/scripts/generate.py` | plain text transcript |
+| G1 | `generate_transcript.md` | LLM client `complete_text`, offline script | `data/scripts/generate.py` | plain text transcript |
 
 Preference memories are template sentences, not prompts (see Supporting prompts).
 
@@ -111,7 +111,7 @@ Rules:
   attendee roles only, with evidence_ids empty.
 ```
 
-**Evidence assembly (code, before the prompt):** mental model → recall hits per section → reflect outputs (objections, gaps, patterns) with their `based_on` ids → ledger rows → pinned Ask answers. Cap at 40 items, newest first within each group, to stay within Groq context limits.
+**Evidence assembly (code, before the prompt):** mental model → recall hits per section → reflect outputs (objections, gaps, patterns) with their `based_on` ids → ledger rows → pinned Ask answers. Cap at 40 items, newest first within each group, to stay within provider context limits.
 
 **Post-processing (code, after the prompt):** map `evidence_ids` to `Citation`s, drop unresolved ids, drop items left with no citations in `memory` mode, then apply `hidden_sections` and `section_order` from the style profile.
 
@@ -250,7 +250,7 @@ Prompts are code: versioned, tested, and changed only together with their output
 - [ ] Every prompt file starts with a header comment: ID, output model, temperature
 - [ ] Temperatures: P1, P2 at 0; P3, P4 at 0.3; G1 at 0.8; reflect uses Hindsight's own settings
 - [ ] Placeholders are filled with `str.format`-style keys only; no f-strings inside prompt files
-- [ ] Output schemas are sent as JSON schema to Groq's JSON mode and re-validated with Pydantic
+- [ ] Output schemas are sent as JSON schema through the selected provider's mechanism (openai structured outputs / JSON mode, groq JSON mode, anthropic forced tool call with `input_schema`) and re-validated with Pydantic
 - [ ] A prompt change reruns its fixture tests before merging
 
 | Prompt | Fixture test |

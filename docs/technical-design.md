@@ -14,7 +14,7 @@ Python FastAPI backend, self-hosted Hindsight in Docker for memory, SQLite for s
 | Package manager | uv | Fast installs, one lockfile, simple commands for agents |
 | Memory | Hindsight, self-hosted Docker image `ghcr.io/vectorize-io/hindsight` + `hindsight-client` Python SDK | Hackathon requirement; retain / recall / reflect, tags, mental models, reflect citations |
 | Structured store | SQLite via SQLModel | Contacts, accounts, meetings, commitments ledger, feedback. Zero setup; deterministic queries for overdue detection and UI lists |
-| LLM | Groq for both the app and Hindsight; model set by env var | Generous free tier and fast inference; Hindsight supports Groq as a provider. Free-tier rate limits apply (see Config) |
+| LLM | Switchable between `openai`, `groq` and `anthropic` via `.env`, set separately for the app and for Hindsight; model set by env var | One interface, no vendor lock-in; pick whichever provider has quota headroom. Free-tier rate limits apply (see Config) |
 | Frontend | React + Vite + TypeScript, Tailwind CSS, shadcn/ui, TanStack Query | Polished UI fast; AI agents are highly fluent in this stack |
 | Background work | FastAPI `BackgroundTasks` | Retain and reflect can take seconds; no Celery or Redis needed at hackathon scale |
 | Tests | pytest + httpx `AsyncClient`; Vitest for a few UI units | Golden-scenario tests are the agents' definition of done |
@@ -51,7 +51,7 @@ meeting-prep-agent/
 │  │  ├─ services/            # ingest.py, brief.py, reasoning.py, preferences.py
 │  │  ├─ memory/              # memory_service.py (only Hindsight caller), tags.py
 │  │  ├─ db/                  # models.py (SQLModel), repository.py, session.py
-│  │  ├─ llm/                 # client.py, prompts/*.md
+│  │  ├─ llm/                 # client.py, providers/ (openai, groq, anthropic adapters), prompts/*.md
 │  │  └─ core/                # errors, logging, time utils
 │  └─ tests/
 │     ├─ unit/
@@ -81,7 +81,8 @@ Each module has one job and a narrow interface; routers stay thin and call servi
 | `memory/memory_service.py` | Wrapper over `hindsight-client`: bank setup, `retain_meeting`, `retain_note`, `recall`, `reflect`, mental model helpers, tag building. Only file that imports the SDK | Hindsight |
 | `memory/tags.py` | Tag conventions as functions (`account_tag(id)`, `contact_tag(id)`…) so nobody hand-types tag strings | — |
 | `db/repository.py` | All SQLite reads and writes | SQLModel |
-| `llm/client.py` | One function for structured calls (`complete_json(prompt, schema)`) and one for text; retries and timeouts | provider SDK |
+| `llm/client.py` | `complete_json(prompt, schema)` for structured calls and `complete_text(prompt) -> str` for plain text; retries and timeouts | `llm/providers/` |
+| `llm/providers/` | One adapter per provider (`openai`, `groq`, `anthropic`) behind the client; the only place provider SDKs are imported | provider SDKs |
 
 A "no memory" mode flag on `brief.py` skips all memory calls. It powers the with vs without toggle and must use the same prompt so the comparison is fair.
 
@@ -178,6 +179,7 @@ Four flows carry the whole product; each is a straight sequence, so agents imple
 
 The app makes two kinds of LLM calls, extraction and brief assembly, both returning JSON validated against Pydantic models; everything else goes through Hindsight.
 
+- **Providers:** `llm/client.py` delegates to one adapter per provider in `llm/providers/`, chosen by `LLM_PROVIDER`; nothing outside `app/llm/` depends on the choice. Structured output per provider: `openai` uses structured outputs / JSON mode with the Pydantic JSON schema; `groq` uses its OpenAI-compatible API with JSON mode; `anthropic` uses a forced tool call whose `input_schema` is the Pydantic JSON schema. The result is always re-validated with Pydantic.
 - **Structured only:** Every app call uses `complete_json(prompt, PydanticModel)`. Invalid JSON gets one retry with the validation error appended, then the job fails loudly.
 - **Prompts as files:** Prompts live in `backend/app/llm/prompts/*.md` with `{placeholders}`, never inline strings, so the prompt spec doc maps one-to-one to files.
 - **Grounding rule:** The brief prompt receives only recalled memories, reflect output and ledger rows, each with an id. The model must cite those ids; uncited items are dropped in code, not trusted to the prompt.
@@ -209,12 +211,12 @@ The demo runs locally only, with Docker Compose; the service will not be hosted.
 - **Services:** `hindsight` (ports 8888 API, 9999 UI, data volume), `api` (FastAPI on 8000), `web` (Vite on 5173, proxies `/api`).
 - **Stable worker id:** Set `HINDSIGHT_API_WORKER_ID` to a fixed value in compose. The docs warn that Docker's rotating hostname otherwise leaves background jobs stuck after a restart. [source](https://hindsight.vectorize.io/faq)
 - **Machine:** Self-hosted Hindsight needs at least 4 GB RAM. [source](https://hindsight.vectorize.io/faq)
-- **Env vars (`.env.example`):** `LLM_PROVIDER`=groq, `LLM_MODEL`, `LLM_API_KEY`, `HINDSIGHT_URL`, the Hindsight container's own LLM settings (names per the Hindsight installation docs), `DATABASE_URL=sqlite:///./app.db`, `DEMO_USER_ID`.
+- **Env vars (`.env.example`):** `LLM_PROVIDER` (`openai` | `groq` | `anthropic`), `LLM_MODEL`, one key per provider (`OPENAI_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`), `HINDSIGHT_URL`, `HINDSIGHT_LLM_PROVIDER`, `HINDSIGHT_LLM_MODEL`, `HINDSIGHT_LLM_API_KEY` (mapped in compose onto Hindsight's `HINDSIGHT_API_LLM_*`), `HINDSIGHT_API_LLM_GROQ_SERVICE_TIER=on_demand` (only applies when Hindsight uses groq), `DATABASE_URL=sqlite:///./app.db`, `DEMO_USER_ID`.
 - **Commands:** `docker compose up` → `uv run python data/scripts/seed.py` → open `localhost:5173`.
 - **Reset:** `make reset-demo` wipes the SQLite file and Hindsight bank, then reseeds, so every rehearsal starts identical.
 - **Fallback:** Hindsight Cloud is a managed option if local Docker is a problem on demo day; only `HINDSIGHT_URL` and a key change. [source](https://hindsight.vectorize.io/faq)
 
-**Groq rate limits:** Retain and reflect make several LLM calls each, so the free tier can throttle bulk seeding. The seed script retains meetings one at a time with a pause and retry on `429`, and seeding runs once before rehearsals rather than on every reset.
+**LLM rate limits:** Retain and reflect make several LLM calls each, so a provider's free tier can throttle bulk seeding. Groq's free tier (8,000 tokens/minute) could not finish one retain+reflect cycle, so choose Hindsight's provider for headroom first. The seed script retains meetings one at a time with a pause and retry on `429`, and seeding runs once before rehearsals rather than on every reset.
 
 ## Testing and quality gates
 
@@ -249,7 +251,7 @@ Settled choices; agents do not reopen these witHindsight, self-hosted Docker ima
 | D5 | One bank per user, tags for account and contact | Isolation plus scoped recall |
 | D6 | Uncited brief items dropped in code | Enforces the no-hallucination requirement |
 | D7 | React + Vite, not Next.js or Streamlit | Polished UI without SSR complexity |
-| D8 | Groq as the single LLM provider | Generous free tier; supported by Hindsight |
+| D8 | LLM provider switchable via `.env` (openai, groq, anthropic), replacing Groq-only | Groq's free tier (8,000 tokens/minute) could not finish one retain+reflect cycle; switching providers needs only env changes because all app calls go through one client with per-provider adapters |
 | D9 | Local demo only, no hosting | Keeps effort on the product; judges see a live local demo |
 | D10 | `fact_kind` entity labels with `tag: true` | Deterministic section-scoped recall (commitments, objections, personal, deal facts, competitors) |
 

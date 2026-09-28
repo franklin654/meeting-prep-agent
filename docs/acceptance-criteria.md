@@ -50,7 +50,7 @@ P1 features are judged on the same fixture; each maps to a story beat or a suppo
 
 ## Golden scenarios
 
-Four end-to-end tests against real Hindsight and Groq, each in a throwaway bank; together they are the demo, run as tests.
+Four end-to-end tests against real Hindsight and the configured LLM providers, each in a throwaway bank; together they are the demo, run as tests.
 
 1. **G-1 Pre-meeting brief (FinEdge M6).** Seed M1–M5 and supporting accounts → wait until idle → generate M6 brief. Assert B1 (overdue deck, critical), B2 pre-state (budget about $40K cited to M2), B3 (Ananya touchpoint), B4 (DataHawk watch-out), B5 (Anita gap), B6 is absent here (it belongs to Veda). Assert zero uncited items.
 2. **G-2 Without memory.** Same meeting in `no_memory` mode. Assert none of "pricing deck", "Ananya", "DataHawk", "40K" appear.
@@ -64,7 +64,8 @@ Golden tests allow wording to vary: they assert on citations, severities, IDs, d
 | Level | Scope | Runs | Tools |
 | --- | --- | --- | --- |
 | Unit | Services, tags, schemas, post-processing | Every PR, CI | pytest, fakes |
-| Prompt fixtures | P1–P4, R1–R5 on fixture inputs | On prompt change | pytest, live Groq |
+| Prompt fixtures | P1–P4, R1–R5 on fixture inputs | On prompt change | pytest, live configured provider |
+| Live LLM | One smoke call per provider through the client | On adapter change, before demo | pytest `-m live_llm`; skipped without that provider's key |
 | Contract | Hindsight SDK round trip | On SDK bump | pytest `-m live` |
 | Golden | G-1 to G-4 | Merge to `main`, before rehearsals | pytest `-m golden` |
 | Validation (optional) | AMI recall and extraction scores | Once, for the pitch | `eval_ami.py` |
@@ -78,6 +79,7 @@ Golden tests allow wording to vary: they assert on citations, severities, IDs, d
 - [ ] `DEMO_TODAY=2026-09-28` set; dashboard shows M6 and V4 as upcoming
 - [ ] Briefs for M6 (both modes) and V4 pre-generated and cached
 - [ ] `make demo-after-m6` snapshot exists and restores in under 1 minute
-- [ ] Groq quota checked on the morning of the demo
+- [ ] LLM quota checked on the morning of the demo, for both the app's provider and Hindsight's provider
+- [ ] Provider switching verified: each provider with a key passes the P1 fixture and returns a valid `BriefDraft`; an unknown provider or a missing key stops startup naming the variable, and no key is printed
 - [ ] Two full rehearsals timed under 90 seconds
 - [ ] Hindsight UI on port 9999 open in a spare tab as a backup memory view
