@@ -58,6 +58,10 @@ services:
       - "5173:5173"
     env_file:
       - .env
+    environment:
+      # Reach the api service over the compose network, not localhost — the
+      # vite dev server's /api proxy target (frontend/vite.config.ts).
+      VITE_API_PROXY_TARGET: http://api:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
