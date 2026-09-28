@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
+    "groq>=1.7.0",
 ]
 
 [dependency-groups]
