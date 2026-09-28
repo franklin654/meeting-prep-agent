@@ -1,0 +1,213 @@
+{
+  "meetings": [
+    {
+      "meeting_id": "m1_finedge",
+      "required_facts": [
+        {"id": "f_m1_incidents", "speaker": "c_rahul", "text": "3 pipeline incidents last quarter, one delayed a settlement report", "must_match": ["3 pipeline incidents|three pipeline incidents", "settlement report"]},
+        {"id": "f_m1_homegrown_alerts", "speaker": "c_karan", "text": "current alerts are homegrown Airflow checks", "must_match": ["Airflow"]},
+        {"id": "f_m1_pipeline_count", "speaker": "c_karan", "text": "about 40 pipelines", "must_match": ["40 pipelines"]},
+        {"id": "f_m1_ananya", "speaker": "c_rahul", "text": "Rahul's daughter Ananya starts college in Pune in September", "must_match": ["Ananya", "Pune", "college|university"], "beat": "B3"},
+        {"id": "f_m1_case_study_promise", "speaker": "c_priya", "text": "Priya promises a fintech case study by Jul 17", "must_match": ["case study", "Jul 17|July 17|17th"]}
+      ],
+      "forbidden": ["DataHawk", "SOC 2", "55 pipelines", "75K", "pricing deck", "Vikram"]
+    },
+    {
+      "meeting_id": "m2_finedge",
+      "required_facts": [
+        {"id": "f_m2_case_study_ack", "speaker": "c_karan", "text": "Karan thanks Priya for the case study", "must_match": ["case study"]},
+        {"id": "f_m2_budget", "speaker": "c_anita", "text": "Anita: budget is about $40K this fiscal year", "must_match": ["40K|\\$40,000|forty thousand", "budget"], "beat": "B2"},
+        {"id": "f_m2_decision_date", "speaker": "c_anita", "text": "decision by Oct 31", "must_match": ["Oct 31|October 31"]},
+        {"id": "f_m2_procurement", "speaker": "c_anita", "text": "procurement runs through Vikram Rao", "must_match": ["Vikram"]},
+        {"id": "f_m2_what_does_this_replace", "speaker": "c_anita", "text": "Anita asks \"what does this replace?\"", "must_match": ["what does this replace"]},
+        {"id": "f_m2_half_marathon", "speaker": "c_anita", "text": "Anita mentions training for the Mumbai half marathon (distractor)", "must_match": ["half marathon|marathon"]},
+        {"id": "f_m2_roi_promise", "speaker": "c_priya", "text": "Priya promises an ROI one-pager by Aug 5", "must_match": ["ROI one-pager|ROI one pager", "Aug 5|August 5|5th"]}
+      ],
+      "forbidden": ["55 pipelines", "SOC 2", "DataHawk", "75K", "pricing deck"]
+    },
+    {
+      "meeting_id": "m3_finedge",
+      "required_facts": [
+        {"id": "f_m3_roi_ack", "speaker": "c_rahul", "text": "Rahul confirms ROI one-pager received", "must_match": ["ROI one-pager|ROI one pager"]},
+        {"id": "f_m3_soc2_residency", "speaker": "c_sneha", "text": "Sneha: needs SOC 2 Type II and India data residency (RBI rules)", "must_match": ["SOC 2", "data residency|residency", "RBI"], "beat": "B5"},
+        {"id": "f_m3_datahawk", "speaker": "c_karan", "text": "Karan: \"we also had a look at DataHawk\"", "must_match": ["DataHawk"], "beat": "B4"},
+        {"id": "f_m3_pipeline_count", "speaker": "c_karan", "text": "pipeline count now 55 (above Growth plan limit)", "must_match": ["55 pipelines|55"]},
+        {"id": "f_m3_soc2_promise", "speaker": "c_priya", "text": "Priya promises SOC 2 report under NDA by Aug 14", "must_match": ["SOC 2", "NDA", "Aug 14|August 14|14th"]}
+      ],
+      "forbidden": ["75K", "pricing deck", "Vikram joined", "pilot on 10 pipelines"]
+    },
+    {
+      "meeting_id": "m4_finedge",
+      "required_facts": [
+        {"id": "f_m4_soc2_ack", "speaker": "c_rahul", "text": "Rahul thanks Priya for the SOC 2 report", "must_match": ["SOC 2"]},
+        {"id": "f_m4_pilot_scope", "speaker": "c_rahul", "text": "pilot on 10 pipelines, start by mid-October", "must_match": ["10 pipelines", "mid-October|mid October"]},
+        {"id": "f_deck_promise", "speaker": "c_priya", "text": "Priya promises a revised pricing deck with the pilot option by Sep 3", "must_match": ["pricing deck", "Sep 3|September 3|3rd"], "beat": "B1"},
+        {"id": "f_m4_dag_promise", "speaker": "c_karan", "text": "Karan promises sample DAG configs by Sep 5", "must_match": ["DAG configs", "Sep 5|September 5|5th"]}
+      ],
+      "forbidden": ["75K", "Vikram joined"]
+    },
+    {
+      "meeting_id": "m5_finedge",
+      "required_facts": [
+        {"id": "f_m5_dag_ack", "speaker": "c_priya", "text": "Priya thanks Karan for the DAG configs", "must_match": ["DAG configs"]},
+        {"id": "f_m5_ananya_move", "speaker": "c_karan", "text": "Rahul was out last week for his daughter's college move", "must_match": ["daughter|Ananya", "college"], "beat": "B3"},
+        {"id": "f_m5_payments_risk", "speaker": "c_karan", "text": "Anita asked whether the payments-risk team could join the rollout", "must_match": ["payments-risk|payments risk"]},
+        {"id": "f_m5_anita_gap", "speaker": "c_karan", "text": "Karan: Anita hasn't been in any of the security conversations", "must_match": ["Anita", "security"], "beat": "B5"},
+        {"id": "f_m5_waiting_distractor", "speaker": "c_karan", "text": "Karan: \"Rahul said he's still waiting on something from your side\" (never named, distractor)", "must_match": ["waiting on something"]},
+        {"id": "f_m5_next_call", "speaker": "c_priya", "text": "next call set for Sep 29 with Rahul, Anita, Karan", "must_match": ["Sep 29|September 29"]}
+      ],
+      "forbidden": ["75K", "pricing deck received", "thanks for the pricing deck", "got the pricing deck"]
+    },
+    {
+      "meeting_id": "m6_finedge",
+      "required_facts": [
+        {"id": "f_m6_budget_75k", "speaker": "c_anita", "text": "Anita: the budget is now \"closer to $75K\" because the payments-risk team is joining", "must_match": ["75K|\\$75,000", "payments-risk|payments risk"], "beat": "B2"},
+        {"id": "f_m6_deck_never_arrived", "speaker": "c_rahul", "text": "Rahul: \"we never did get that revised pricing deck\"", "must_match": ["never did get", "pricing deck"], "beat": "B1"},
+        {"id": "f_m6_deck_new_promise", "speaker": "c_priya", "text": "Priya apologises and promises the revised pricing deck by Oct 1", "must_match": ["Oct 1|October 1|1st", "pricing deck"], "beat": "B1"},
+        {"id": "f_m6_soc2_closes_gap", "speaker": "c_anita", "text": "Priya walks Anita through the SOC 2 report and India data residency; Anita: \"good, that was my main worry\"", "must_match": ["main worry", "SOC 2|data residency"], "beat": "B5"},
+        {"id": "f_m6_datahawk_price", "speaker": "c_anita", "text": "Anita asks how Tracewise compares with DataHawk on price", "must_match": ["DataHawk", "price"], "beat": "B4"},
+        {"id": "f_m6_ananya_settled", "speaker": "c_rahul", "text": "Rahul says the move went well and Ananya has settled in", "must_match": ["Ananya", "settled in|went well"], "beat": "B3"},
+        {"id": "f_m6_vikram_intro", "speaker": "c_karan", "text": "Karan introduces Vikram Rao for procurement by Oct 6", "must_match": ["Vikram", "Oct 6|October 6"]},
+        {"id": "f_m6_pilot_start", "speaker": "c_priya", "text": "pilot starts Oct 15", "must_match": ["Oct 15|October 15"]}
+      ],
+      "forbidden": [],
+      "note": "Hand-written per synthetic-data-spec.md's Live demo meeting section, not generated by T10's script. Kept here so the team drafting it (and G-3) can check required facts."
+    },
+    {
+      "meeting_id": "n1_nimbus",
+      "required_facts": [
+        {"id": "f_n1_late_shipments", "speaker": "c_meera", "text": "Late shipment data breaks weekly reports", "must_match": ["shipment", "weekly reports"]},
+        {"id": "f_n1_pipeline_count", "speaker": "c_meera", "text": "about 70 pipelines", "must_match": ["70 pipelines"]}
+      ],
+      "forbidden": ["SOC 2", "trust portal", "pen-test", "62K"]
+    },
+    {
+      "meeting_id": "n2_nimbus",
+      "required_facts": [
+        {"id": "f_n2_soc2_blocker", "speaker": "c_deepak", "text": "Deepak: SOC 2 Type II and India data residency are blockers", "must_match": ["SOC 2", "data residency|residency"], "beat": "B6"},
+        {"id": "f_n2_trust_portal_promise", "speaker": "c_priya", "text": "Priya promises trust portal access and pen-test summary by Mar 31", "must_match": ["trust portal", "pen-test summary|pen test summary", "Mar 31|March 31|31st"]}
+      ],
+      "forbidden": ["62K", "signed", "reference"]
+    },
+    {
+      "meeting_id": "n3_nimbus",
+      "required_facts": [
+        {"id": "f_n3_trust_portal_ack", "speaker": "c_deepak", "text": "Deepak confirms trust portal and pen-test summary received", "must_match": ["trust portal", "pen-test summary|pen test summary"]},
+        {"id": "f_n3_exactly_what_i_needed", "speaker": "c_deepak", "text": "Deepak: \"the trust portal and the pen-test summary were exactly what I needed\"", "must_match": ["exactly what I needed"], "beat": "B6"},
+        {"id": "f_n3_signoff", "speaker": "c_deepak", "text": "security sign-off given", "must_match": ["sign-off|sign off"]}
+      ],
+      "forbidden": ["62K", "contract signed"]
+    },
+    {
+      "meeting_id": "n4_nimbus",
+      "required_facts": [
+        {"id": "f_n4_signed", "speaker": "c_meera", "text": "Signed Enterprise at $62K", "must_match": ["62K|\\$62,000", "Enterprise"]},
+        {"id": "f_n4_reference", "speaker": "c_meera", "text": "Meera offers to be a reference", "must_match": ["reference"]}
+      ],
+      "forbidden": []
+    },
+    {
+      "meeting_id": "o1_orbit",
+      "required_facts": [
+        {"id": "f_o1_silent_failures", "speaker": "c_lakshmi", "text": "Stock-level pipelines fail silently", "must_match": ["stock-level|stock level", "fail silently"]},
+        {"id": "f_o1_tight_budget", "speaker": "c_lakshmi", "text": "budget \"tight this year\"", "must_match": ["tight this year"]}
+      ],
+      "forbidden": ["DataHawk", "40%", "lost"]
+    },
+    {
+      "meeting_id": "o2_orbit",
+      "required_facts": [
+        {"id": "f_o2_datahawk_price", "speaker": "c_sameer", "text": "Sameer: DataHawk quoted about 40% lower", "must_match": ["DataHawk", "40%|forty percent"]},
+        {"id": "f_o2_value_comparison_promise", "speaker": "c_priya", "text": "Priya promises a value comparison by Jun 25", "must_match": ["value comparison", "Jun 25|June 25|25th"]}
+      ],
+      "forbidden": ["lost", "reach back out"]
+    },
+    {
+      "meeting_id": "o3_orbit",
+      "required_facts": [
+        {"id": "f_o3_value_comparison_ack", "speaker": "c_lakshmi", "text": "Lakshmi confirms value comparison received", "must_match": ["value comparison"]},
+        {"id": "f_o3_lost", "speaker": "c_lakshmi", "text": "lost to DataHawk on price", "must_match": ["DataHawk", "price"]},
+        {"id": "f_o3_reach_back_out", "speaker": "c_lakshmi", "text": "Lakshmi: \"reach back out in Q1 if their residency roadmap slips\"", "must_match": ["reach back out", "Q1", "residency roadmap"]}
+      ],
+      "forbidden": []
+    },
+    {
+      "meeting_id": "v1_veda",
+      "required_facts": [
+        {"id": "f_v1_pipeline_count", "speaker": "c_nikhil", "text": "Patient-analytics pipelines, about 25", "must_match": ["patient-analytics|patient analytics", "25 pipelines|about 25"]},
+        {"id": "f_v1_sandbox_request", "speaker": "c_nikhil", "text": "Nikhil wants a sandbox", "must_match": ["sandbox"]}
+      ],
+      "forbidden": ["SOC 2", "sandbox access", "security review"]
+    },
+    {
+      "meeting_id": "v2_veda",
+      "required_facts": [
+        {"id": "f_v2_soc2_musthave", "speaker": "c_farah", "text": "Farah: SOC 2 Type II and patient-data handling are must-haves", "must_match": ["SOC 2", "patient data|patient-data"], "beat": "B6"},
+        {"id": "f_v2_sandbox_promise", "speaker": "c_priya", "text": "Priya promises sandbox access by Sep 17", "must_match": ["sandbox access", "Sep 17|September 17|17th"]}
+      ],
+      "forbidden": ["received", "security review set"]
+    },
+    {
+      "meeting_id": "v3_veda",
+      "required_facts": [
+        {"id": "f_v3_sandbox_ack", "speaker": "c_nikhil", "text": "Nikhil confirms sandbox access received, likes lineage view", "must_match": ["sandbox access", "lineage"]},
+        {"id": "f_v3_security_review_date", "speaker": "c_priya", "text": "security review set for Oct 1", "must_match": ["Oct 1|October 1"]}
+      ],
+      "forbidden": []
+    }
+  ],
+  "beats": [
+    {
+      "id": "B1",
+      "name": "Broken promise",
+      "planted_in": ["m4_finedge"],
+      "reinforced_in": ["m6_finedge"],
+      "feature": "Missed follow-up detection (6)",
+      "brief_for_m6_must_show": "Overdue, red: \"Revised pricing deck with pilot option, promised Aug 27, due Sep 3\", cited to M4",
+      "cited_to": ["m4_finedge"]
+    },
+    {
+      "id": "B2",
+      "name": "Budget change",
+      "planted_in": ["m2_finedge"],
+      "reinforced_in": ["m6_finedge"],
+      "feature": "Contradiction detection (12)",
+      "brief_for_m6_must_show": "Before M6: budget \"about $40K\" cited to M2. After live M6: alert \"$40K on Jul 28 → $75K on Sep 29\"",
+      "cited_to": ["m2_finedge", "m6_finedge"]
+    },
+    {
+      "id": "B3",
+      "name": "Personal detail",
+      "planted_in": ["m1_finedge"],
+      "reinforced_in": ["m5_finedge", "m6_finedge"],
+      "feature": "Personal touchpoints (4)",
+      "brief_for_m6_must_show": "\"Ask Rahul how Ananya's move to college in Pune went\", cited to M1 and M5",
+      "cited_to": ["m1_finedge", "m5_finedge"]
+    },
+    {
+      "id": "B4",
+      "name": "Competitor",
+      "planted_in": ["m3_finedge"],
+      "reinforced_in": ["m6_finedge"],
+      "feature": "Watch-outs (4)",
+      "brief_for_m6_must_show": "\"FinEdge has looked at DataHawk\", cited to M3",
+      "cited_to": ["m3_finedge"]
+    },
+    {
+      "id": "B5",
+      "name": "Security gap",
+      "planted_in": ["m3_finedge", "m5_finedge"],
+      "reinforced_in": ["m6_finedge"],
+      "feature": "Cross-contact intelligence (13)",
+      "brief_for_m6_must_show": "\"Sneha's SOC 2 and data-residency concerns were answered, but Anita hasn't heard them\", cited to M3 and M5",
+      "cited_to": ["m3_finedge", "m5_finedge"]
+    },
+    {
+      "id": "B6",
+      "name": "Cross-deal pattern",
+      "planted_in": ["n2_nimbus", "n3_nimbus", "v2_veda"],
+      "feature": "Pattern learning (16)",
+      "brief_for_m6_must_show": "\"SOC 2 objections at this stage were resolved at Nimbus with the trust portal and pen-test summary\", cited to Nimbus",
+      "cited_to": ["n2_nimbus", "n3_nimbus"]
+    }
+  ]
+}

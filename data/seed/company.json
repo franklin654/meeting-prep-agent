@@ -1,0 +1,49 @@
+{
+  "vendor": {
+    "name": "Tracewise",
+    "description": "Data observability platform: data pipeline monitoring, lineage, incident alerts",
+    "plans": [
+      {
+        "name": "Growth",
+        "price_usd_per_year": 36000,
+        "pipeline_limit": 50
+      },
+      {
+        "name": "Enterprise",
+        "price_usd_per_year": 75000,
+        "pipeline_limit": null,
+        "features": ["unlimited pipelines", "SSO", "India data residency"]
+      }
+    ],
+    "pilot": {
+      "name": "30-day paid pilot",
+      "price_usd": 5000,
+      "credited_on_purchase": true
+    },
+    "trust_assets": [
+      "SOC 2 Type II report (under NDA)",
+      "trust portal",
+      "annual pen-test summary"
+    ]
+  },
+  "ae": {
+    "contact_id": "c_priya",
+    "name": "Priya Nair",
+    "title": "Account Executive",
+    "location": "Bengaluru",
+    "years_in_saas_sales": 4,
+    "active_deals": 22
+  },
+  "sales_engineer": {
+    "contact_id": "c_arjun",
+    "name": "Arjun Menon",
+    "title": "Sales Engineer",
+    "role_note": "Joins technical calls"
+  },
+  "competitor": {
+    "name": "DataHawk",
+    "fictional": true,
+    "positioning": "Cheaper, no India data residency"
+  },
+  "demo_today": "2026-09-28"
+}

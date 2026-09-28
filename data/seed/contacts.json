@@ -1,0 +1,120 @@
+[
+  {
+    "id": "c_priya",
+    "name": "Priya Nair",
+    "account_id": null,
+    "role": "Account Executive",
+    "aliases": [],
+    "deal_role": "our_side",
+    "voice_and_traits": "Our AE, Bengaluru, 4 years in SaaS sales, 22 active deals. Runs every call.",
+    "note": "Not one of the spec's twelve account contacts; added as the AE so beats.json can cite her as a speaker (matches the beats.json worked example's \"c_priya\")."
+  },
+  {
+    "id": "c_arjun",
+    "name": "Arjun Menon",
+    "account_id": null,
+    "role": "Sales Engineer",
+    "aliases": [],
+    "deal_role": "our_side",
+    "voice_and_traits": "Joins technical calls"
+  },
+  {
+    "id": "c_rahul",
+    "name": "Rahul Mehta",
+    "account_id": "acc_finedge",
+    "role": "VP Engineering",
+    "aliases": [],
+    "deal_role": "technical_decision_maker",
+    "voice_and_traits": "Direct, impatient with fluff, jokes about on-call pain"
+  },
+  {
+    "id": "c_anita",
+    "name": "Anita Desai",
+    "account_id": "acc_finedge",
+    "role": "CFO",
+    "aliases": [],
+    "deal_role": "economic_buyer",
+    "voice_and_traits": "Numbers-first, asks \"what does this replace?\", polite but brief"
+  },
+  {
+    "id": "c_karan",
+    "name": "Karan Shah",
+    "account_id": "acc_finedge",
+    "role": "Data Platform Lead",
+    "aliases": ["KS"],
+    "deal_role": "champion",
+    "voice_and_traits": "Enthusiastic, over-shares, alias \"KS\" in notes"
+  },
+  {
+    "id": "c_sneha",
+    "name": "Sneha Iyer",
+    "account_id": "acc_finedge",
+    "role": "IT Security Manager",
+    "aliases": [],
+    "deal_role": "blocker_until_satisfied",
+    "voice_and_traits": "Precise, cites RBI data rules, asks for documents"
+  },
+  {
+    "id": "c_vikram",
+    "name": "Vikram Rao",
+    "account_id": "acc_finedge",
+    "role": "Procurement Manager",
+    "aliases": [],
+    "deal_role": "gatekeeper_not_met_yet",
+    "voice_and_traits": "Mentioned only; appears in the live meeting's next steps"
+  },
+  {
+    "id": "c_meera",
+    "name": "Meera Kulkarni",
+    "account_id": "acc_nimbus",
+    "role": "Head of Data",
+    "aliases": [],
+    "deal_role": "champion_signed",
+    "voice_and_traits": "Warm, gives referrals"
+  },
+  {
+    "id": "c_deepak",
+    "name": "Deepak Joshi",
+    "account_id": "acc_nimbus",
+    "role": "CISO",
+    "aliases": [],
+    "deal_role": "security_approver",
+    "voice_and_traits": "Was won over by the trust portal + pen-test summary"
+  },
+  {
+    "id": "c_farah",
+    "name": "Farah Siddiqui",
+    "account_id": "acc_veda",
+    "role": "Director of Engineering",
+    "aliases": [],
+    "deal_role": "technical_decision_maker",
+    "voice_and_traits": "Cautious, healthcare compliance focus"
+  },
+  {
+    "id": "c_nikhil",
+    "name": "Nikhil Reddy",
+    "account_id": "acc_veda",
+    "role": "Data Engineer",
+    "aliases": [],
+    "deal_role": "champion",
+    "voice_and_traits": "Hands-on, wants a sandbox"
+  },
+  {
+    "id": "c_lakshmi",
+    "name": "Lakshmi Pillai",
+    "account_id": "acc_orbit",
+    "role": "VP Data",
+    "aliases": [],
+    "deal_role": "decision_maker",
+    "voice_and_traits": "Price-sensitive"
+  },
+  {
+    "id": "c_sameer",
+    "name": "Sameer Khan",
+    "account_id": "acc_orbit",
+    "role": "Finance Controller",
+    "aliases": [],
+    "deal_role": "economic_buyer",
+    "voice_and_traits": "Pushed for DataHawk's price"
+  }
+]
