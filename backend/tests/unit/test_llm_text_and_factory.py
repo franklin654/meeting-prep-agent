@@ -85,6 +85,27 @@ def test_factory_picks_adapter_from_settings(
     assert type(client) is getattr(module, cls)
 
 
+@pytest.mark.parametrize("provider", ["groq", "openai", "anthropic"])
+def test_factory_passes_timeout_seconds_to_adapter(
+    monkeypatch: pytest.MonkeyPatch, provider: str
+) -> None:
+    for name in ("OPENAI_API_KEY", "GROQ_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", provider)
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv(f"{provider.upper()}_API_KEY", "not-a-real-key")
+    config = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    default = get_llm_client(config)
+    custom = get_llm_client(config, timeout_seconds=180)
+
+    assert default._timeout_seconds == 30.0  # type: ignore[attr-defined]
+    assert custom._timeout_seconds == 180  # type: ignore[attr-defined]
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            get_llm_client(config, timeout_seconds=bad)
+
+
 def test_factory_fails_fast_on_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("OPENAI_API_KEY", "GROQ_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
