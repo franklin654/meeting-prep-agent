@@ -33,10 +33,10 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T02b | `backend/Dockerfile` and `frontend/Dockerfile` | BE-core, FE | T01, T03 | `backend/Dockerfile`, `frontend/Dockerfile` | `docker compose build` and `docker compose up` bring up all three services (hindsight, api, web) cleanly | Done |
 | T03 | Frontend scaffold: Vite, React, TS, Tailwind, shadcn/ui, router, layout, OpenAPI client script | FE | — | `frontend/src/`, `package.json` | Three empty routes render; `npm run gen:api` works | Done |
 | T04 | AGENTS.md, hindsight-docs skill, CI (ruff, mypy, pytest, eslint, tsc) | BE-core | T01, T03 | `AGENTS.md`, `.github/workflows/ci.yml` | CI green on PR | Done |
-| T05 | All Pydantic models and enums from Data Model & Schemas | BE-core | T01 | `app/schemas/*` | Models import; round-trip JSON tests pass | Not started |
+| T05 | All Pydantic models and enums from Data Model & Schemas | BE-core | T01 | `app/schemas/*` | Models import; round-trip JSON tests pass | Done |
 | T06 | SQLModel tables, repository, session, reset | BE-core | T05 | `app/db/*` | CRUD tests pass; overdue query uses `demo_today` | Not started |
 | T07 | `tags.py`, `memory_service.py` (bootstrap, retain, recall, reflect, mental models, wait\_until\_idle), `FakeMemoryService`, live contract test | BE-core | T02, T05 | `app/memory/*`, `tests/fakes/` | Contract test passes against real Hindsight | Not started |
-| T08 | `llm/client.py` for Groq: `complete_json` with retry on invalid JSON, timeouts, 429 backoff; `FakeLLM` | BE-brief | T01 | `app/llm/client.py` | Unit tests for retry and error mapping pass | Not started |
+| T08 | `llm/client.py` for Groq: `complete_json` with retry on invalid JSON, timeouts, 429 backoff; `FakeLLM` | BE-brief | T01 | `app/llm/client.py` | Unit tests for retry and error mapping pass | Done |
 | T09 | Seed JSON: company, accounts, contacts, meetings, beats | DATA | — | `data/seed/*.json` | Matches Synthetic Data Spec tables exactly | Done |
 | T10 | Generator (G1) and validator; generate 15 transcripts; draft M6 for team edit | DATA | T08, T09 | `data/scripts/generate.py`, `validate.py`, `transcripts/` | Validator passes all 15; M6 reviewed | Not started |
 | T11 | Seed script through the real ingest path; `make reset-demo` | DATA | T10, T12 | `data/scripts/seed.py`, `Makefile` | Reset completes; bank and DB populated | Not started |
