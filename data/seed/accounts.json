@@ -1,0 +1,53 @@
+[
+  {
+    "id": "acc_finedge",
+    "name": "FinEdge Payments",
+    "city": "Mumbai",
+    "industry": "Fintech",
+    "size": 600,
+    "stage": "evaluation",
+    "deal_value_usd": 40000,
+    "deal_value_note": "$40K as of M2 (Jul 28); budget moves to $75K live on stage in M6 (Sep 29) – see beats.json B2",
+    "meetings_seeded": 5,
+    "meetings_total": 6,
+    "role_in_demo": "Hero: all story beats"
+  },
+  {
+    "id": "acc_nimbus",
+    "name": "Nimbus Logistics",
+    "city": "Pune",
+    "industry": "Logistics",
+    "size": 1200,
+    "stage": "closed_won",
+    "closed_date": "2026-06-02",
+    "deal_value_usd": 62000,
+    "meetings_seeded": 4,
+    "meetings_total": 4,
+    "role_in_demo": "Source of the SOC 2 answer that worked"
+  },
+  {
+    "id": "acc_veda",
+    "name": "Veda Health",
+    "city": "Hyderabad",
+    "industry": "Healthtech",
+    "size": 350,
+    "stage": "discovery",
+    "deal_value_usd": 30000,
+    "meetings_seeded": 3,
+    "meetings_total": 4,
+    "role_in_demo": "Same SOC 2 objection at stage 2; a meeting on the dashboard"
+  },
+  {
+    "id": "acc_orbit",
+    "name": "Orbit Retail",
+    "city": "Chennai",
+    "industry": "E-commerce",
+    "size": 900,
+    "stage": "closed_lost",
+    "closed_date": "2026-08-04",
+    "deal_value_usd": 45000,
+    "meetings_seeded": 3,
+    "meetings_total": 3,
+    "role_in_demo": "Lost to DataHawk on price; warning pattern"
+  }
+]
