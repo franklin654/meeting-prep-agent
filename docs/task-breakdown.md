@@ -30,7 +30,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Backend scaffold: uv project, FastAPI app, `config.py` with `demo_today`, error handler, `/api/health` stub | BE-core | — | `backend/app/main.py`, `config.py`, `core/` | App starts; health returns 200; error shape matches schemas doc | Done |
 | T02 | Docker Compose: hindsight (Groq, stable worker id, volume), api, web; `.env.example` | BE-core | — | `docker-compose.yml`, `.env.example` | `docker compose up` brings up all three; Hindsight UI on 9999 | Done |
-| T03 | Frontend scaffold: Vite, React, TS, Tailwind, shadcn/ui, router, layout, OpenAPI client script | FE | — | `frontend/src/`, `package.json` | Three empty routes render; `npm run gen:api` works | In progress (verifier FAIL: typescript/openapi-typescript peer conflict, fix in flight) |
+| T03 | Frontend scaffold: Vite, React, TS, Tailwind, shadcn/ui, router, layout, OpenAPI client script | FE | — | `frontend/src/`, `package.json` | Three empty routes render; `npm run gen:api` works | Done |
 | T04 | AGENTS.md, hindsight-docs skill, CI (ruff, mypy, pytest, eslint, tsc) | BE-core | T01, T03 | `AGENTS.md`, `.github/workflows/ci.yml` | CI green on PR | Not started |
 | T05 | All Pydantic models and enums from Data Model & Schemas | BE-core | T01 | `app/schemas/*` | Models import; round-trip JSON tests pass | Not started |
 | T06 | SQLModel tables, repository, session, reset | BE-core | T05 | `app/db/*` | CRUD tests pass; overdue query uses `demo_today` | Not started |
