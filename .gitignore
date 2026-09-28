@@ -1,0 +1,5 @@
+# Real secrets — never commit. .env.example is the tracked template.
+.env
+
+# OS cruft
+.DS_Store
