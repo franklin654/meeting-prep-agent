@@ -59,8 +59,9 @@ STYLE_REFS_DIR = SEED_DIR / "style_refs"
 TEMPERATURE = 0.8  # prompt-specs.md: G1 at 0.8
 DEFAULT_MINUTES = 30
 LIVE_MINUTES = 10
-DEFAULT_PAUSE_SECONDS = 5.0
-DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_PAUSE_SECONDS = 0.0
+CALL_TIMEOUT_SECONDS = 180.0  # per-call ceiling; a call exceeding it stops the run
+DEFAULT_MAX_ATTEMPTS = 3  # 1 try + at most 2 regenerations
 NO_STYLE_REFS = "(none provided; use ordinary, casual business speech between colleagues)"
 
 logger = logging.getLogger("data.generate")
@@ -328,7 +329,11 @@ async def generate_transcripts(
                     await sleep(pause_seconds)
                 first_call = False
                 started = clock()
-                text = await _one_call(client, prompt, watch, result)
+                try:
+                    text = await _one_call(client, prompt, watch, result)
+                except GenerationAborted:
+                    result.timings.append(CallTiming(mid, attempt, clock() - started, 0))
+                    raise
                 seconds = clock() - started
                 text = text.strip() + "\n"
                 problems = check_transcript(
@@ -361,6 +366,9 @@ async def generate_transcripts(
             else:
                 result.failed.append(mid)
                 result.failure_details[mid] = problems
+                raise GenerationAborted(
+                    f"{mid} failed validation after {max_attempts} attempts; run stopped", result
+                )
     return result
 
 
@@ -401,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
 
     seed = load_seed(args.seed_dir)
     out_dir = args.out_dir or (args.seed_dir / "transcripts")
-    client = get_llm_client()
+    client = get_llm_client(timeout_seconds=CALL_TIMEOUT_SECONDS)
     try:
         result = asyncio.run(
             generate_transcripts(
@@ -422,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ABORTED: {exc.reason}")
         for line in exc.result.rate_limit_evidence:
             print(f"evidence: {line}")
+        for mid, details in exc.result.failure_details.items():
+            print(f"  {mid}: {details}")
         print(f"written before abort: {exc.result.written}")
         print(timing_summary(exc.result))
         return 2

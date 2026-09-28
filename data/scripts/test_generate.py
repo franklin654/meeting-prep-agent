@@ -250,18 +250,49 @@ def test_failing_transcript_is_regenerated_and_not_written_if_it_keeps_failing(t
     fake2 = FakeLLM()
     for _ in range(2):
         fake2.queue_text("nonsense\n")
-    res2 = _run(
-        generate_transcripts(
-            fake2,
-            seed,
-            other,
-            pause_seconds=0,
-            sleep=NoSleep(),
-            only={"m1_test"},
-            max_attempts=2,
+    with pytest.raises(GenerationAborted) as exc:
+        _run(
+            generate_transcripts(
+                fake2,
+                seed,
+                other,
+                pause_seconds=0,
+                sleep=NoSleep(),
+                only={"m1_test"},
+                max_attempts=2,
+            )
         )
+    assert exc.value.result.failed == ["m1_test"] and list(other.iterdir()) == []
+    assert "m1_test" in exc.value.reason
+
+
+def test_default_is_three_attempts_no_pause_and_180s_timeout():
+    import generate
+
+    assert generate.DEFAULT_MAX_ATTEMPTS == 3
+    assert generate.DEFAULT_PAUSE_SECONDS == 0
+    assert generate.CALL_TIMEOUT_SECONDS == 180
+
+
+def test_main_builds_client_with_180s_timeout(monkeypatch, tmp_path: Path):
+    import generate
+
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(
+        "app.llm.client.get_llm_client",
+        lambda *a, **kw: seen.update(kw) or FakeLLM(),
     )
-    assert res2.failed == ["m1_test"] and list(other.iterdir()) == []
+    generate.main(["--out-dir", str(tmp_path), "--only", "nothing"])
+    assert seen == {"timeout_seconds": 180.0}
+
+
+def test_timed_out_call_is_timed_and_stops_the_run(tmp_path: Path):
+    seed = make_seed()
+    fake = FakeLLM()
+    fake.queue_text_error(LLMTimeoutError("slow"))
+    with pytest.raises(GenerationAborted) as exc:
+        _run(generate_transcripts(fake, seed, tmp_path, sleep=NoSleep()))
+    assert [t.meeting_id for t in exc.value.result.timings] == ["m1_test"]
 
 
 def test_typed_llm_error_aborts_the_run(tmp_path: Path):
