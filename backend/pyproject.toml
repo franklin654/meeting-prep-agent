@@ -12,6 +12,8 @@ dependencies = [
     "groq>=1.7.0",
     "sqlmodel>=0.0.22",
     "hindsight-client>=0.10.1",
+    "openai>=3.20.0",
+    "anthropic>=1.9.0",
 ]
 
 [dependency-groups]
@@ -34,7 +36,8 @@ packages = ["app"]
 testpaths = ["tests"]
 markers = [
     "live: contract tests against a real Hindsight instance",
-    "golden: end-to-end golden scenarios against real Hindsight and Groq",
+    "live_llm: one live smoke call per LLM provider; skipped without that provider's key",
+    "golden: end-to-end golden scenarios against real Hindsight and the configured LLM providers",
 ]
 asyncio_mode = "auto"
 

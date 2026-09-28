@@ -16,12 +16,14 @@ services:
       - "8888:8888" # API
       - "9999:9999" # UI
     environment:
-      # Hindsight's own LLM settings — names per docs/hindsight-integration.md
-      # "Setup". Reflect drives structured tool calls, so the chosen Groq model
-      # must support tool use (see technical-design.md Config section).
-      HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_API_LLM_PROVIDER}
-      HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_API_LLM_API_KEY}
-      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_API_LLM_MODEL}
+      # Hindsight's own LLM, set separately from the app's (docs/hindsight-integration.md
+      # "Setup"). The root .env uses HINDSIGHT_LLM_*; they are mapped here onto the names
+      # Hindsight reads. Reflect drives structured tool calls, so the chosen model must
+      # support tool calling, whichever provider (openai | groq | anthropic) is selected.
+      HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER}
+      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_LLM_MODEL}
+      HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY}
+      # Only applies when Hindsight uses groq; ignored for other providers.
       # Free-tier Groq keys don't have the `auto` service tier Hindsight
       # requests by default, which fails retain's fact extraction with a 400
       # ("service_tier auto is not available for this org"). Override to

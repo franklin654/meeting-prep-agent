@@ -1,4 +1,4 @@
-"""Unit tests for the Groq LLM gateway (T08).
+"""Unit tests for the Groq provider adapter (T08, ported in T08b).
 
 No real network calls: the Groq SDK client is replaced with a stub that returns
 canned `chat.completions.create` responses/exceptions in sequence. Covers the
@@ -18,7 +18,7 @@ from groq import APITimeoutError, RateLimitError
 from pydantic import BaseModel, ValidationError
 
 from app.core.errors import LLMInvalidOutputError, LLMTimeoutError, RateLimitedError
-from app.llm.client import GroqLLMClient
+from app.llm.providers.groq import GroqProvider
 from tests.fakes.fake_llm import FakeLLM
 
 
@@ -82,10 +82,10 @@ class FakeClock:
 
 def make_client(
     side_effects: list[Any], **kwargs: Any
-) -> tuple[GroqLLMClient, StubGroqClient, FakeClock]:
+) -> tuple[GroqProvider, StubGroqClient, FakeClock]:
     stub = StubGroqClient(side_effects)
     clock = FakeClock()
-    client = GroqLLMClient(client=stub, model="test-model", sleep=clock.sleep, **kwargs)
+    client = GroqProvider(client=stub, model="test-model", sleep=clock.sleep, **kwargs)
     return client, stub, clock
 
 
