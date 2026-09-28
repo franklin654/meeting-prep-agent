@@ -1,0 +1,95 @@
+[2026-09-29T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): Morning, Rahul, Anita, Karan. Thanks for making the time. I’ve got us down for a pilot decision today. I’ll keep us to ten minutes: confirm scope and timing, cover the open security and pricing questions, then agree next steps. Sound okay?
+
+[2026-09-29T10:00:19+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Yep. I have ten, maybe eleven if nobody says “quick question” at minute nine.
+
+[2026-09-29T10:00:27+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s usually me. I’ll try to behave.
+
+[2026-09-29T10:00:34+05:30] Priya Nair (Account Executive, Tracewise): Appreciate it, KS. Rahul, before we get into it, how did the college move go?
+
+[2026-09-29T10:00:42+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): The move went well and Ananya has settled in. Pune seems to have more boxes than actual rooms, but we survived. I was back online Monday.
+
+[2026-09-29T10:00:57+05:30] Priya Nair (Account Executive, Tracewise): Glad it went smoothly. And Anita, good to see you. Karan mentioned you’d be joining the rollout discussions with the payments-risk team.
+
+[2026-09-29T10:01:07+05:30] Anita Desai (CFO, FinEdge Payments): Yes. Their pipelines are part of the operational picture, so I want them included before we commit. That changes the budget: it’s now closer to $75K because the payments-risk team is joining.
+
+[2026-09-29T10:01:23+05:30] Priya Nair (Account Executive, Tracewise): Understood. That gives us a broader rollout to plan for. Before I get into the numbers, I also owe you an apology. We never sent the revised pricing deck after the scoping call. I’m sorry—I’ll send the revised pricing deck by Oct 1.
+
+[2026-09-29T10:01:40+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Right, we never did get that revised pricing deck. I’d rather not make a decision off the old version.
+
+[2026-09-29T10:01:51+05:30] Priya Nair (Account Executive, Tracewise): Fair. Please don’t use the old version to make a commitment. The new deck will show the pilot and the rollout assumptions separately, so we can see what the expanded team changes.
+
+[2026-09-29T10:02:05+05:30] Anita Desai (CFO, FinEdge Payments): And I want to be clear on the comparison. How does Tracewise compare with DataHawk on price?
+
+[2026-09-29T10:02:14+05:30] Priya Nair (Account Executive, Tracewise): I can compare the pricing structure, but I don’t want to guess at DataHawk’s quote. Tracewise is priced by monitored pipeline bands, with implementation and support called out separately in the deck. If you share their proposal—or even the relevant line items—I’ll make the comparison apples to apples.
+
+[2026-09-29T10:02:35+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can get that. Their quote may have a different definition of a monitored pipeline, though. Some of ours are really just a DAG with a couple of downstream checks, and then there are the settlement flows, which are—
+
+[2026-09-29T10:02:49+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Karan, save the taxonomy for the pilot.
+
+[2026-09-29T10:02:53+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yep. Sorry. I have it in a spreadsheet anyway.
+
+[2026-09-29T10:03:00+05:30] Priya Nair (Account Executive, Tracewise): That spreadsheet will help. I’ll make sure the deck says exactly what counts, rather than burying it in a footnote.
+
+[2026-09-29T10:03:12+05:30] Anita Desai (CFO, FinEdge Payments): Good. One small tangent, since we’re all here: I’m still trying to fit half-marathon training around quarter-end. The long run is winning.
+
+[2026-09-29T10:03:22+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That’s still better than getting paged during a long run. Our on-call system has managed that with impressive timing.
+
+[2026-09-29T10:03:31+05:30] Anita Desai (CFO, FinEdge Payments): I can imagine. All right, back to the decision.
+
+[2026-09-29T10:03:37+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. Anita, you weren’t in the earlier security sessions, so let me walk you through the SOC 2 report and the India data residency details. The report covers our controls and audit period; on residency, the deployment design keeps the customer data in the India region. I’ll send the architecture and the report securely after this call so your team can review the specifics.
+
+[2026-09-29T10:04:02+05:30] Anita Desai (CFO, FinEdge Payments): Good, that was my main worry. I’ll have our security person check the architecture against our requirements, but that answers the question I needed to settle today.
+
+[2026-09-29T10:04:16+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I’m good with that as a next step. I don’t want the pilot to turn into a security review that starts after we’ve already planned the work, though.
+
+[2026-09-29T10:04:26+05:30] Priya Nair (Account Executive, Tracewise): Agreed. I’ll send the documents today, and we’ll treat any security feedback as an explicit pilot gate, not a surprise in the middle. Karan, are the sample DAG configs still representative of what you want to test?
+
+[2026-09-29T10:04:40+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yes. I sent the configs over, and I’ve got a shortlist of ten pipelines. It includes a settlement-report flow, a couple of high-volume payment-risk ones, and some less dramatic jobs so we can see how setup feels when nothing is on fire.
+
+[2026-09-29T10:04:58+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Make sure one of the test cases is an actual failure, not just a green dashboard tour. We need to know whether the alert tells the on-call engineer what broke and where to look.
+
+[2026-09-29T10:05:10+05:30] Priya Nair (Account Executive, Tracewise): Yes. We can use one controlled failure and check detection time, alert usefulness, and how much manual investigation it takes. For the settlement flow, we can also verify whether the right people get notified without generating noise for the whole team.
+
+[2026-09-29T10:05:27+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s the part I’m keen on. Our current checks are useful, but the context is scattered. I can line up the owners and expected outcomes for each pipeline. I’ll probably have a few questions once we map the dependencies, because some of the risk jobs share upstream tables—
+
+[2026-09-29T10:05:45+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That’s fine, as long as we keep the pilot bounded.
+
+[2026-09-29T10:05:50+05:30] Priya Nair (Account Executive, Tracewise): We will. We’ll hold the scope at ten pipelines and use the existing configs as the starting point. If something falls outside that, we’ll log it rather than quietly expanding the work.
+
+[2026-09-29T10:06:03+05:30] Anita Desai (CFO, FinEdge Payments): What do you need from us to avoid delays? I don’t want a date in the plan that depends on an unnamed approval.
+
+[2026-09-29T10:06:13+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): For procurement, I’ll introduce Vikram Rao by Oct 6. He owns that process and can tell us what documents he needs. I can also make sure the engineering owners are available for kickoff.
+
+[2026-09-29T10:06:28+05:30] Priya Nair (Account Executive, Tracewise): Great, thank you. I’ll send Vikram the commercial and security materials once you connect us, and I’ll ask him to flag any required forms early.
+
+[2026-09-29T10:06:39+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Timing now. We’d talked about a mid-October start. Can you actually support that, or is it “mid-October” in the way vendors mean “sometime this quarter”?
+
+[2026-09-29T10:06:53+05:30] Priya Nair (Account Executive, Tracewise): We can support it. Let’s put a specific date on the calendar: the pilot starts Oct 15. That gives us time to confirm access, owners, and the security review before kickoff.
+
+[2026-09-29T10:07:07+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That works if the access checklist lands promptly. I don’t want my team spending day one guessing which credentials you need.
+
+[2026-09-29T10:07:16+05:30] Priya Nair (Account Executive, Tracewise): Agreed. I’ll include the access checklist with the follow-up today, and we can have Karan’s team confirm it before the kickoff. We’ll use the kickoff to walk the ten pipelines and confirm who owns each one.
+
+[2026-09-29T10:07:34+05:30] Anita Desai (CFO, FinEdge Payments): For the pilot outcome, I want something I can take back to the payments-risk leads. What will we be able to say at the end besides “the tool was installed”?
+
+[2026-09-29T10:07:46+05:30] Priya Nair (Account Executive, Tracewise): We can agree on a short scorecard: whether the selected failures were detected, whether alerts included actionable context, how much investigation time the team spent, and whether the workflow fits both engineering and risk operations. We’ll send the proposed measures in writing for your approval.
+
+[2026-09-29T10:08:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can get the pipeline owners to review that. For the shared upstream tables, I’ll note where an alert should route to one team versus both. Otherwise we’ll just recreate our current “everyone gets everything” situation.
+
+[2026-09-29T10:08:23+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Exactly. If the alert is noisy, people mute it, and then it’s just another dashboard no one opens.
+
+[2026-09-29T10:08:32+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. I’ll make routing and alert quality part of the scorecard, not an informal observation. Anything else blocking a yes on the pilot today?
+
+[2026-09-29T10:08:43+05:30] Anita Desai (CFO, FinEdge Payments): Not from my side, provided the revised commercial view reflects the expanded team and separates pilot from rollout. The comparison needs to be readable without a decoder ring.
+
+[2026-09-29T10:08:57+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I’m comfortable proceeding with the pilot on that basis. The price deck and the access plan are the two things I’ll be watching for.
+
+[2026-09-29T10:09:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ll connect Priya and Vikram, confirm the owners for the ten pipelines, and send the scorecard comments. I can also put the DataHawk comparison details in the same email.
+
+[2026-09-29T10:09:24+05:30] Priya Nair (Account Executive, Tracewise): Perfect. I’ll send the revised deck by Oct 1, plus the security materials, access checklist, and scorecard draft today. Karan will connect us with Vikram and gather the pipeline-owner input. We’ll hold the kickoff for Oct 15, with security and access confirmed ahead of it.
+
+[2026-09-29T10:09:45+05:30] Anita Desai (CFO, FinEdge Payments): That’s clear. Please send everything in one thread so I can forward the relevant pieces internally.
+
+[2026-09-29T10:09:53+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Good. And if anything slips, tell us before the date, not after the meeting where we discover it.
+
+[2026-09-29T10:10:00+05:30] Priya Nair (Account Executive, Tracewise): Understood. Thanks, everyone. I’ll get the follow-up out today, and we’ll use the next check-in to close any remaining review items. Have a good one.
