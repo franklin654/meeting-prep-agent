@@ -1,0 +1,122 @@
+[2026-09-10T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): Hi, Farah. Hi, Nikhil. Good to see you both. How’s the morning going?
+[2026-09-10T10:00:20+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Good, thanks. A little packed, but we’re here.
+[2026-09-10T10:00:34+05:30] Nikhil Reddy (Data Engineer, Veda Health): Same here. I’ve got the pipeline diagram open, so we should be all set.
+[2026-09-10T10:00:48+05:30] Arjun Menon (Sales Engineer, Tracewise): Great. Nice to meet you both. I’m Arjun; I’ll handle the technical walkthrough and questions.
+[2026-09-10T10:01:02+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Arjun. I’ll keep us moving and make sure we leave time for next steps. We have about half an hour. I thought we could confirm the workflow, look at how Tracewise would connect, then cover the sandbox and any compliance questions. Does that work?
+[2026-09-10T10:01:19+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Yes, that’s good. I’d like to understand the boundaries before we get into a trial.
+[2026-09-10T10:01:31+05:30] Nikhil Reddy (Data Engineer, Veda Health): And I’d like to see what I can actually test, not just a slide deck.
+[2026-09-10T10:01:43+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. Since our discovery on 2026-08-20, we’ve been working from the picture of roughly 25 patient-analytics pipelines. Nikhil, has anything changed in that picture?
+[2026-09-10T10:02:00+05:30] Nikhil Reddy (Data Engineer, Veda Health): Not really. They’re mostly scheduled jobs. We have a few event-driven ones, but the bulk are daily or hourly runs.
+[2026-09-10T10:02:13+05:30] Arjun Menon (Sales Engineer, Tracewise): And are those all in one environment, or split across accounts?
+[2026-09-10T10:02:21+05:30] Nikhil Reddy (Data Engineer, Veda Health): Split across two cloud accounts, with a shared analytics warehouse. Orchestration is mostly Airflow.
+[2026-09-10T10:02:35+05:30] Arjun Menon (Sales Engineer, Tracewise): Got it. Tracewise can ingest run metadata through our Airflow integration, or through the API if you want more control. The connector reads task and run information; it doesn’t need to read the underlying patient tables.
+[2026-09-10T10:02:52+05:30] Farah Siddiqui (Director of Engineering, Veda Health): When you say metadata, what exactly lands in your system?
+[2026-09-10T10:03:00+05:30] Arjun Menon (Sales Engineer, Tracewise): Typically pipeline and task names, timestamps, status, duration, and configured tags. Depending on what you send, it can include logs or error text as well. We can leave logs out, and we don’t ask for table contents as part of that integration.
+[2026-09-10T10:03:17+05:30] Farah Siddiqui (Director of Engineering, Veda Health): I want to be careful there. Error text can sometimes include identifiers if someone has logged something they shouldn’t.
+[2026-09-10T10:03:28+05:30] Arjun Menon (Sales Engineer, Tracewise): That’s a fair concern. The safest initial setup is to omit logs and pass only the run fields you’ve approved. If you later want logs, we can talk through masking and sampling before enabling them.
+[2026-09-10T10:03:45+05:30] Nikhil Reddy (Data Engineer, Veda Health): Can I choose fields per pipeline, or is it a global switch?
+[2026-09-10T10:03:52+05:30] Arjun Menon (Sales Engineer, Tracewise): You can configure the fields at the integration level, and apply tags or filters to narrow what’s collected. For a first pass, I’d recommend a small allowlist rather than relying on exclusions.
+[2026-09-10T10:04:10+05:30] Priya Nair (Account Executive, Tracewise): That sounds like a sensible starting point. Farah, what are the non-negotiables you’ll need us to address before a sandbox can be useful?
+[2026-09-10T10:04:22+05:30] Farah Siddiqui (Director of Engineering, Veda Health): SOC 2 Type II and patient-data handling are must-haves. I’ll also need to understand access controls, retention, and where the data is stored.
+[2026-09-10T10:04:40+05:30] Arjun Menon (Sales Engineer, Tracewise): Understood. I can walk through the controls we support, and we can follow up with the current documentation so your team can assess the details. For the sandbox itself, we can keep it synthetic and avoid connecting any production data.
+[2026-09-10T10:04:57+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Good. I don’t want anyone assuming that a sandbox means we’ve approved live patient data.
+[2026-09-10T10:05:09+05:30] Priya Nair (Account Executive, Tracewise): Completely understood. We’ll treat those as separate decisions. Nikhil, what would you want to validate first if you had a synthetic environment?
+[2026-09-10T10:05:21+05:30] Nikhil Reddy (Data Engineer, Veda Health): Connector setup, mostly. Then whether the lineage view is useful when a task fails, and how much work it takes to instrument our custom operators.
+[2026-09-10T10:05:38+05:30] Arjun Menon (Sales Engineer, Tracewise): We can test those in that order. The standard Airflow tasks should be quick to connect. For custom operators, the API lets you emit the run and dependency information you care about; we’d need to see one example to estimate the effort.
+[2026-09-10T10:05:54+05:30] Nikhil Reddy (Data Engineer, Veda Health): We have one operator that wraps a Python job and another that calls an internal service. I can share the shape of those without sharing source code.
+[2026-09-10T10:06:08+05:30] Arjun Menon (Sales Engineer, Tracewise): That would be useful. A simplified payload or a field list should be enough for us to advise on the mapping.
+[2026-09-10T10:06:23+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Before that, can we clarify whether the connector needs a persistent credential?
+[2026-09-10T10:06:32+05:30] Arjun Menon (Sales Engineer, Tracewise): It uses a service credential with scoped permissions. You can rotate it, and it only needs the permissions required to read the selected orchestration metadata. We should confirm the exact scope against your Airflow deployment.
+[2026-09-10T10:06:50+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Is the credential stored by your agent or sent to your hosted service?
+[2026-09-10T10:07:00+05:30] Arjun Menon (Sales Engineer, Tracewise): The connector runs in your environment. The credential stays in your secret store and is used locally by the connector; it isn’t included in telemetry.
+[2026-09-10T10:07:14+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Okay. I’d want that architecture documented, not just explained verbally.
+[2026-09-10T10:07:25+05:30] Priya Nair (Account Executive, Tracewise): Yes, we can provide a written architecture overview for your team. We’ll make sure it distinguishes what stays in your environment from the metadata you choose to send.
+[2026-09-10T10:07:40+05:30] Nikhil Reddy (Data Engineer, Veda Health): What does the lineage view show if a task fails halfway through?
+[2026-09-10T10:07:47+05:30] Arjun Menon (Sales Engineer, Tracewise): It can show the upstream and downstream relationships that have been defined or observed, alongside the run status and timing. It won’t infer every dependency inside a custom script automatically; for those, you’d either provide the relationship or instrument the relevant events.
+[2026-09-10T10:08:05+05:30] Nikhil Reddy (Data Engineer, Veda Health): So if a Python job reads three inputs and writes two outputs, I need to declare those?
+[2026-09-10T10:08:12+05:30] Arjun Menon (Sales Engineer, Tracewise): Right, unless your existing orchestration metadata already exposes them. The sandbox is a good place to test how much declaration you’d need for one representative job.
+[2026-09-10T10:08:28+05:30] Farah Siddiqui (Director of Engineering, Veda Health): And can access to those lineage details be restricted by team?
+[2026-09-10T10:08:35+05:30] Arjun Menon (Sales Engineer, Tracewise): Yes. You can assign roles and limit access to projects. I’d want to map that to your team structure rather than guess at the right setup.
+[2026-09-10T10:08:51+05:30] Farah Siddiqui (Director of Engineering, Veda Health): We have separate analytics and platform groups. Some pipeline names themselves can be sensitive, so project-level access matters.
+[2026-09-10T10:09:05+05:30] Arjun Menon (Sales Engineer, Tracewise): That makes sense. We can use neutral names in the sandbox and keep the project visible only to the people you nominate.
+[2026-09-10T10:09:19+05:30] Priya Nair (Account Executive, Tracewise): Let me pause on the technical thread for a second. We’re at about ten minutes in, and I want to make sure we leave enough room for Nikhil’s hands-on plan and Farah’s review questions.
+[2026-09-10T10:09:33+05:30] Nikhil Reddy (Data Engineer, Veda Health): Works for me. One thing I’d like to check is whether the agent has to be online all the time.
+[2026-09-10T10:09:43+05:30] Arjun Menon (Sales Engineer, Tracewise): It needs network access to send the selected metadata, but a temporary connection issue won’t stop your Airflow jobs. The connector can queue events locally and retry, subject to the queue configuration and available disk.
+[2026-09-10T10:10:00+05:30] Nikhil Reddy (Data Engineer, Veda Health): How much local storage should I plan for?
+[2026-09-10T10:10:07+05:30] Arjun Menon (Sales Engineer, Tracewise): It depends on event volume and how long you want to buffer. For the test, we can start with a small limit and observe it under a few representative runs. I wouldn’t size production from a guess.
+[2026-09-10T10:10:25+05:30] Nikhil Reddy (Data Engineer, Veda Health): Fair. We do have a backlog of jobs after maintenance windows, so retry behavior is worth testing.
+[2026-09-10T10:10:37+05:30] Arjun Menon (Sales Engineer, Tracewise): Definitely. We can simulate a short disconnect and check that jobs continue locally and the metadata catches up afterward.
+[2026-09-10T10:10:52+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Does a retry ever cause duplicate records in the dashboard?
+[2026-09-10T10:11:00+05:30] Arjun Menon (Sales Engineer, Tracewise): Events carry identifiers so retries are handled idempotently in the service. I can include the behavior and limitations in the technical notes, and we should verify it with your test case.
+[2026-09-10T10:11:17+05:30] Priya Nair (Account Executive, Tracewise): Great. Nikhil, is there a particular pipeline you’d use as the sample?
+[2026-09-10T10:11:26+05:30] Nikhil Reddy (Data Engineer, Veda Health): I’d use a nonclinical reporting workflow. It has a few joins and one custom operator, so it’s representative without touching patient records.
+[2026-09-10T10:11:41+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That’s a better choice than using a production patient-analytics job.
+[2026-09-10T10:11:48+05:30] Nikhil Reddy (Data Engineer, Veda Health): Agreed. I can make a synthetic version with the same shape.
+[2026-09-10T10:12:01+05:30] Arjun Menon (Sales Engineer, Tracewise): That should let us test the connector and lineage without exposing real records. We can also deliberately make one task fail, then check what appears in the view.
+[2026-09-10T10:12:17+05:30] Nikhil Reddy (Data Engineer, Veda Health): Can I bring my own Airflow image, or does the sandbox come with a fixed environment?
+[2026-09-10T10:12:25+05:30] Arjun Menon (Sales Engineer, Tracewise): You can run the connector in your environment. The sandbox is the Tracewise workspace; it doesn’t require you to move your orchestration stack into ours.
+[2026-09-10T10:12:41+05:30] Nikhil Reddy (Data Engineer, Veda Health): Okay, that’s what I was hoping. I’d rather test with our staging configuration.
+[2026-09-10T10:12:53+05:30] Priya Nair (Account Executive, Tracewise): That’s a useful distinction. We can provision the workspace, and you can decide what synthetic events to send from staging.
+[2026-09-10T10:13:05+05:30] Farah Siddiqui (Director of Engineering, Veda Health): What’s the retention period in a sandbox?
+[2026-09-10T10:13:14+05:30] Arjun Menon (Sales Engineer, Tracewise): I don’t want to give you a number from memory and risk being inaccurate. I’ll confirm the current sandbox retention terms and include them with the documentation.
+[2026-09-10T10:13:28+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Thanks. I’d also like to know whether the workspace can be deleted at the end of the test and what the deletion process covers.
+[2026-09-10T10:13:41+05:30] Priya Nair (Account Executive, Tracewise): Noted. We’ll get you a clear answer on retention and deletion before you decide what to put in the workspace.
+[2026-09-10T10:13:54+05:30] Arjun Menon (Sales Engineer, Tracewise): I can cover the data-flow diagram, credential handling, role controls, and retention details in one follow-up packet, with anything we need to verify clearly marked.
+[2026-09-10T10:14:12+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That’ll help. Our review usually involves more than engineering, so precise details save a lot of back and forth.
+[2026-09-10T10:14:27+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. We won’t treat the sandbox as a shortcut around your process.
+[2026-09-10T10:14:39+05:30] Nikhil Reddy (Data Engineer, Veda Health): While we’re on setup, does the connector require outbound access to a fixed set of endpoints?
+[2026-09-10T10:14:47+05:30] Arjun Menon (Sales Engineer, Tracewise): Yes, it needs outbound HTTPS to the service endpoints. I’ll send the current endpoint list and ports so your platform team can check their egress rules.
+[2026-09-10T10:15:04+05:30] Nikhil Reddy (Data Engineer, Veda Health): Does it support a proxy?
+[2026-09-10T10:15:09+05:30] Arjun Menon (Sales Engineer, Tracewise): It supports a standard outbound proxy configuration. If your proxy uses a specific authentication method, send me the details at a high level and I’ll confirm compatibility.
+[2026-09-10T10:15:26+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Please keep any credentials out of email.
+[2026-09-10T10:15:31+05:30] Arjun Menon (Sales Engineer, Tracewise): Absolutely. We’d only need to confirm the method, not exchange secrets.
+[2026-09-10T10:15:40+05:30] Priya Nair (Account Executive, Tracewise): Quick tangent before we get back to the checklist: Nikhil, you mentioned you’re in Hyderabad, right? How’s the rain been there this week?
+[2026-09-10T10:15:52+05:30] Nikhil Reddy (Data Engineer, Veda Health): I am, and it’s been on and off. Yesterday I got caught in a downpour between the office and the metro.
+[2026-09-10T10:16:02+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Bengaluru hasn’t been much better. I thought I’d escaped the rain by joining from home, but the internet had other ideas.
+[2026-09-10T10:16:12+05:30] Priya Nair (Account Executive, Tracewise): Oh no. At least the connection’s holding now. All right, back to the checklist.
+[2026-09-10T10:16:23+05:30] Arjun Menon (Sales Engineer, Tracewise): One question for the staging test: does your Airflow environment have a deployment process for adding a connector, or would Nikhil be testing it locally first?
+[2026-09-10T10:16:37+05:30] Nikhil Reddy (Data Engineer, Veda Health): I can test locally, then ask platform to deploy it into staging if the package and permissions look acceptable.
+[2026-09-10T10:16:49+05:30] Arjun Menon (Sales Engineer, Tracewise): Great. I’ll include the deployment options and the minimum permission scope. For the local test, we can use a sample configuration with synthetic task names.
+[2026-09-10T10:17:06+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Does the connector collect anything automatically beyond the fields we select?
+[2026-09-10T10:17:15+05:30] Arjun Menon (Sales Engineer, Tracewise): It sends operational fields needed for the run view, such as connector version and delivery status, in addition to the selected pipeline metadata. We can provide the full field list so you can inspect it.
+[2026-09-10T10:17:32+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Good. I’ll want to compare that list against our internal data classification.
+[2026-09-10T10:17:44+05:30] Priya Nair (Account Executive, Tracewise): That’s a clear action for us. Anything else you need to decide whether the evaluation is worthwhile?
+[2026-09-10T10:17:54+05:30] Nikhil Reddy (Data Engineer, Veda Health): If the setup is reasonable, I’d like a few days to test it. The main question for me is whether the lineage view saves time when something breaks, not just whether the connector works.
+[2026-09-10T10:18:10+05:30] Arjun Menon (Sales Engineer, Tracewise): We can define a practical test: one normal run, one intentional failure, and one run where an upstream dependency changes. Then you can compare what you see in Tracewise with your current debugging process.
+[2026-09-10T10:18:27+05:30] Nikhil Reddy (Data Engineer, Veda Health): That’s good. I can capture how long it takes us to identify the affected downstream tasks.
+[2026-09-10T10:18:39+05:30] Priya Nair (Account Executive, Tracewise): Nice, that gives us an outcome to evaluate rather than a vague thumbs-up.
+[2026-09-10T10:18:48+05:30] Farah Siddiqui (Director of Engineering, Veda Health): I’m comfortable with a synthetic evaluation, subject to our normal checks on the documentation and deployment details. No live patient data.
+[2026-09-10T10:19:01+05:30] Priya Nair (Account Executive, Tracewise): Understood. I promise we’ll have sandbox access for you by Sep 17. We’ll keep the setup focused on synthetic data and won’t ask you to connect a production workflow.
+[2026-09-10T10:19:18+05:30] Nikhil Reddy (Data Engineer, Veda Health): Great. If it’s ready by then, I can start with the local configuration and get platform involved after I’ve checked it.
+[2026-09-10T10:19:30+05:30] Arjun Menon (Sales Engineer, Tracewise): I’ll make sure the quick-start guide uses the same synthetic example we discussed, and I’ll point out where to configure the allowlist and disable logs.
+[2026-09-10T10:19:44+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Can we have a short technical session once Nikhil has tried it? I’d like to see the permissions and data flow in context.
+[2026-09-10T10:19:55+05:30] Priya Nair (Account Executive, Tracewise): Yes. We can schedule that after he’s had time to run the first tests, and keep it focused on the findings and anything that needs clarification.
+[2026-09-10T10:20:09+05:30] Nikhil Reddy (Data Engineer, Veda Health): I’ll send a simplified example of the custom operator and the fields I plan to emit. I can do that without code or real names.
+[2026-09-10T10:20:23+05:30] Arjun Menon (Sales Engineer, Tracewise): Perfect. I’ll review the mapping and flag any fields that aren’t necessary for the test.
+[2026-09-10T10:20:37+05:30] Farah Siddiqui (Director of Engineering, Veda Health): And please include the storage region and the access-control details in the written material.
+[2026-09-10T10:20:46+05:30] Priya Nair (Account Executive, Tracewise): Yes. I have architecture, field list, endpoints, retention and deletion, storage region, and access controls. Arjun, am I missing anything from your side?
+[2026-09-10T10:21:03+05:30] Arjun Menon (Sales Engineer, Tracewise): The credential scope and retry behavior, too. I’ll add both, plus the connector deployment options.
+[2026-09-10T10:21:17+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That covers my main questions for today. I’ll review the material with the relevant people here.
+[2026-09-10T10:21:29+05:30] Priya Nair (Account Executive, Tracewise): Great. Nikhil, from your end, the synthetic workflow, simplified operator shape, and a short list of what you want to measure?
+[2026-09-10T10:21:41+05:30] Nikhil Reddy (Data Engineer, Veda Health): Yes. I’ll also check the staging proxy requirements with platform so we know whether anything needs adjusting.
+[2026-09-10T10:21:54+05:30] Arjun Menon (Sales Engineer, Tracewise): Once I have the operator shape, I can recommend the smallest test configuration and make sure the example lines up with your Airflow version.
+[2026-09-10T10:22:09+05:30] Priya Nair (Account Executive, Tracewise): Before we close, is there a particular concern we haven’t addressed that would block the synthetic sandbox work?
+[2026-09-10T10:22:20+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Nothing beyond confirming the details in writing. The boundary around patient data is important, and I want that reflected in the plan.
+[2026-09-10T10:22:33+05:30] Priya Nair (Account Executive, Tracewise): We’ll state that the initial evaluation uses synthetic data only, and that any broader use would be a separate discussion.
+[2026-09-10T10:22:46+05:30] Nikhil Reddy (Data Engineer, Veda Health): That works. Once I have access, I’ll run through the three cases and send you the results.
+[2026-09-10T10:22:58+05:30] Arjun Menon (Sales Engineer, Tracewise): If you can note where the lineage is clear or confusing, that’ll help us make the review useful. Screenshots with synthetic names are fine.
+[2026-09-10T10:23:13+05:30] Nikhil Reddy (Data Engineer, Veda Health): Sure. I’ll keep the test notes focused on setup time, failure diagnosis, and downstream impact.
+[2026-09-10T10:23:26+05:30] Priya Nair (Account Executive, Tracewise): Excellent. I’ll send a recap with the owners and dates so nothing gets lost.
+[2026-09-10T10:23:37+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Please include who to contact if our platform team has a connector question.
+[2026-09-10T10:23:46+05:30] Arjun Menon (Sales Engineer, Tracewise): They can contact me directly for the technical setup. If something needs checking on our side, I’ll take it back to our product team.
+[2026-09-10T10:24:02+05:30] Priya Nair (Account Executive, Tracewise): And I’ll coordinate the access and follow-up session. I’ll aim to send the materials shortly so your team has time to look through them.
+[2026-09-10T10:24:16+05:30] Nikhil Reddy (Data Engineer, Veda Health): Sounds good. I’m looking forward to trying it with the synthetic workflow.
+[2026-09-10T10:24:28+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Thanks, everyone. This was useful, especially the distinction between orchestration metadata and table contents.
+[2026-09-10T10:24:40+05:30] Arjun Menon (Sales Engineer, Tracewise): Glad that helped. I’ll make sure the written materials are just as specific.
+[2026-09-10T10:24:52+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Farah and Nikhil. To recap: Arjun will send the technical packet and review Nikhil’s synthetic operator example; Nikhil will confirm the staging setup and evaluation measures; I’ll coordinate the sandbox and our follow-up. We’ll keep the evaluation synthetic and revisit anything broader only after your team has reviewed the details.
+[2026-09-10T10:25:17+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That captures it. Thanks.
+[2026-09-10T10:25:24+05:30] Nikhil Reddy (Data Engineer, Veda Health): Yep, thanks. I’ll send over the example once I’ve stripped out the internal names.
+[2026-09-10T10:25:35+05:30] Arjun Menon (Sales Engineer, Tracewise): Great. I’ll keep an eye out for it. Have a good rest of your day.
+[2026-09-10T10:25:43+05:30] Priya Nair (Account Executive, Tracewise): Thanks both. Talk soon. Bye.
+[2026-09-10T10:25:51+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Bye.
+[2026-09-10T10:25:55+05:30] Nikhil Reddy (Data Engineer, Veda Health): Bye, everyone.

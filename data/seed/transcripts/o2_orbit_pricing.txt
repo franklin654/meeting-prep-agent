@@ -1,0 +1,144 @@
+[2026-06-18T10:00:08+05:30] Priya Nair (Account Executive, Tracewise): Hi, Lakshmi. Hi, Sameer. Can you both hear me all right?
+[2026-06-18T10:00:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, loud and clear. Hi, Priya.
+[2026-06-18T10:00:21+05:30] Sameer Khan (Finance Controller, Orbit Retail): I can hear you. Morning.
+[2026-06-18T10:00:26+05:30] Priya Nair (Account Executive, Tracewise): Morning. How’s the week going?
+[2026-06-18T10:00:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Busy, but manageable. We’ve had a few teams asking for numbers before the quarter closes.
+[2026-06-18T10:00:43+05:30] Sameer Khan (Finance Controller, Orbit Retail): That’s one way to put it.
+[2026-06-18T10:00:48+05:30] Priya Nair (Account Executive, Tracewise): Fair. I’ll keep us focused. We have half an hour, and I thought we could walk through the proposal, compare what’s included, and agree what would make the numbers workable. Anything you want to add?
+[2026-06-18T10:01:01+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No, that’s right. I’d like to understand the price against the operational value, but we also have to be realistic about this year’s budget.
+[2026-06-18T10:01:11+05:30] Sameer Khan (Finance Controller, Orbit Retail): And I want to make sure we’re comparing like with like. The headline is hard to ignore.
+[2026-06-18T10:01:19+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. The proposal I sent is ₹12.5 lakh annually for the platform subscription. Implementation is listed separately, so I’ll make sure we don’t blur those together.
+[2026-06-18T10:01:31+05:30] Sameer Khan (Finance Controller, Orbit Retail): DataHawk quoted about 40% lower.
+[2026-06-18T10:01:37+05:30] Priya Nair (Account Executive, Tracewise): Understood. That’s a meaningful difference. Do you have their scope or quote handy, even if it’s just the main line items?
+[2026-06-18T10:01:47+05:30] Sameer Khan (Finance Controller, Orbit Retail): I have the summary, not the full technical schedule. It covers monitoring and alerting. They’ve also included onboarding, though I need to check what that means in practice.
+[2026-06-18T10:02:01+05:30] Lakshmi Pillai (VP Data, Orbit Retail): For us, the practical bit matters. We talked about the stock-level pipelines failing silently. The issue isn’t that nobody can see a failed job; it’s that teams find out after a store has acted on stale stock data.
+[2026-06-18T10:02:15+05:30] Priya Nair (Account Executive, Tracewise): Right. That was the core problem you described in discovery: the alert has to reach the person who can fix the pipeline, and it has to happen before the downstream team is working from old numbers.
+[2026-06-18T10:02:29+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. But it’s still hard for me to say the platform is worth a big premium without a credible way to measure that.
+[2026-06-18T10:02:39+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. I don’t want to invent savings for you. We can build the comparison around the operational measures you already track: time to detect, time to resolve, and how often a stale feed reaches the store teams.
+[2026-06-18T10:02:55+05:30] Sameer Khan (Finance Controller, Orbit Retail): We track incidents, but not consistently by impact. Some are fixed before anyone outside data engineering notices.
+[2026-06-18T10:03:08+05:30] Priya Nair (Account Executive, Tracewise): That distinction is useful. Would it be reasonable to separate incidents caught internally from incidents that affect a business user?
+[2026-06-18T10:03:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, though we’d have to agree what counts as an impact. A delayed dashboard isn’t the same as an inventory feed being stale.
+[2026-06-18T10:03:33+05:30] Priya Nair (Account Executive, Tracewise): Agreed. We can keep the inventory case as its own category rather than averaging it into every data issue.
+[2026-06-18T10:03:45+05:30] Sameer Khan (Finance Controller, Orbit Retail): Before we get too deep into a model, what exactly is different in your scope? If both products send an alert, I need a clearer answer than “better monitoring.”
+[2026-06-18T10:04:01+05:30] Priya Nair (Account Executive, Tracewise): Sure. The proposal includes pipeline health checks, alert routing, and the incident history in one place. It also includes the connector coverage we discussed for your stock feeds. I’d like to verify the exact connector list against DataHawk’s rather than assume theirs is narrower.
+[2026-06-18T10:04:20+05:30] Sameer Khan (Finance Controller, Orbit Retail): Good. Please don’t make that assumption.
+[2026-06-18T10:04:25+05:30] Priya Nair (Account Executive, Tracewise): I won’t. Lakshmi, on alert routing, is the current setup mostly email, or are teams using your incident channel too?
+[2026-06-18T10:04:38+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mostly email today. A few teams use the incident channel, but it’s not consistent. The on-call person can miss an email if they’re already handling something else.
+[2026-06-18T10:04:51+05:30] Priya Nair (Account Executive, Tracewise): Then the routing configuration and escalation path are relevant, but only if they fit the way your teams actually work. We shouldn’t count an alert as value just because it was sent.
+[2026-06-18T10:05:06+05:30] Sameer Khan (Finance Controller, Orbit Retail): What does onboarding involve on your side?
+[2026-06-18T10:05:13+05:30] Priya Nair (Account Executive, Tracewise): We map the pipelines you want covered, configure the checks and alert routes, and work with your team to validate a few incident scenarios. Your engineers still own the underlying pipelines; we help make sure the monitoring is set up around them.
+[2026-06-18T10:05:30+05:30] Lakshmi Pillai (VP Data, Orbit Retail): How much time do you need from our engineers?
+[2026-06-18T10:05:36+05:30] Priya Nair (Account Executive, Tracewise): I’d want to confirm that after we agree on the first group of pipelines. I don’t want to give you a tidy estimate now and then discover we’ve missed a dependency.
+[2026-06-18T10:05:50+05:30] Sameer Khan (Finance Controller, Orbit Retail): That’s reasonable, but it affects the total cost internally. If we’re asking a small team to spend weeks configuring this, that’s not free.
+[2026-06-18T10:06:02+05:30] Priya Nair (Account Executive, Tracewise): Completely. I’ll include the expected Orbit effort in the comparison as a range, with the assumptions visible. Then you can tell me whether that range matches what your team can absorb.
+[2026-06-18T10:06:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We should also talk about how many pipelines we start with. The full estate is too much for a first pass.
+[2026-06-18T10:06:26+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. Would you prioritize the feeds that support store inventory decisions, then expand once the alerting and ownership are working?
+[2026-06-18T10:06:39+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Probably. There are a few that feed replenishment, and a few that are useful but not urgent.
+[2026-06-18T10:06:52+05:30] Sameer Khan (Finance Controller, Orbit Retail): If it starts with a smaller group, does the annual price reduce, or are we paying the same amount to use less?
+[2026-06-18T10:07:04+05:30] Priya Nair (Account Executive, Tracewise): The current proposal is based on the scope we discussed, so I’d need to price a narrower scope rather than assume a straight reduction. I can show you both options, but I’ll be clear about what changes in coverage.
+[2026-06-18T10:07:18+05:30] Sameer Khan (Finance Controller, Orbit Retail): Okay. That’s what I need to see.
+[2026-06-18T10:07:24+05:30] Priya Nair (Account Executive, Tracewise): Just to check, is the main concern the first-year spend, or is it that the ongoing subscription would be difficult to justify even if the initial rollout is useful?
+[2026-06-18T10:07:40+05:30] Sameer Khan (Finance Controller, Orbit Retail): Both, but first-year spend is the more immediate problem. Budget is tight this year, as you’ve heard from Lakshmi.
+[2026-06-18T10:07:52+05:30] Lakshmi Pillai (VP Data, Orbit Retail): And I don’t want to solve that by buying a small plan that misses the pipelines we actually care about.
+[2026-06-18T10:08:01+05:30] Priya Nair (Account Executive, Tracewise): Right. We should find the smallest scope that still tests the real problem, not just the cheapest bundle.
+[2026-06-18T10:08:12+05:30] Sameer Khan (Finance Controller, Orbit Retail): Can you explain how pricing changes with scope? Is it mainly pipeline count, data volume, or users?
+[2026-06-18T10:08:21+05:30] Priya Nair (Account Executive, Tracewise): It’s primarily the monitored workload and the coverage level, rather than how many people can view incidents. I’ll verify which elements move the price in your specific proposal and lay them out line by line.
+[2026-06-18T10:08:39+05:30] Sameer Khan (Finance Controller, Orbit Retail): Please do. I don’t want a per-user surprise after we roll it out to store operations.
+[2026-06-18T10:08:48+05:30] Priya Nair (Account Executive, Tracewise): There isn’t a per-user charge in the proposal as written, but I’ll state that plainly in the comparison so it’s easy to check.
+[2026-06-18T10:08:59+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Do you include the history for investigating incidents, or does that depend on the tier?
+[2026-06-18T10:09:08+05:30] Priya Nair (Account Executive, Tracewise): The incident history is included in this scope. Retention details are worth checking against your needs, though. How far back do you usually need to investigate?
+[2026-06-18T10:09:21+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Usually a few months is enough for operational reviews. For a recurring issue, we may look further back.
+[2026-06-18T10:09:34+05:30] Priya Nair (Account Executive, Tracewise): Got it. I’ll note the operational window and confirm the available retention so we’re comparing the same thing.
+[2026-06-18T10:09:45+05:30] Sameer Khan (Finance Controller, Orbit Retail): One more question on the implementation line. Is that a fixed fee, or does it depend on how much help we need?
+[2026-06-18T10:09:57+05:30] Priya Nair (Account Executive, Tracewise): The current line is fixed for the scope in the proposal. If we change the scope, I’ll confirm whether that changes. I’ll also separate any optional work from what’s required to get started.
+[2026-06-18T10:10:10+05:30] Sameer Khan (Finance Controller, Orbit Retail): Good. I’ve seen “optional” services become necessary after signing.
+[2026-06-18T10:10:18+05:30] Priya Nair (Account Executive, Tracewise): Fair point. I’ll mark what’s included, what’s optional, and what would need your team’s time.
+[2026-06-18T10:10:29+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Sorry, small tangent, but our data engineering room was freezing this morning. Someone had the air conditioning turned all the way down.
+[2026-06-18T10:10:38+05:30] Sameer Khan (Finance Controller, Orbit Retail): That’s better than our finance room. The fan is making a noise like a delivery truck.
+[2026-06-18T10:10:45+05:30] Priya Nair (Account Executive, Tracewise): I’ll trade you both for the Bengaluru rain outside my window. I’m glad we’re not trying to do this call from a café today.
+[2026-06-18T10:10:56+05:30] Lakshmi Pillai (VP Data, Orbit Retail): All right, back to the numbers.
+[2026-06-18T10:11:01+05:30] Priya Nair (Account Executive, Tracewise): Yes. I want to be careful that the comparison doesn’t turn into a feature checklist with no business context. Lakshmi, could you describe what a typical silent failure looks like from the first missed check to someone noticing?
+[2026-06-18T10:11:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): A feed can stop updating, but the job itself may still appear healthy. A planner notices that the stock position looks wrong, then asks our team to investigate. Sometimes it’s a source delay; sometimes the transformation has quietly stopped reflecting the latest changes.
+[2026-06-18T10:11:38+05:30] Priya Nair (Account Executive, Tracewise): And do you have a consistent timestamp for when the data was last fresh?
+[2026-06-18T10:11:45+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not across all of those feeds. Some have one, some don’t.
+[2026-06-18T10:11:54+05:30] Priya Nair (Account Executive, Tracewise): That’s an important setup detail. If the freshness signal isn’t available, we need to identify the right check with your engineers rather than claim we can catch every case automatically.
+[2026-06-18T10:12:09+05:30] Sameer Khan (Finance Controller, Orbit Retail): From a finance perspective, I’d want to know what proportion of that work is preventable. Otherwise we’re paying to observe a problem we still have to fix ourselves.
+[2026-06-18T10:12:22+05:30] Priya Nair (Account Executive, Tracewise): Yes. The platform won’t repair a broken source system for you. The value is earlier, clearer detection and making sure the right person gets the information. Whether that reduces disruption is something we should measure.
+[2026-06-18T10:12:40+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s more credible. I don’t want a promise that every issue disappears.
+[2026-06-18T10:12:48+05:30] Priya Nair (Account Executive, Tracewise): Nor should I make one. We can define what success looks like for a first phase and review it after the team has real data.
+[2026-06-18T10:13:02+05:30] Sameer Khan (Finance Controller, Orbit Retail): How long would that first phase take?
+[2026-06-18T10:13:07+05:30] Priya Nair (Account Executive, Tracewise): I’d rather confirm with a shortlist of pipelines before giving you a timeline. The key variables are access, whether freshness checks already exist, and how quickly we can validate the alert routes.
+[2026-06-18T10:13:24+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We can identify a shortlist. I don’t want to commit to access until we know what you need.
+[2026-06-18T10:13:32+05:30] Priya Nair (Account Executive, Tracewise): That’s fine. For now, the comparison can use the shortlist and mark access as an assumption, not a commitment.
+[2026-06-18T10:13:46+05:30] Sameer Khan (Finance Controller, Orbit Retail): And what does DataHawk include in support? I don’t have that in the summary.
+[2026-06-18T10:13:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I can ask their team for the support details and the connector list. We have the commercial summary, but not the full service description.
+[2026-06-18T10:14:05+05:30] Priya Nair (Account Executive, Tracewise): That would help. If you’re comfortable sharing those sections, we can compare them directly. You can remove anything you don’t want to circulate.
+[2026-06-18T10:14:19+05:30] Sameer Khan (Finance Controller, Orbit Retail): I’ll check what we’re allowed to share. I can at least send the feature and support summary.
+[2026-06-18T10:14:28+05:30] Priya Nair (Account Executive, Tracewise): Perfect. We don’t need their confidential detail to make the comparison useful.
+[2026-06-18T10:14:37+05:30] Lakshmi Pillai (VP Data, Orbit Retail): What would you need from us to estimate the smaller scope?
+[2026-06-18T10:14:45+05:30] Priya Nair (Account Executive, Tracewise): A list of the priority stock feeds, approximate workload or pipeline counts for those, and the current owners. It would also help to know which teams need to receive alerts. We can keep the first pass simple.
+[2026-06-18T10:15:02+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I can get the feed list. The ownership column may take a little sorting.
+[2026-06-18T10:15:11+05:30] Priya Nair (Account Executive, Tracewise): That’s okay. Even an initial owner is useful; we can flag anything uncertain.
+[2026-06-18T10:15:21+05:30] Sameer Khan (Finance Controller, Orbit Retail): I’m still not clear what would justify paying more. If the connector list and support turn out to be similar, then it comes down to outcomes, and we don’t have those numbers yet.
+[2026-06-18T10:15:38+05:30] Priya Nair (Account Executive, Tracewise): That’s a fair summary. I’d look at whether the monitoring catches the specific stale-feed cases, whether alert ownership is straightforward, and whether your team can investigate incidents without stitching together several tools. We should validate each one, not just present it as a claim.
+[2026-06-18T10:15:58+05:30] Sameer Khan (Finance Controller, Orbit Retail): How do you propose validating it?
+[2026-06-18T10:16:03+05:30] Priya Nair (Account Executive, Tracewise): First, compare the documented scope. Then, if the technical fit is there, use a small set of representative pipelines to test freshness detection and routing. We can write down the acceptance criteria before anyone starts configuring.
+[2026-06-18T10:16:19+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I like agreeing on criteria first. Otherwise people end up judging the tool on whatever happens to come up that week.
+[2026-06-18T10:16:29+05:30] Priya Nair (Account Executive, Tracewise): Exactly. We can include how you’d tell an alert was timely and useful, and who confirms the result on your side.
+[2026-06-18T10:16:42+05:30] Sameer Khan (Finance Controller, Orbit Retail): But that’s another demand on the engineering team.
+[2026-06-18T10:16:47+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It is, but we already spend time investigating these issues. I’d rather spend a planned amount of time testing than keep doing ad hoc reviews.
+[2026-06-18T10:17:00+05:30] Priya Nair (Account Executive, Tracewise): We can make the test lightweight, and I’ll include the expected time commitment in the comparison. If the required effort is too high, that’s part of the decision.
+[2026-06-18T10:17:15+05:30] Sameer Khan (Finance Controller, Orbit Retail): All right. For my side, the comparison needs subscription, implementation, any recurring add-ons, and the internal effort assumption. No hidden lines.
+[2026-06-18T10:17:29+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll use those headings and show the narrower scope alongside the current proposal.
+[2026-06-18T10:17:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Include coverage differences prominently. I don’t want the reduced price to be the only thing visible.
+[2026-06-18T10:17:51+05:30] Priya Nair (Account Executive, Tracewise): Yes. I’ll show what drops out of the narrower option and what remains covered.
+[2026-06-18T10:18:03+05:30] Sameer Khan (Finance Controller, Orbit Retail): Can you also make the payment schedule clear? Our budget review looks at the timing, not only the annual total.
+[2026-06-18T10:18:13+05:30] Priya Nair (Account Executive, Tracewise): I can confirm the available invoicing terms and put the schedule in the commercial section. I won’t imply that changing the schedule changes the total cost.
+[2026-06-18T10:18:28+05:30] Sameer Khan (Finance Controller, Orbit Retail): Good. That’s an important distinction.
+[2026-06-18T10:18:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Priya, when you send the comparison, can you include the assumptions about data freshness? That’s probably where our requirements differ most from a generic monitoring checklist.
+[2026-06-18T10:18:45+05:30] Priya Nair (Account Executive, Tracewise): Yes. I’ll separate checks available from the current metadata from checks that need extra instrumentation, and call out any dependency on your team.
+[2026-06-18T10:18:58+05:30] Sameer Khan (Finance Controller, Orbit Retail): Would we need to buy anything else to get that extra instrumentation?
+[2026-06-18T10:19:06+05:30] Priya Nair (Account Executive, Tracewise): I’ll verify that rather than guess. If there’s any additional product or service cost, it will be listed separately.
+[2026-06-18T10:19:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Okay.
+[2026-06-18T10:19:22+05:30] Priya Nair (Account Executive, Tracewise): Let me check what I’ve captured. Sameer, you’ll share the commercial and support summary you’re permitted to share. Lakshmi, you’ll send the priority feed list and the teams that need alerts. I’ll return the scope and cost comparison, including internal effort, assumptions, and the payment schedule.
+[2026-06-18T10:19:39+05:30] Sameer Khan (Finance Controller, Orbit Retail): That’s right.
+[2026-06-18T10:19:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. I’ll try to include current owners, even if a few are tentative.
+[2026-06-18T10:19:51+05:30] Priya Nair (Account Executive, Tracewise): I’ll have the value comparison ready by Jun 25.
+[2026-06-18T10:19:58+05:30] Sameer Khan (Finance Controller, Orbit Retail): That works. Please label confirmed facts separately from assumptions, so I can use it in the review without having to explain which is which.
+[2026-06-18T10:20:11+05:30] Priya Nair (Account Executive, Tracewise): Definitely. I’ll include a short summary up front, then the details and open questions below it.
+[2026-06-18T10:20:24+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Could we have a follow-up after we’ve reviewed it, but before anyone prepares a final internal recommendation?
+[2026-06-18T10:20:34+05:30] Priya Nair (Account Executive, Tracewise): Sure. We can use that session to challenge the assumptions and adjust the scope if the feed list points us in a different direction.
+[2026-06-18T10:20:48+05:30] Sameer Khan (Finance Controller, Orbit Retail): I’d prefer not to schedule it until we’ve seen the comparison. We can coordinate after that.
+[2026-06-18T10:20:56+05:30] Priya Nair (Account Executive, Tracewise): That’s fine. I’ll send the document first, and we can find a time once you’ve had a chance to review it.
+[2026-06-18T10:21:07+05:30] Lakshmi Pillai (VP Data, Orbit Retail): One thing I want to avoid is a comparison that assumes we’ll instrument every pipeline. We probably won’t do that in the first phase.
+[2026-06-18T10:21:18+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll use the priority feed list as the boundary and identify where an assumption applies only to the broader rollout.
+[2026-06-18T10:21:31+05:30] Sameer Khan (Finance Controller, Orbit Retail): And please don’t annualize a short test in a way that makes it look like a full-year saving. Those comparisons can be misleading.
+[2026-06-18T10:21:42+05:30] Priya Nair (Account Executive, Tracewise): Agreed. I’ll keep any test costs separate from annual subscription pricing and show the timeframe beside each figure.
+[2026-06-18T10:21:55+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks. This feels more useful than just negotiating the line item.
+[2026-06-18T10:22:04+05:30] Priya Nair (Account Executive, Tracewise): That’s my aim. Price matters, and the scope needs to make sense for the team using it.
+[2026-06-18T10:22:15+05:30] Sameer Khan (Finance Controller, Orbit Retail): It does matter a lot, though.
+[2026-06-18T10:22:19+05:30] Priya Nair (Account Executive, Tracewise): It should. I’m not asking you to set it aside. I just want the decision to reflect what you’d actually be buying.
+[2026-06-18T10:22:33+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Fair enough. I’ll send the feed list once I’ve checked it with the team.
+[2026-06-18T10:22:42+05:30] Priya Nair (Account Executive, Tracewise): Great. If anything in the comparison depends on a detail we haven’t confirmed, I’ll mark it as a question instead of filling in a guess.
+[2026-06-18T10:22:53+05:30] Sameer Khan (Finance Controller, Orbit Retail): And if the scope is the same on both sides, say that plainly. I’m not looking for a reason to prefer one just because we’re having this conversation.
+[2026-06-18T10:23:05+05:30] Priya Nair (Account Executive, Tracewise): I appreciate that. If the scope is equivalent in a particular area, I’ll show it as equivalent.
+[2026-06-18T10:23:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Then we can focus on where it isn’t equivalent and whether that difference matters to us.
+[2026-06-18T10:23:28+05:30] Priya Nair (Account Executive, Tracewise): Exactly. Before we wrap, is there anything about the current proposal that feels unclear apart from the scope and total cost?
+[2026-06-18T10:23:41+05:30] Sameer Khan (Finance Controller, Orbit Retail): The renewal terms. I didn’t see the notice period in the summary.
+[2026-06-18T10:23:49+05:30] Priya Nair (Account Executive, Tracewise): I’ll add the renewal and notice terms to the commercial page, along with any conditions that could change the subscription.
+[2026-06-18T10:24:01+05:30] Lakshmi Pillai (VP Data, Orbit Retail): And I want to know who owns support after onboarding. Our team needs a clear route for questions.
+[2026-06-18T10:24:11+05:30] Priya Nair (Account Executive, Tracewise): I’ll include the support model and escalation route. I’ll also distinguish onboarding support from ongoing support so it’s clear when each applies.
+[2026-06-18T10:24:25+05:30] Sameer Khan (Finance Controller, Orbit Retail): All right. That covers my questions for now.
+[2026-06-18T10:24:31+05:30] Priya Nair (Account Executive, Tracewise): Great. To recap: we’re comparing the current proposal with a narrower first phase, checking scope against DataHawk’s summary, and making the operational assumptions visible. Sameer will share what he can from the quote, and Lakshmi will send the priority feeds and alert owners.
+[2026-06-18T10:24:50+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s a good recap.
+[2026-06-18T10:24:54+05:30] Sameer Khan (Finance Controller, Orbit Retail): Yes. I’ll send the summary once I’ve checked the sharing rules.
+[2026-06-18T10:25:02+05:30] Priya Nair (Account Executive, Tracewise): Thanks. I’ll send a short note after this with the information I need and the sections I’ll include, so it’s easy to reply.
+[2026-06-18T10:25:14+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Perfect. And please keep the first phase focused on the stock feeds, not every pipeline we own.
+[2026-06-18T10:25:23+05:30] Priya Nair (Account Executive, Tracewise): Will do. We’ll use those feeds as the starting point and show any broader coverage separately.
+[2026-06-18T10:25:36+05:30] Sameer Khan (Finance Controller, Orbit Retail): Sounds good.
+[2026-06-18T10:25:40+05:30] Priya Nair (Account Executive, Tracewise): Thanks, both. I know we went into quite a bit of detail, but it’s helpful to get the commercial and technical questions on the table together.
+[2026-06-18T10:25:54+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks, Priya. This was useful.
+[2026-06-18T10:26:00+05:30] Sameer Khan (Finance Controller, Orbit Retail): Thanks.
+[2026-06-18T10:26:03+05:30] Priya Nair (Account Executive, Tracewise): Thanks. I’ll follow up with the recap shortly. Have a good rest of the day.
+[2026-06-18T10:26:10+05:30] Lakshmi Pillai (VP Data, Orbit Retail): You too. Bye.
+[2026-06-18T10:26:13+05:30] Sameer Khan (Finance Controller, Orbit Retail): Bye.

@@ -1,0 +1,131 @@
+[2026-07-28T09:00:03+05:30] Priya Nair (Account Executive, Tracewise): Morning, Karan. Morning, Anita. Can you both hear me okay?
+[2026-07-28T09:00:11+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yep, loud and clear. Morning, Priya. Anita’s here too, just joining from the other room.
+[2026-07-28T09:00:19+05:30] Anita Desai (CFO, FinEdge Payments): I’m here. Good morning.
+[2026-07-28T09:00:26+05:30] Priya Nair (Account Executive, Tracewise): Great. Thanks for making the time. I put thirty minutes on the calendar, and I thought we could focus on budget and how a decision would work on your side. Does that still suit?
+[2026-07-28T09:00:39+05:30] Anita Desai (CFO, FinEdge Payments): Yes. I have to leave at half past, but that works.
+[2026-07-28T09:00:45+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Absolutely. And, Priya, thanks for the fintech case study. I shared it with two people on my team; they found the incident write-up useful.
+[2026-07-28T09:00:58+05:30] Priya Nair (Account Executive, Tracewise): I’m glad it landed well. I’d hoped it would give you something concrete to compare against, rather than just a product overview.
+[2026-07-28T09:01:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): It did. The part about catching a broken upstream change before the downstream team noticed felt familiar. Not exactly our setup, but close enough to prompt a good conversation.
+[2026-07-28T09:01:22+05:30] Anita Desai (CFO, FinEdge Payments): Before we get into options, I’d like to understand the size of the ask and what we’re buying.
+[2026-07-28T09:01:31+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. I can give you a working range and the assumptions behind it, then we can pressure-test whether the scope fits what Karan’s team actually needs.
+[2026-07-28T09:01:44+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Sure. Just to reset the technical context, we have about 40 pipelines, mostly around settlement, reconciliation, and reporting. The checks we use today are homegrown Airflow checks.
+[2026-07-28T09:01:57+05:30] Priya Nair (Account Executive, Tracewise): Right. And from our July 14 conversation, I noted three pipeline incidents last quarter, including one that delayed a settlement report. Have I got that right?
+[2026-07-28T09:02:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yes, that’s right. The report still went out, but later than anyone wanted. The hard part was that we knew something was off, but it took time to work out which upstream change mattered.
+[2026-07-28T09:02:21+05:30] Priya Nair (Account Executive, Tracewise): Got it. So it’s not that there are no alerts; it’s that the signal and the investigation path aren’t dependable enough when something goes wrong.
+[2026-07-28T09:02:31+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Exactly. We have alerts. We have a lot of alerts, actually. And some are great, and some are basically a message saying, “Something happened somewhere,” which is not what you want at 7 a.m.
+[2026-07-28T09:02:45+05:30] Anita Desai (CFO, FinEdge Payments): How much time does that cost the team?
+[2026-07-28T09:02:51+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): It varies. The team will jump on a pipeline, compare run history, message the owner, check whether it’s a data issue or a deployment issue. Sometimes it’s ten minutes; sometimes someone loses most of a morning. I don’t have a clean average yet.
+[2026-07-28T09:03:07+05:30] Priya Nair (Account Executive, Tracewise): That’s useful to know. I wouldn’t want to turn a rough estimate into a promised saving. We can build the case around the incidents and the time you can verify, and keep any assumptions visible.
+[2026-07-28T09:03:20+05:30] Anita Desai (CFO, FinEdge Payments): Good. I don’t want a savings model that depends on every incident becoming a crisis.
+[2026-07-28T09:03:27+05:30] Priya Nair (Account Executive, Tracewise): Agreed. The first question is probably whether the current checks can be improved enough, or whether there’s a genuine gap that merits another tool.
+[2026-07-28T09:03:40+05:30] Anita Desai (CFO, FinEdge Payments): Yes. What does this replace?
+[2026-07-28T09:03:46+05:30] Priya Nair (Account Executive, Tracewise): Fair question. Based on what Karan has described, it wouldn’t replace Airflow or your pipelines. It could replace some of the custom monitoring and the manual investigation steps, but we’d need to map which checks you’d keep, which you’d retire, and which should stay as they are.
+[2026-07-28T09:04:04+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s the bit I want to get right. Some checks are tiny and stable, and I don’t want us to migrate them for the sake of migrating them. Others are basically rules that one engineer remembers how to maintain.
+[2026-07-28T09:04:18+05:30] Priya Nair (Account Executive, Tracewise): That’s a sensible distinction. KS, if we took a small group of important pipelines first, what would make it a useful test for your team?
+[2026-07-28T09:04:29+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’d pick a few that are visible to finance and operations, plus one that has enough dependencies to test lineage. I can think of candidates, but I’d need to check with the owners. Otherwise I’ll volunteer somebody else’s pipeline and they’ll remind me about it for six months.
+[2026-07-28T09:04:45+05:30] Anita Desai (CFO, FinEdge Payments): And how long would that take?
+[2026-07-28T09:04:50+05:30] Priya Nair (Account Executive, Tracewise): For an initial scope like that, the setup is usually a few weeks, depending on access and how quickly we can work with the owners. I’d rather confirm the dependencies with Karan before attaching a firm timeline.
+[2026-07-28T09:05:05+05:30] Anita Desai (CFO, FinEdge Payments): What would we need to provide?
+[2026-07-28T09:05:10+05:30] Priya Nair (Account Executive, Tracewise): Typically, a technical contact, access to the relevant pipeline metadata, and time from the owners for a couple of working sessions. We’d agree on the boundaries before anyone connects anything. Karan, you can correct me if there’s a local requirement I’m missing.
+[2026-07-28T09:05:28+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s about right. We’d want to start read-only. Our platform team would review the access, then the pipeline owners would tell us which signals are meaningful. I can get those people in a room, but not all on the same day.
+[2026-07-28T09:05:44+05:30] Priya Nair (Account Executive, Tracewise): That’s fine. We can plan around their availability rather than create a big kickoff that nobody can attend.
+[2026-07-28T09:05:54+05:30] Anita Desai (CFO, FinEdge Payments): Okay. Let’s talk dollars.
+[2026-07-28T09:05:59+05:30] Anita Desai (CFO, FinEdge Payments): The budget is about $40K this fiscal year.
+[2026-07-28T09:06:07+05:30] Priya Nair (Account Executive, Tracewise): Thanks, that gives me a boundary to work with. Is that intended to cover the full first-year cost, including onboarding, or is onboarding accounted for separately?
+[2026-07-28T09:06:19+05:30] Anita Desai (CFO, FinEdge Payments): I’d prefer the total cost in one view. If onboarding is separate, I still need to know it before I can judge the spend.
+[2026-07-28T09:06:29+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll make the scope and any services line clear, rather than show a base number that leaves out the work needed to get started.
+[2026-07-28T09:06:41+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): And if we start with fewer pipelines, can we add more later without having to redo the whole setup?
+[2026-07-28T09:06:49+05:30] Priya Nair (Account Executive, Tracewise): Generally, yes. The exact commercial model depends on the scope, so I’ll confirm what expansion looks like rather than guess. Technically, we’d want the initial setup to be reusable.
+[2026-07-28T09:07:04+05:30] Anita Desai (CFO, FinEdge Payments): I don’t want a low entry price that doubles once the team has done the work.
+[2026-07-28T09:07:10+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. I can show a starting scope and a realistic next step, with the assumptions called out, so you can see how the spend changes if adoption goes well.
+[2026-07-28T09:07:26+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That would help me too. If I take a number to the engineers, they’re going to ask whether it covers the things they actually care about, like tracing a failed run back to the change that caused it.
+[2026-07-28T09:07:42+05:30] Priya Nair (Account Executive, Tracewise): Let’s put that on the technical validation list. We should be clear about what the product can show for your setup and what would still require you to check another system.
+[2026-07-28T09:07:56+05:30] Anita Desai (CFO, FinEdge Payments): What are you asking us to compare against? The cost of staff time?
+[2026-07-28T09:08:02+05:30] Priya Nair (Account Executive, Tracewise): Staff time is one part. We can also look at the operational impact of delayed detection, and the maintenance burden of the custom checks. But we should avoid assigning a dollar value to things you can’t reasonably measure.
+[2026-07-28T09:08:18+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): For maintenance, I could probably get a rough view from the people who own the checks. The time isn’t tracked formally. It’s more like, “I had to spend Friday afternoon fixing that script again.”
+[2026-07-28T09:08:34+05:30] Anita Desai (CFO, FinEdge Payments): Then call it a rough view. Don’t present it as audited savings.
+[2026-07-28T09:08:40+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. I’ll separate observed facts from estimates, and we can show a conservative scenario alongside the assumptions.
+[2026-07-28T09:08:53+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can ask the team for the last couple of incidents and how long it took to diagnose each one. One of the owners writes pretty detailed notes, so that might be more reliable than my memory.
+[2026-07-28T09:09:07+05:30] Priya Nair (Account Executive, Tracewise): That would be excellent. Even a small sample is better than a confident guess.
+[2026-07-28T09:09:16+05:30] Anita Desai (CFO, FinEdge Payments): When do we need to make a decision?
+[2026-07-28T09:09:21+05:30] Anita Desai (CFO, FinEdge Payments): We need a decision by Oct 31.
+[2026-07-28T09:09:28+05:30] Priya Nair (Account Executive, Tracewise): Okay. That gives us time to validate the technical fit and the financial case, but we shouldn’t leave the process steps until the last minute.
+[2026-07-28T09:09:39+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): For the technical part, I can coordinate with the platform team. We’d want one session on the data flow and one with the pipeline owners. If the demo can use a realistic example, they’ll engage more than if I just send them a recording.
+[2026-07-28T09:09:56+05:30] Priya Nair (Account Executive, Tracewise): That sounds right. We can use a representative workflow and make the discussion interactive. We’ll need to be careful not to use any production data in the session.
+[2026-07-28T09:10:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Definitely. We can make a sanitized example. I’ll check what we’re allowed to share, and I’ll invite the people who maintain the checks rather than only the managers.
+[2026-07-28T09:10:23+05:30] Anita Desai (CFO, FinEdge Payments): Who else needs to approve it?
+[2026-07-28T09:10:28+05:30] Anita Desai (CFO, FinEdge Payments): Procurement runs through Vikram Rao.
+[2026-07-28T09:10:35+05:30] Priya Nair (Account Executive, Tracewise): Thanks. Should we bring Vikram in once the scope is clear, or does he prefer to see a request earlier?
+[2026-07-28T09:10:46+05:30] Anita Desai (CFO, FinEdge Payments): Once there’s a defined scope. He’ll want the quote, supplier details, and the business rationale. If he sees an early draft with open questions, it tends to create more questions.
+[2026-07-28T09:11:01+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ll make sure I don’t send him a half-finished version. I can own the technical rationale and get it aligned with the team first.
+[2026-07-28T09:11:12+05:30] Priya Nair (Account Executive, Tracewise): That’s helpful. When you say supplier details, is there anything we should prepare beyond our standard company and security information?
+[2026-07-28T09:11:23+05:30] Anita Desai (CFO, FinEdge Payments): Vikram can tell you exactly what he needs. I can introduce you when we have the scope.
+[2026-07-28T09:11:34+05:30] Priya Nair (Account Executive, Tracewise): Perfect. I won’t assume his checklist. We can send him a concise package when you’re ready.
+[2026-07-28T09:11:47+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’m also thinking about who’d administer it day to day. I could take the initial lead, but I don’t want this to become a tool that only I understand. That’s happened before, and then I’m the person everyone pings when I’m trying to get lunch.
+[2026-07-28T09:12:04+05:30] Priya Nair (Account Executive, Tracewise): Yes, we should plan for shared ownership from the start. We can include the people who’ll maintain the checks and agree on what they need to learn during setup.
+[2026-07-28T09:12:17+05:30] Anita Desai (CFO, FinEdge Payments): Is training included?
+[2026-07-28T09:12:22+05:30] Priya Nair (Account Executive, Tracewise): I’ll confirm exactly what’s included in the proposed onboarding. At a minimum, I’d expect we can provide a working session for the admins and a handover for the pipeline owners, but I’ll put the specifics in writing.
+[2026-07-28T09:12:38+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That matters. We have people in different locations, so a session that can be recorded would make it much easier to bring new owners up to speed.
+[2026-07-28T09:12:52+05:30] Priya Nair (Account Executive, Tracewise): Good point. I’ll check how we can support that, and we can also make sure the material is usable after the initial setup rather than just a one-off call.
+[2026-07-28T09:13:06+05:30] Anita Desai (CFO, FinEdge Payments): I’m doing training for the Mumbai half marathon, so I’m going to be direct: I don’t want us buying a system that requires a weekly meeting forever.
+[2026-07-28T09:13:20+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s more organized than my exercise plan. But yes, I agree on the meetings. The team will use it if it fits how they work, not if it adds another standing call.
+[2026-07-28T09:13:34+05:30] Priya Nair (Account Executive, Tracewise): Totally fair. The goal should be a focused setup period, then a routine your team can run without us in every conversation. We can agree what support is available without making it a recurring meeting requirement.
+[2026-07-28T09:13:48+05:30] Anita Desai (CFO, FinEdge Payments): Good. That’s enough on my running.
+[2026-07-28T09:13:54+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Back to the pipeline owners: one of them is especially protective of their alert rules. They wrote most of them, and they’ll hear “replace” as “your work is being thrown away.”
+[2026-07-28T09:14:08+05:30] Priya Nair (Account Executive, Tracewise): Then we should make the evaluation collaborative. We can map what those rules do first, identify the ones that still make sense, and only suggest changes where there’s a clear reason.
+[2026-07-28T09:14:22+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can frame it that way. Some of those checks are useful; the issue is that they don’t explain enough when one of them fires.
+[2026-07-28T09:14:34+05:30] Priya Nair (Account Executive, Tracewise): That distinction will help. We’re not looking to erase the team’s knowledge. We want to see whether we can make the signals more actionable and reduce the manual chasing.
+[2026-07-28T09:14:49+05:30] Anita Desai (CFO, FinEdge Payments): I’m going to ask the uncomfortable question: if the current system is imperfect but free, why isn’t improving it the better choice?
+[2026-07-28T09:15:01+05:30] Priya Nair (Account Executive, Tracewise): It may be. We should compare both paths. For the current approach, that means estimating what it takes to maintain the checks and what coverage you can realistically add. For Tracewise, it means proving that the information and workflows justify the cost.
+[2026-07-28T09:15:19+05:30] Anita Desai (CFO, FinEdge Payments): Fine. I’ll want that comparison, not just a list of product capabilities.
+[2026-07-28T09:15:26+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll make it a decision-oriented comparison: current approach, proposed scope, costs, and what we can or can’t credibly quantify.
+[2026-07-28T09:15:41+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That would help me get the engineers involved. They’re practical people. If they can see a failed run and follow the reason without opening six tabs, that’ll mean more than a polished slide.
+[2026-07-28T09:15:58+05:30] Priya Nair (Account Executive, Tracewise): We can make the working session centered on that. Karan, could you send me an example of a workflow you’d be comfortable recreating with dummy data?
+[2026-07-28T09:16:10+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yes. I’ll ask the owners for something representative. I might have one in mind already, but I’ll check before I promise it. I’ve learned not to volunteer someone’s system on their behalf.
+[2026-07-28T09:16:23+05:30] Priya Nair (Account Executive, Tracewise): Appreciate that. And I can send a short outline of what the session will cover, so the team knows what to bring.
+[2026-07-28T09:16:36+05:30] Anita Desai (CFO, FinEdge Payments): What do you need from me before then?
+[2026-07-28T09:16:41+05:30] Priya Nair (Account Executive, Tracewise): For now, just the budget boundary and the decision process you’ve shared. Once we have a scope and a credible comparison, I’d ask you to review the business case and tell us where it doesn’t hold up.
+[2026-07-28T09:16:55+05:30] Anita Desai (CFO, FinEdge Payments): That’s reasonable. I’m not going to sign off on engineering claims I can’t validate, but I can review the cost and assumptions.
+[2026-07-28T09:17:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can own the technical part. I’ll ask the team to document the checks they’d keep, the ones they’d want to test, and the incidents where diagnosis took longer than it should have.
+[2026-07-28T09:17:21+05:30] Priya Nair (Account Executive, Tracewise): Great. That gives us inputs from both sides without making the engineers write a long report.
+[2026-07-28T09:17:34+05:30] Anita Desai (CFO, FinEdge Payments): And please don’t give me a twenty-page model.
+[2026-07-28T09:17:39+05:30] Priya Nair (Account Executive, Tracewise): I hear you. I’ll keep the first pass concise, and put supporting calculations behind it if you want to inspect them.
+[2026-07-28T09:17:52+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That works for me. I’m happy to read the details, but Anita shouldn’t have to hunt through an appendix to find the ask.
+[2026-07-28T09:18:04+05:30] Priya Nair (Account Executive, Tracewise): Agreed. One page for the decision, with the technical notes separate.
+[2026-07-28T09:18:14+05:30] Anita Desai (CFO, FinEdge Payments): How soon can we see a draft?
+[2026-07-28T09:18:19+05:30] Priya Nair (Account Executive, Tracewise): I’ll send an ROI one-pager by Aug 5. I’ll keep it provisional until we have the incident and maintenance inputs from Karan’s team.
+[2026-07-28T09:18:32+05:30] Anita Desai (CFO, FinEdge Payments): Good. Make sure the assumptions are visible on the page.
+[2026-07-28T09:18:38+05:30] Priya Nair (Account Executive, Tracewise): I will. And if you see a number you don’t trust, we can remove it or mark it as an estimate instead of trying to defend it.
+[2026-07-28T09:18:51+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ll aim to get you the technical inputs before then. I should be able to line up the owners, though I may need to negotiate around their release work.
+[2026-07-28T09:19:04+05:30] Priya Nair (Account Executive, Tracewise): No problem. Let’s schedule the technical session now, and you can tell me if the attendee list needs adjusting.
+[2026-07-28T09:19:15+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ll check calendars after this. I’d rather send you two or three windows than guess in the meeting.
+[2026-07-28T09:19:25+05:30] Priya Nair (Account Executive, Tracewise): Sounds good. I’ll send the agenda and the questions we’ll cover, so the owners can prepare without doing a lot of homework.
+[2026-07-28T09:19:39+05:30] Anita Desai (CFO, FinEdge Payments): When would you bring me back in?
+[2026-07-28T09:19:44+05:30] Priya Nair (Account Executive, Tracewise): Once the technical scope is clearer and I’ve drafted the comparison. Then we can review the total cost and assumptions together, before anything goes to procurement.
+[2026-07-28T09:19:58+05:30] Anita Desai (CFO, FinEdge Payments): Good. I don’t need to attend every technical discussion.
+[2026-07-28T09:20:05+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): And I’ll make sure you get a short summary afterward, not a transcript of every debate about naming conventions.
+[2026-07-28T09:20:15+05:30] Priya Nair (Account Executive, Tracewise): I’ll take the summary. Naming conventions can have a meeting of their own if needed.
+[2026-07-28T09:20:23+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Please don’t encourage them. We once spent forty minutes deciding what to call a shared table, and then somebody changed the name the next week.
+[2026-07-28T09:20:36+05:30] Anita Desai (CFO, FinEdge Payments): That’s your tangent, Karan.
+[2026-07-28T09:20:41+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Fair. I’m back. The important thing is getting the right owners into the technical session.
+[2026-07-28T09:20:50+05:30] Priya Nair (Account Executive, Tracewise): All good. Before we wrap, I want to check I’ve understood the path: Karan validates the technical fit and gathers the incident and maintenance inputs; I prepare the scope, cost view, and ROI summary; Anita reviews the business case; then we involve Vikram with a defined package.
+[2026-07-28T09:21:09+05:30] Anita Desai (CFO, FinEdge Payments): Yes. And I’ll want the total cost and the alternative of maintaining what we have.
+[2026-07-28T09:21:18+05:30] Priya Nair (Account Executive, Tracewise): Noted. The comparison will include the current approach, not just the proposed purchase.
+[2026-07-28T09:21:28+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ll send over the candidate workflows and the owner list. I’ll keep it to a manageable group for the first session.
+[2026-07-28T09:21:39+05:30] Priya Nair (Account Executive, Tracewise): Great. I’ll send a recap today with the agenda, the inputs we need, and the commercial questions I’m confirming.
+[2026-07-28T09:21:51+05:30] Anita Desai (CFO, FinEdge Payments): Please include the decision timing in the recap so everyone is working back from the same point.
+[2026-07-28T09:21:58+05:30] Priya Nair (Account Executive, Tracewise): Will do. I’ll also keep the written scope clear about what’s included, what’s optional, and what we still need to validate.
+[2026-07-28T09:22:12+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): One last question. If the technical session shows that only part of the workflow is a fit, can we still price that smaller scope?
+[2026-07-28T09:22:21+05:30] Priya Nair (Account Executive, Tracewise): Yes. We can come back with a smaller, defined scope if that’s what the evidence supports. I won’t treat a partial fit as a reason to push a bigger rollout.
+[2026-07-28T09:22:34+05:30] Anita Desai (CFO, FinEdge Payments): Good. I’d rather have a clear limited case than a broad one that doesn’t hold together.
+[2026-07-28T09:22:41+05:30] Priya Nair (Account Executive, Tracewise): That’s a good principle for this evaluation. We’ll make the recommendation match what we learn.
+[2026-07-28T09:22:52+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’m feeling good about the next steps. The team will have opinions, but if we show them their own workflow and let them challenge it, we’ll get a real answer.
+[2026-07-28T09:23:06+05:30] Priya Nair (Account Executive, Tracewise): Exactly. Better to find out early what doesn’t fit than to assume it will.
+[2026-07-28T09:23:16+05:30] Anita Desai (CFO, FinEdge Payments): All right. I have what I need for now.
+[2026-07-28T09:23:22+05:30] Priya Nair (Account Executive, Tracewise): Great. Quick recap: Karan will confirm candidate workflows, owners, and incident details. I’ll send today’s recap and the technical-session outline, then prepare the one-page financial view for Aug 5. We’ll review scope and total cost with Anita before engaging procurement.
+[2026-07-28T09:23:39+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s right. I’ll get back to you with calendar options once I’ve checked with the owners.
+[2026-07-28T09:23:47+05:30] Anita Desai (CFO, FinEdge Payments): Works for me. Thank you both.
+[2026-07-28T09:23:53+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Anita. Thanks, Karan. I’ll send the follow-up shortly.
+[2026-07-28T09:24:00+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Thanks, Priya. Talk soon.
+[2026-07-28T09:24:05+05:30] Anita Desai (CFO, FinEdge Payments): Bye.
+[2026-07-28T09:24:08+05:30] Priya Nair (Account Executive, Tracewise): Bye, both.
