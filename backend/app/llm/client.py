@@ -60,8 +60,19 @@ class LLMClient(abc.ABC):
         """Run one plain-text LLM call and return the response text."""
 
 
-def get_llm_client(config: Settings | None = None) -> LLMClient:
-    """Build the adapter for `LLM_PROVIDER`. Fails fast (`ConfigError`) on bad config."""
+def get_llm_client(
+    config: Settings | None = None, *, timeout_seconds: float | None = None
+) -> LLMClient:
+    """Build the adapter for `LLM_PROVIDER`. Fails fast (`ConfigError`) on bad config.
+
+    `timeout_seconds` overrides the adapter's per-call timeout (default 30 s when None).
+    """
+    if timeout_seconds is not None and timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be > 0")
+    # Lazy import: providers.base imports this module (LLMClient).
+    from app.llm.providers.base import DEFAULT_TIMEOUT_SECONDS
+
+    timeout = DEFAULT_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
     config = config or default_settings
     config.validate_app_llm_config()
     api_key = config.app_llm_api_key
@@ -72,11 +83,11 @@ def get_llm_client(config: Settings | None = None) -> LLMClient:
     if config.llm_provider == "openai":
         from app.llm.providers.openai import OpenAIProvider
 
-        return OpenAIProvider(api_key=api_key, model=model)
+        return OpenAIProvider(api_key=api_key, model=model, timeout_seconds=timeout)
     if config.llm_provider == "groq":
         from app.llm.providers.groq import GroqProvider
 
-        return GroqProvider(api_key=api_key, model=model)
+        return GroqProvider(api_key=api_key, model=model, timeout_seconds=timeout)
     from app.llm.providers.anthropic import AnthropicProvider
 
-    return AnthropicProvider(api_key=api_key, model=model)
+    return AnthropicProvider(api_key=api_key, model=model, timeout_seconds=timeout)
