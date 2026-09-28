@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+from app.config import settings
 from app.core.errors import register_exception_handlers
 
-app = FastAPI(title="Meeting Prep Agent API")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Fail fast at startup on invalid LLM config (app and Hindsight).
+
+    Raises `ConfigError` naming the variable, never its value. Later tickets add
+    gateway startup/shutdown around the `yield`.
+    """
+    settings.validate_llm_config()
+    yield
+
+
+app = FastAPI(title="Meeting Prep Agent API", lifespan=lifespan)
 
 register_exception_handlers(app)
 
