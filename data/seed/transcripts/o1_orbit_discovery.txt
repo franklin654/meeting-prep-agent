@@ -1,0 +1,163 @@
+[2026-05-06T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): Hi, Lakshmi. Can you hear me okay?
+[2026-05-06T10:00:05+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yep, loud and clear. Hi, Priya.
+[2026-05-06T10:00:10+05:30] Priya Nair (Account Executive, Tracewise): Great. Thanks for making time. How’s your morning going?
+[2026-05-06T10:00:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Busy, but manageable. We’re in the middle of planning, so everyone has a spreadsheet open somewhere.
+[2026-05-06T10:00:24+05:30] Priya Nair (Account Executive, Tracewise): I know that feeling. I’ve got a few tabs open myself. And just to check, are you still okay for about half an hour?
+[2026-05-06T10:00:31+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, that works.
+[2026-05-06T10:00:36+05:30] Priya Nair (Account Executive, Tracewise): Perfect. Since this is our first conversation, I thought I’d keep it simple: understand how you’re handling data reliability today, what’s most important to improve, and then we can see whether it’s worth a follow-up. Sound alright?
+[2026-05-06T10:00:47+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Sounds good. I’d rather start with the problem than sit through a generic product tour.
+[2026-05-06T10:00:53+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. No slides unless they’re useful. To start, could you give me the quick version of your role and what your team owns?
+[2026-05-06T10:01:04+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I lead data for Orbit Retail. That covers the platform team, analytics engineering, and the group supporting reporting for merchandising and operations. The exact boundaries move around a bit, depending on the project.
+[2026-05-06T10:01:20+05:30] Priya Nair (Account Executive, Tracewise): Sure. And what’s taking up the most attention right now?
+[2026-05-06T10:01:27+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Reliability. We have plenty of data, but people need to trust it before they’ll act on it. It’s not one dramatic outage. It’s lots of small issues that take too long to spot and sort out.
+[2026-05-06T10:01:44+05:30] Priya Nair (Account Executive, Tracewise): When you say small issues, what tends to show up most often?
+[2026-05-06T10:01:50+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Late feeds, schema changes, and jobs that technically complete but produce something odd. Then there are gaps that nobody notices until a report looks wrong.
+[2026-05-06T10:02:03+05:30] Priya Nair (Account Executive, Tracewise): How do those get noticed today?
+[2026-05-06T10:02:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Usually a dashboard user messages someone, or an analyst spots a mismatch while doing their own checks. We have alerts on some jobs, but they’re mostly about whether a run completed.
+[2026-05-06T10:02:24+05:30] Priya Nair (Account Executive, Tracewise): So the alert tells you the job ran, but not necessarily that the output makes sense?
+[2026-05-06T10:02:30+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. And the business has different ideas of what “makes sense” means, which complicates things.
+[2026-05-06T10:02:40+05:30] Priya Nair (Account Executive, Tracewise): Right. Can you walk me through one area where that gap has been particularly visible?
+[2026-05-06T10:02:48+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Stock-level pipelines fail silently. We may not know there’s a problem until a store or category team sees that the numbers don’t line up.
+[2026-05-06T10:03:03+05:30] Priya Nair (Account Executive, Tracewise): Understood. When that happens, what’s the usual chain of events?
+[2026-05-06T10:03:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Someone raises it in chat. Then an analyst checks the report, asks the data team if the source arrived, and the engineers start tracing the job history. If it’s unclear, we bring in the source-system owner.
+[2026-05-06T10:03:26+05:30] Priya Nair (Account Executive, Tracewise): And roughly how much time does that take?
+[2026-05-06T10:03:31+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It varies. A straightforward case might take an hour or two. If ownership isn’t clear or the issue crosses teams, it can take a good part of the day.
+[2026-05-06T10:03:45+05:30] Priya Nair (Account Executive, Tracewise): Is there a consistent person who coordinates that, or does it depend on who hears about it first?
+[2026-05-06T10:03:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It depends. We have a support rotation, but the first person who sees the message often ends up coordinating. That isn’t ideal.
+[2026-05-06T10:04:05+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. What tools are in the mix for monitoring and investigation?
+[2026-05-06T10:04:11+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Our warehouse has its own logs and job status. We use a couple of internal checks, and the team has dashboards for freshness and volume on selected tables. A lot of the actual investigation is still done by querying directly.
+[2026-05-06T10:04:29+05:30] Priya Nair (Account Executive, Tracewise): Are those internal checks centrally managed?
+[2026-05-06T10:04:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not fully. Some are owned by platform, some sit with analytics engineering, and a few are maintained by the teams that asked for them. We’ve accumulated them over time.
+[2026-05-06T10:04:49+05:30] Priya Nair (Account Executive, Tracewise): How’s the experience of keeping them current?
+[2026-05-06T10:04:54+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mixed. The checks that have a clear owner are fine. The others can become background noise. People stop paying attention if an alert fires too often without a clear action.
+[2026-05-06T10:05:08+05:30] Priya Nair (Account Executive, Tracewise): Yeah, alert fatigue is hard to unwind once it sets in. Do you have any shared definition of severity or response time?
+[2026-05-06T10:05:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We have guidance for production incidents, but not a consistent policy for data quality. A bad number in a daily operations report is treated differently from a minor delay in an exploratory dashboard.
+[2026-05-06T10:05:35+05:30] Priya Nair (Account Executive, Tracewise): That distinction seems important. Who usually decides the business impact?
+[2026-05-06T10:05:41+05:30] Lakshmi Pillai (VP Data, Orbit Retail): The business owner, if they’re available. The data team can explain what changed, but we don’t always know whether the affected metric is critical to that day’s decisions.
+[2026-05-06T10:05:55+05:30] Priya Nair (Account Executive, Tracewise): Is there a particular business process that’s most sensitive to those delays or inaccuracies?
+[2026-05-06T10:06:03+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Replenishment is a clear example. If inventory numbers are questionable, the teams become cautious about using the recommendations. Promotions can also be tricky because there’s a short window to react.
+[2026-05-06T10:06:20+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. Do you have a way to measure the effect, or is it mostly seen in escalations and manual work?
+[2026-05-06T10:06:29+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mostly the latter right now. We can see support requests and some of the manual checking, but we don’t have a reliable measure of the total effort.
+[2026-05-06T10:06:42+05:30] Priya Nair (Account Executive, Tracewise): If you were able to get one thing under better control first, what would you pick?
+[2026-05-06T10:06:49+05:30] Lakshmi Pillai (VP Data, Orbit Retail): The critical pipelines. I don’t want to monitor everything just because we can. I’d rather know which datasets matter, who owns them, and what a meaningful warning looks like.
+[2026-05-06T10:07:04+05:30] Priya Nair (Account Executive, Tracewise): That’s a helpful way to frame it. How far along are you on identifying those datasets and owners?
+[2026-05-06T10:07:12+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We have a catalog, but coverage and ownership aren’t complete. The teams know their own areas better than they know the whole picture.
+[2026-05-06T10:07:24+05:30] Priya Nair (Account Executive, Tracewise): Is completing the catalog an active initiative, or more of a goal people mention when there’s time?
+[2026-05-06T10:07:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It’s active, but it competes with delivery work. We’re trying to make it part of how new data products are introduced rather than asking everyone to go document old tables all at once.
+[2026-05-06T10:07:51+05:30] Priya Nair (Account Executive, Tracewise): That sounds more sustainable. What would a successful first phase look like for you?
+[2026-05-06T10:07:58+05:30] Lakshmi Pillai (VP Data, Orbit Retail): A small set of important datasets with clear owners, useful checks, and a way to see what changed when something goes off track. And the team shouldn’t need a full-time person just to maintain the setup.
+[2026-05-06T10:08:18+05:30] Priya Nair (Account Executive, Tracewise): That last part is worth underlining. How many people would realistically be involved in a first phase?
+[2026-05-06T10:08:25+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Probably a platform engineer, someone from analytics engineering, and the business owner for whichever area we choose. I’d sponsor it, but I wouldn’t be doing the day-to-day configuration.
+[2026-05-06T10:08:41+05:30] Priya Nair (Account Executive, Tracewise): Got it. And would your security or infrastructure teams need to review a new tool?
+[2026-05-06T10:08:47+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. Security would want to understand what data it accesses and where it runs. Platform would look at deployment and permissions. We try not to create a second operational system without a clear reason.
+[2026-05-06T10:09:04+05:30] Priya Nair (Account Executive, Tracewise): Of course. Is your preference to keep that kind of tooling in your environment?
+[2026-05-06T10:09:11+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Generally, yes, though I’d want the technical details before making a call. Data access is always the first question.
+[2026-05-06T10:09:24+05:30] Priya Nair (Account Executive, Tracewise): We can make sure that’s part of any technical follow-up. Just to understand the timing, is there a particular deadline or planning event driving this conversation?
+[2026-05-06T10:09:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We’re reviewing priorities for the next planning cycle. I’m looking at a few ways to reduce operational drag, but nothing has been approved yet.
+[2026-05-06T10:09:48+05:30] Priya Nair (Account Executive, Tracewise): Helpful context. Where does budget stand for work like this?
+[2026-05-06T10:09:54+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Honestly, the budget is tight this year. I’d need a clear case for the cost, and I’d be cautious about something that starts small and then grows with usage.
+[2026-05-06T10:10:09+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. Is the main concern the starting price, or uncertainty about what it could cost over time?
+[2026-05-06T10:10:17+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Both, but mostly predictability. If the value is clear, I can make a case. I don’t want to discover later that the useful version requires a much larger commitment.
+[2026-05-06T10:10:32+05:30] Priya Nair (Account Executive, Tracewise): Understood. I won’t make assumptions about fit or pricing before we know the scope. If it’s useful, we can keep any evaluation focused on a small, defined area.
+[2026-05-06T10:10:43+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That would be better. A broad rollout would be hard to justify before we know whether the team actually uses it.
+[2026-05-06T10:10:56+05:30] Priya Nair (Account Executive, Tracewise): What would you need to see to feel confident that it’s worth exploring further?
+[2026-05-06T10:11:04+05:30] Lakshmi Pillai (VP Data, Orbit Retail): First, whether it can identify issues that our current checks miss. Second, whether it helps someone get to a likely cause faster. And third, whether setup is manageable for our engineers.
+[2026-05-06T10:11:20+05:30] Priya Nair (Account Executive, Tracewise): Those are good criteria. Would the business team need to see it too, or would you want to validate the technical side first?
+[2026-05-06T10:11:28+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Technical validation first. After that, I’d bring in the owner for replenishment or merchandising. They’ll want to know what changes for them, not how the checks are configured.
+[2026-05-06T10:11:43+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. Do you have a representative dataset in mind for that technical validation?
+[2026-05-06T10:11:49+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Probably a stock or inventory dataset. We’d need to confirm which one with the team, because I don’t want to choose something with an unusual source or a temporary workaround.
+[2026-05-06T10:12:04+05:30] Priya Nair (Account Executive, Tracewise): Right, you want a normal slice of the environment, not a special case that tells us very little.
+[2026-05-06T10:12:12+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly.
+[2026-05-06T10:12:17+05:30] Priya Nair (Account Executive, Tracewise): Could you describe the rough shape of the data flow, just at a high level?
+[2026-05-06T10:12:24+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Operational systems feed into our warehouse through scheduled ingestion. From there, analytics engineering maintains transformed tables for reporting and internal applications. A few teams also have their own downstream jobs.
+[2026-05-06T10:12:40+05:30] Priya Nair (Account Executive, Tracewise): And where do you most often see the problem surface: ingestion, transformation, or downstream consumption?
+[2026-05-06T10:12:48+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Any of those. We see late arrival at ingestion, unexpected values after transformation, and then confusion downstream about which table is the source of truth.
+[2026-05-06T10:13:03+05:30] Priya Nair (Account Executive, Tracewise): Is that source-of-truth question a naming issue, an ownership issue, or both?
+[2026-05-06T10:13:11+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Both, probably. Teams move quickly and make a useful table for a specific need. Then it gets reused, but the context doesn’t always travel with it.
+[2026-05-06T10:13:27+05:30] Priya Nair (Account Executive, Tracewise): Yeah, that tends to happen once a useful table gets passed around. Do people have a place to see lineage today?
+[2026-05-06T10:13:36+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Some lineage is available in our catalog, but it’s not complete for every workflow. Engineers can usually work it out, though that may mean looking in several places.
+[2026-05-06T10:13:51+05:30] Priya Nair (Account Executive, Tracewise): When somebody reports a bad number, how do you work out which downstream reports could be affected?
+[2026-05-06T10:14:00+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We check the known dependencies, ask around, and sometimes compare the report with another view. It’s workable, but it can take several people to build the picture.
+[2026-05-06T10:14:14+05:30] Priya Nair (Account Executive, Tracewise): Is there a formal incident record for those cases?
+[2026-05-06T10:14:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): For the more serious ones, yes. Smaller data issues might stay in chat or a ticket. That means the history isn’t always easy to search later.
+[2026-05-06T10:14:35+05:30] Priya Nair (Account Executive, Tracewise): Do you ever use those records to spot recurring patterns?
+[2026-05-06T10:14:41+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We try. It’s harder than it should be because the descriptions vary and the resolution notes aren’t always detailed.
+[2026-05-06T10:14:56+05:30] Priya Nair (Account Executive, Tracewise): So there’s an opportunity not just to alert, but to make the investigation repeatable.
+[2026-05-06T10:15:04+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, if it doesn’t turn into a process people have to feed all day.
+[2026-05-06T10:15:13+05:30] Priya Nair (Account Executive, Tracewise): That’s a good constraint. I’m curious, how do you decide whether to build something internally or look at an external platform?
+[2026-05-06T10:15:23+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We look at what we can maintain. A small check is easy enough to build, but a durable system for ownership, alert context, and investigation takes ongoing attention. That’s where we compare options.
+[2026-05-06T10:15:41+05:30] Priya Nair (Account Executive, Tracewise): And do you already have an internal project aimed at that broader problem?
+[2026-05-06T10:15:48+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not a full project. There are pieces of work in the backlog, but nothing with a dedicated team or a committed delivery date.
+[2026-05-06T10:16:01+05:30] Priya Nair (Account Executive, Tracewise): Okay. I should ask about integrations before I get too far ahead. What do your engineers rely on day to day for code and team communication?
+[2026-05-06T10:16:11+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Code review and deployment are in our standard development setup, and team coordination is mostly through chat and tickets. The exact tools vary by group.
+[2026-05-06T10:16:24+05:30] Priya Nair (Account Executive, Tracewise): Got it. A technical session could map those out rather than me guessing. Would it be useful to include someone from platform engineering?
+[2026-05-06T10:16:33+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. They’ll have the right questions about access, deployment, and operational ownership.
+[2026-05-06T10:16:44+05:30] Priya Nair (Account Executive, Tracewise): Great. Before we get into possible next steps, can I ask one slightly different question? What’s the thing your team is proudest of in its data setup?
+[2026-05-06T10:16:55+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We’ve made good progress getting analysts closer to the business teams. They don’t just receive a request and produce a report; they understand how the numbers are used.
+[2026-05-06T10:17:11+05:30] Priya Nair (Account Executive, Tracewise): That’s valuable. It probably makes it easier to define which problems matter.
+[2026-05-06T10:17:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It does, though it also means people have quite full calendars.
+[2026-05-06T10:17:26+05:30] Priya Nair (Account Executive, Tracewise): Fair. On a different note, I saw the rain had started up in Bengaluru this morning. Has it reached your side yet?
+[2026-05-06T10:17:36+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It has. I was hoping for a dry walk before work, but the weather had other plans.
+[2026-05-06T10:17:44+05:30] Priya Nair (Account Executive, Tracewise): Ah, same here. I made it to the coffee shop just before it came down, so at least the coffee was safe.
+[2026-05-06T10:17:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Priorities in the right order.
+[2026-05-06T10:17:57+05:30] Priya Nair (Account Executive, Tracewise): Definitely. Sorry, that was a tangent. Back to this: if you did choose one dataset, what would you want the test to answer?
+[2026-05-06T10:18:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Whether we can catch a meaningful change early, see enough context to understand it, and route it to the right owner. I’d also want to know how much tuning is required.
+[2026-05-06T10:18:23+05:30] Priya Nair (Account Executive, Tracewise): What would count as a meaningful change in that area?
+[2026-05-06T10:18:30+05:30] Lakshmi Pillai (VP Data, Orbit Retail): A missing or delayed load, a sharp shift in row counts, or a value outside the expected range. But we’d need the team to define sensible thresholds; a fixed rule can be noisy if the data naturally varies.
+[2026-05-06T10:18:47+05:30] Priya Nair (Account Executive, Tracewise): Right. You’d want it judged against the pattern of that dataset, not just an arbitrary line.
+[2026-05-06T10:18:55+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. And we’d need to know why it flagged something. A warning without context creates another investigation.
+[2026-05-06T10:19:08+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. Would the first test need to run against live production data?
+[2026-05-06T10:19:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not necessarily. We’d need to understand the access model and what the tool stores. If there’s a lower-risk way to validate the setup first, we’d prefer that.
+[2026-05-06T10:19:31+05:30] Priya Nair (Account Executive, Tracewise): We can walk through those details with your platform and security folks before suggesting a setup. Is there anything particular they’ll be concerned about beyond access and storage?
+[2026-05-06T10:19:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Network boundaries, credentials, and what happens if the service is unavailable. They’ll want to make sure it can’t affect our existing jobs.
+[2026-05-06T10:19:56+05:30] Priya Nair (Account Executive, Tracewise): Good to know. I’ll make sure we focus the technical discussion there. Switching back to the business case, who would need to sign off if you decided to move forward?
+[2026-05-06T10:20:07+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I’d recommend it if the evaluation went well. Finance would review the spend, and platform leadership would need to be comfortable with the operational model. The business owner would need to see the benefit.
+[2026-05-06T10:20:23+05:30] Priya Nair (Account Executive, Tracewise): Would you expect a formal procurement process as well?
+[2026-05-06T10:20:30+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, if it got to a purchase. Security review and vendor onboarding would be part of that.
+[2026-05-06T10:20:41+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. Is there a particular date by which you need to decide whether to pursue this?
+[2026-05-06T10:20:49+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not yet. I’m trying to narrow down priorities before I ask other teams for time. If we have a clear, small evaluation, I can put it in front of them.
+[2026-05-06T10:21:04+05:30] Priya Nair (Account Executive, Tracewise): Understood. I want to make sure I’m not assuming you’re ready for a sales process. From what you’ve said, it sounds like there’s real interest in improving visibility, but cost and implementation effort are big filters. Did I get that right?
+[2026-05-06T10:21:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. I’m open to exploring it, but I’m not looking for a tool just to say we have a tool. It has to reduce work or improve trust in a way we can explain.
+[2026-05-06T10:21:32+05:30] Priya Nair (Account Executive, Tracewise): That’s a sensible bar. Would it help if I briefly explained how Tracewise approaches that, without turning this into a full demo?
+[2026-05-06T10:21:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Sure, keep it high level.
+[2026-05-06T10:21:47+05:30] Priya Nair (Account Executive, Tracewise): At a high level, Tracewise helps teams set up checks around important data assets, understand changes and dependencies, and route issues with context to the people who can act. The intent is to make monitoring and investigation part of one workflow rather than add another set of disconnected alerts.
+[2026-05-06T10:22:06+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Okay. How much of that is automatic, and how much do we have to define ourselves?
+[2026-05-06T10:22:16+05:30] Priya Nair (Account Executive, Tracewise): Some signals can be suggested from the data and its behavior. The team still needs to decide what’s important, confirm owners, and tune checks to match how the business uses the data. I’d rather show that on a relevant example than promise a hands-off setup.
+[2026-05-06T10:22:33+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s the right answer. We’ve had tools claim they’re automatic and then require a lot of care.
+[2026-05-06T10:22:43+05:30] Priya Nair (Account Executive, Tracewise): I hear you. What sort of ongoing effort would feel reasonable for your team?
+[2026-05-06T10:22:51+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I can’t give you a number yet. It needs to fit into existing ownership rather than create a new role. If checks need constant adjustment, people will deprioritize them.
+[2026-05-06T10:23:06+05:30] Priya Nair (Account Executive, Tracewise): That gives us something concrete to validate. We can include the setup steps and ongoing maintenance in the walkthrough, not just the alert itself.
+[2026-05-06T10:23:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Good. I’d also want to know what happens when an alert is wrong. Can the owner give feedback or refine the rule?
+[2026-05-06T10:23:29+05:30] Priya Nair (Account Executive, Tracewise): Yes, we can cover how checks are adjusted and how the team can handle an alert that doesn’t reflect the business context. I’ll get a specialist to show the exact workflow so I don’t hand-wave it.
+[2026-05-06T10:23:44+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Appreciate that.
+[2026-05-06T10:23:49+05:30] Priya Nair (Account Executive, Tracewise): Based on this conversation, I’d suggest a focused technical session: map the stock or inventory flow, review access and deployment, and show how a check is configured and investigated. Then you can decide whether it merits a small evaluation. Would that be useful?
+[2026-05-06T10:24:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, as long as we keep it practical and don’t spend the session on a broad overview.
+[2026-05-06T10:24:18+05:30] Priya Nair (Account Executive, Tracewise): Agreed. Who should join from your side?
+[2026-05-06T10:24:24+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I’d invite the platform engineer who owns data access and someone from analytics engineering. I can ask them who makes sense for the inventory flow.
+[2026-05-06T10:24:38+05:30] Priya Nair (Account Executive, Tracewise): Perfect. On our side I’ll bring a solutions engineer and send a short agenda in advance. Could you share a diagram or a redacted example beforehand, if that’s easy?
+[2026-05-06T10:24:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I can check. We may have an architecture sketch we can use, but I’ll need to make sure it’s okay to share externally.
+[2026-05-06T10:25:05+05:30] Priya Nair (Account Executive, Tracewise): Of course—please don’t send anything until that’s cleared. A verbal walkthrough is fine too.
+[2026-05-06T10:25:13+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Great. What would you need from us to prepare?
+[2026-05-06T10:25:20+05:30] Priya Nair (Account Executive, Tracewise): The name of the warehouse and orchestration setup, if you’re comfortable sharing those, plus a rough example of a recent issue and who was involved. No sensitive data needed.
+[2026-05-06T10:25:34+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I can send the platform details and ask the engineer to bring an example. They’ll be better placed to explain the technical sequence.
+[2026-05-06T10:25:46+05:30] Priya Nair (Account Executive, Tracewise): Sounds good. And I’ll send a one-page outline of the session, including the questions we’ll cover on deployment, data access, alert context, and maintenance.
+[2026-05-06T10:25:59+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Please include pricing structure at a high level too. I don’t need a quote before we scope anything, but I do need to understand what drives the cost.
+[2026-05-06T10:26:14+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. I’ll include the main pricing factors and make clear what we’d need to know before giving you a meaningful estimate.
+[2026-05-06T10:26:26+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Good. Predictability matters more to me than an attractive starting figure.
+[2026-05-06T10:26:36+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll make sure we address that directly rather than leave it for later.
+[2026-05-06T10:26:44+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks.
+[2026-05-06T10:26:48+05:30] Priya Nair (Account Executive, Tracewise): For scheduling, would early next week be reasonable, or is that too soon to get the right people together?
+[2026-05-06T10:26:58+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Early next week might be tight. Let me check with them first, and I’ll send you a couple of options.
+[2026-05-06T10:27:09+05:30] Priya Nair (Account Executive, Tracewise): That works. I’ll email the outline today, and you can reply with times once you’ve checked.
+[2026-05-06T10:27:18+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. I’ll also confirm which dataset we should use as the example.
+[2026-05-06T10:27:27+05:30] Priya Nair (Account Executive, Tracewise): Great. One last question for my notes: is there anything you’d want me to avoid in the next session?
+[2026-05-06T10:27:35+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Keep the discussion grounded in our workflow. Don’t assume every alert is urgent, and please be direct if something depends on setup or extra work from us.
+[2026-05-06T10:27:49+05:30] Priya Nair (Account Executive, Tracewise): That’s clear. I’ll keep it specific and call out any assumptions. Anything I missed that you think we should cover?
+[2026-05-06T10:27:59+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No, I think that covers it. This was useful.
+[2026-05-06T10:28:05+05:30] Priya Nair (Account Executive, Tracewise): Glad to hear it. Just to recap: you’ll check with platform and analytics engineering, confirm a representative inventory dataset, and send a few times. I’ll send the agenda and pricing structure, then bring a solutions engineer to the technical session.
+[2026-05-06T10:28:22+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s right.
+[2026-05-06T10:28:26+05:30] Priya Nair (Account Executive, Tracewise): Perfect. Thanks again, Lakshmi. I appreciate the candor, especially on the budget and the maintenance concerns.
+[2026-05-06T10:28:36+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Sure. Thanks for keeping it focused.
+[2026-05-06T10:28:42+05:30] Priya Nair (Account Executive, Tracewise): You’re welcome. Hope the rain lets up for your next walk.
+[2026-05-06T10:28:48+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks, you too. Bye, Priya.
+[2026-05-06T10:28:53+05:30] Priya Nair (Account Executive, Tracewise): Bye, Lakshmi. Have a good day.
