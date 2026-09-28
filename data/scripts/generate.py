@@ -66,6 +66,7 @@ DEFAULT_PAUSE_SECONDS = 0.0
 DEFAULT_MAX_ATTEMPTS = 4  # 1 try + at most 3 regenerations
 CALL_TIMEOUT_SECONDS = 300.0  # per-call ceiling passed to get_llm_client
 MAX_PARALLEL_LANES = 4
+DEFAULT_REJECTED_DIR = Path("/tmp/t10_rejected")  # raw rejected attempts; never in the repo
 DEFAULT_RATE_LIMIT_BACKOFF_SECONDS = 20.0
 DEFAULT_MAX_RATE_LIMIT_RETRIES = 5
 NO_STYLE_REFS = "(none provided; use ordinary, casual business speech between colleagues)"
@@ -266,6 +267,7 @@ async def generate_transcripts(
     rate_limit_backoff_seconds: float = DEFAULT_RATE_LIMIT_BACKOFF_SECONDS,
     max_rate_limit_retries: int = DEFAULT_MAX_RATE_LIMIT_RETRIES,
     max_parallel: int = MAX_PARALLEL_LANES,
+    rejected_dir: Path | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> GenerationResult:
     """Generate the selected transcripts. See the module docstring for the rules."""
@@ -339,6 +341,9 @@ async def generate_transcripts(
                 write_transcript(path, text, overwrite=force)
                 result.written.append(mid)
                 return
+            if rejected_dir is not None:
+                rejected_dir.mkdir(parents=True, exist_ok=True)
+                (rejected_dir / f"{mid}_attempt{attempt}.txt").write_text(text, encoding="utf-8")
             feedback = [p for p in problems if not _is_length_problem(p)]
             prompt = base_prompt
             if feedback:
@@ -424,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
                 include_m6=args.include_m6,
                 force=args.force,
                 max_attempts=args.max_attempts,
+                rejected_dir=DEFAULT_REJECTED_DIR,
             )
         )
     except RefuseOverwriteError as exc:

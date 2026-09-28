@@ -435,3 +435,39 @@ def test_seed_object_is_not_mutated(tmp_path: Path):
     fake.queue_text(_m1_text())
     _run(generate_transcripts(fake, seed, tmp_path, sleep=NoSleep(), only={"m1_test"}))
     assert seed.beats == before
+
+
+def test_rejected_attempts_are_saved_outside_the_repo_and_not_logged(tmp_path: Path, caplog):
+    import generate
+
+    seed = make_seed()
+    rejected = tmp_path / "rejected"
+    out = tmp_path / "out"
+    marker = "SECRETMARKER"
+    bad = (
+        "[2026-07-14T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): "
+        f"{marker} (laughs)\n"
+    )
+    fake = FakeLLM()
+    fake.queue_text(bad)
+    fake.queue_text(_m1_text())
+    with caplog.at_level("INFO"):
+        _run(
+            generate_transcripts(
+                fake, seed, out, sleep=NoSleep(), only={"m1_test"}, rejected_dir=rejected
+            )
+        )
+    saved = rejected / "m1_test_attempt1.txt"
+    assert saved.read_text() == bad
+    assert not (rejected / "m1_test_attempt2.txt").exists()  # the accepted attempt
+    assert marker not in caplog.text
+    assert str(generate.DEFAULT_REJECTED_DIR) == "/tmp/t10_rejected"
+
+
+def test_no_rejected_dir_means_nothing_is_saved(tmp_path: Path):
+    seed = make_seed()
+    fake = FakeLLM()
+    fake.queue_text("nonsense\n")
+    fake.queue_text(_m1_text())
+    _run(generate_transcripts(fake, seed, tmp_path, sleep=NoSleep(), only={"m1_test"}))
+    assert [p.name for p in tmp_path.iterdir()] == ["m1_test_discovery.txt"]
