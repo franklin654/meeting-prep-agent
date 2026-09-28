@@ -22,7 +22,20 @@ from pydantic import BaseModel
 from app.memory.memory_service import HindsightMemoryService
 from app.memory.tags import account_tag
 
-pytestmark = pytest.mark.live
+# PENDING (not a permanent xfail): this contract test is skipped until T08b.
+# It is blocked by the Groq org's 8,000 tokens-per-minute cap (independent of
+# model), which Hindsight's retain/reflect calls exceed. T08b (switchable LLM
+# provider for app and Hindsight) must re-run this test on Hindsight's
+# configured provider and REMOVE this skip once it passes.
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skip(
+        reason=(
+            "pending T08b: blocked by Groq org 8,000 TPM cap; re-enable when "
+            "T08b lands and the test passes on Hindsight's configured provider"
+        )
+    ),
+]
 
 
 class _TinyAnswer(BaseModel):
