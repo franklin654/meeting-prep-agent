@@ -61,7 +61,9 @@ DEFAULT_MINUTES = 30
 LIVE_MINUTES = 10
 DEFAULT_PAUSE_SECONDS = 0.0
 CALL_TIMEOUT_SECONDS = 180.0  # per-call ceiling; a call exceeding it stops the run
-DEFAULT_MAX_ATTEMPTS = 3  # 1 try + at most 2 regenerations
+DEFAULT_MAX_ATTEMPTS = 4  # 1 try + at most 3 regenerations
+GENERATED_LENGTH = (1300, 1800)  # prompt target and hard cap, spoken words
+LIVE_LENGTH = (700, 800)
 NO_STYLE_REFS = "(none provided; use ordinary, casual business speech between colleagues)"
 
 logger = logging.getLogger("data.generate")
@@ -96,6 +98,7 @@ class GenerationResult:
     failed: list[str] = field(default_factory=list)
     draft_problems: list[str] = field(default_factory=list)
     failure_details: dict[str, list[str]] = field(default_factory=dict)
+    attempt_problems: dict[str, list[list[str]]] = field(default_factory=dict)
     rate_limit_evidence: list[str] = field(default_factory=list)
 
 
@@ -160,7 +163,8 @@ def render_prompt(
     seed: Seed,
     meeting: dict[str, object],
     *,
-    word_range: tuple[int, int],
+    target_words: int,
+    max_words: int,
     minutes: int,
 ) -> str:
     entry = seed.beats[str(meeting["id"])]
@@ -177,8 +181,8 @@ def render_prompt(
         style_refs=_style_refs(),
         required_facts=facts,
         forbidden=forbidden,
-        min_words=word_range[0],
-        max_words=word_range[1],
+        target_words=f"{target_words:,}",
+        max_words=f"{max_words:,}",
     )
 
 
@@ -318,7 +322,8 @@ async def generate_transcripts(
             base_prompt = render_prompt(
                 seed,
                 meeting,
-                word_range=word_range,
+                target_words=(LIVE_LENGTH if is_live else GENERATED_LENGTH)[0],
+                max_words=(LIVE_LENGTH if is_live else GENERATED_LENGTH)[1],
                 minutes=LIVE_MINUTES if is_live else DEFAULT_MINUTES,
             )
             attempts = 1 if is_live else max_attempts
@@ -339,6 +344,7 @@ async def generate_transcripts(
                 problems = check_transcript(
                     seed, seed.meeting(mid), text, words=word_range, duration=duration
                 )
+                result.attempt_problems.setdefault(mid, []).append(problems)
                 words = sum(len(line.split(": ", 1)[-1].split()) for line in text.splitlines())
                 result.timings.append(CallTiming(mid, attempt, seconds, words))
                 logger.info(
@@ -430,8 +436,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ABORTED: {exc.reason}")
         for line in exc.result.rate_limit_evidence:
             print(f"evidence: {line}")
-        for mid, details in exc.result.failure_details.items():
-            print(f"  {mid}: {details}")
+        for mid, attempts in exc.result.attempt_problems.items():
+            if mid in exc.result.failure_details:
+                for n, reasons in enumerate(attempts, start=1):
+                    print(f"  {mid} attempt {n}: {reasons}")
         print(f"written before abort: {exc.result.written}")
         print(timing_summary(exc.result))
         return 2

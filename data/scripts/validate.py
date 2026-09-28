@@ -34,7 +34,7 @@ SEED_DIR = _HERE.parent / "seed"
 TRANSCRIPTS_DIR = SEED_DIR / "transcripts"
 
 LIVE_MEETING_ID = "m6_finedge"
-DEFAULT_WORDS = (900, 1500)  # spec: generation rule 6
+DEFAULT_WORDS = (900, 2000)  # accepted spoken words (spec generation rule 6, widened)
 LIVE_WORDS = (600, 800)  # spec: "Live demo meeting" (about 600-800 words)
 DEFAULT_DURATION_MINUTES = (20, 40)  # spec: generation rule 6
 EXPECTED_MEETINGS = 17

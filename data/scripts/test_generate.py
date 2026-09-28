@@ -73,7 +73,7 @@ def test_prompt_template_has_header_and_all_placeholders():
         "style_refs",
         "required_facts",
         "forbidden",
-        "min_words",
+        "target_words",
         "max_words",
     ):
         assert "{" + key + "}" in template
@@ -82,7 +82,7 @@ def test_prompt_template_has_header_and_all_placeholders():
 def test_render_prompt_contains_cast_facts_forbidden_and_only_past_summaries():
     seed = make_seed()
     m2 = next(m for m in seed.meetings if m["id"] == "m2_test")
-    prompt = render_prompt(seed, m2, word_range=(900, 1500), minutes=30)
+    prompt = render_prompt(seed, m2, target_words=1300, max_words=1800, minutes=30)
     assert "2026-07-28" in prompt and "Follow up" in prompt
     assert "Rahul Mehta" in prompt and "VP Engineering" in prompt
     assert "Karan Shah" in prompt and "KS" in prompt
@@ -90,10 +90,11 @@ def test_render_prompt_contains_cast_facts_forbidden_and_only_past_summaries():
     assert "Priya promises a case study by Jul 17" in prompt  # summary of M1 (earlier)
     assert "{cast}" not in prompt and "{required_facts}" not in prompt
     m1 = next(m for m in seed.meetings if m["id"] == "m1_test")
-    p1 = render_prompt(seed, m1, word_range=(900, 1500), minutes=30)
+    p1 = render_prompt(seed, m1, target_words=1300, max_words=1800, minutes=30)
     assert "thanks for the case study" not in p1  # no later-meeting facts
     assert "DataHawk" in p1  # forbidden list
-    assert "900-1500 words" in p1
+    assert "aim for about 1,300 words of spoken dialogue; never exceed 1,800" in p1.lower()
+    assert "900-1500" not in p1
 
 
 def test_transcript_filename():
@@ -269,7 +270,7 @@ def test_failing_transcript_is_regenerated_and_not_written_if_it_keeps_failing(t
 def test_default_is_three_attempts_no_pause_and_180s_timeout():
     import generate
 
-    assert generate.DEFAULT_MAX_ATTEMPTS == 3
+    assert generate.DEFAULT_MAX_ATTEMPTS == 4
     assert generate.DEFAULT_PAUSE_SECONDS == 0
     assert generate.CALL_TIMEOUT_SECONDS == 180
 
@@ -329,3 +330,25 @@ def test_rate_limit_log_line_aborts_immediately(tmp_path: Path):
         )
     assert "llm.rate_limited" in exc.value.reason
     assert list(tmp_path.iterdir()) == []
+
+
+def test_length_targets_and_validator_ranges():
+    import generate
+    import validate
+
+    assert generate.GENERATED_LENGTH == (1300, 1800)
+    assert generate.LIVE_LENGTH == (700, 800)
+    assert validate.DEFAULT_WORDS == (900, 2000)
+    assert validate.LIVE_WORDS == (600, 800)
+
+
+def test_four_failed_attempts_stop_and_report_reasons_per_attempt(tmp_path: Path):
+    seed = make_seed()
+    fake = FakeLLM()
+    for i in range(4):
+        fake.queue_text(f"nonsense {i}\n")
+    with pytest.raises(GenerationAborted) as exc:
+        _run(generate_transcripts(fake, seed, tmp_path, sleep=NoSleep(), only={"m1_test"}))
+    assert len(fake.text_calls) == 4
+    assert len(exc.value.result.attempt_problems["m1_test"]) == 4
+    assert all(exc.value.result.attempt_problems["m1_test"])
