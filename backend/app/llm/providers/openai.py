@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import openai
@@ -15,6 +16,13 @@ from app.llm.providers.base import (
     ErrorKind,
     SleepFn,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _names_temperature(exc: openai.BadRequestError) -> bool:
+    """True when a 400 says `temperature` is unsupported for this model."""
+    return "temperature" in str(exc.message).lower()
 
 
 def _messages(prompt: str, system: str | None) -> list[dict[str, str]]:
@@ -46,6 +54,8 @@ class OpenAIProvider(BaseProvider):
             backoff_base_seconds=backoff_base_seconds,
             **({"sleep": sleep} if sleep else {}),
         )
+        # Learned once a model rejects `temperature`; later requests omit it up front.
+        self._omit_temperature = False
         self._client: Any = (
             client
             if client is not None
@@ -55,10 +65,9 @@ class OpenAIProvider(BaseProvider):
     async def _request_json(
         self, prompt: str, schema: type[BaseModel], temperature: float, system: str | None
     ) -> str:
-        response = await self._client.chat.completions.create(
-            model=self._model,
+        response = await self._create(
+            temperature,
             messages=_messages(prompt, system),
-            temperature=temperature,
             # strict=False: Pydantic schemas are not always strict-mode compatible
             # (optional fields, additionalProperties); output is re-validated anyway.
             response_format={
@@ -69,18 +78,40 @@ class OpenAIProvider(BaseProvider):
                     "strict": False,
                 },
             },
-            timeout=self._timeout_seconds,
         )
         return str(response.choices[0].message.content or "")
 
     async def _request_text(self, prompt: str, temperature: float, system: str | None) -> str:
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=_messages(prompt, system),
-            temperature=temperature,
-            timeout=self._timeout_seconds,
-        )
+        response = await self._create(temperature, messages=_messages(prompt, system))
         return str(response.choices[0].message.content or "")
+
+    async def _create(self, temperature: float, **kwargs: Any) -> Any:
+        """One chat completion; best-effort drop of `temperature` if the model rejects it.
+
+        The temperature retry is local to this request, so it never consumes the 429
+        backoff or invalid-output budgets owned by `BaseProvider`.
+        """
+        call = self._client.chat.completions.create
+        common: dict[str, Any] = {
+            "model": self._model,
+            "timeout": self._timeout_seconds,
+            **kwargs,
+        }
+        if self._omit_temperature:
+            return await call(**common)
+        try:
+            return await call(temperature=temperature, **common)
+        except openai.BadRequestError as exc:
+            if not _names_temperature(exc):
+                raise
+            logger.warning(
+                "llm.temperature_dropped provider=%s model=%s: temperature unsupported, "
+                "retrying once without it",
+                self.provider_name,
+                self._model,
+            )
+            self._omit_temperature = True
+            return await call(**common)
 
     def _classify_error(self, exc: Exception) -> ErrorKind | None:
         if isinstance(exc, openai.APITimeoutError):
