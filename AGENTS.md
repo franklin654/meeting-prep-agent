@@ -27,7 +27,9 @@ If code and a doc disagree, stop and report it. Do not "fix" the doc to match yo
 
 - Backend: Python 3.11+, FastAPI, Pydantic v2, SQLModel on SQLite, `uv`
 - Memory: self-hosted Hindsight (Docker) via `hindsight-client`
-- LLM: Groq, only through `backend/app/llm/client.py`
+- LLM: switchable via `.env` between `openai`, `groq` and `anthropic`, set separately for the app
+  (`LLM_PROVIDER`, `LLM_MODEL`) and for Hindsight (`HINDSIGHT_LLM_PROVIDER`, `HINDSIGHT_LLM_MODEL`).
+  App calls go only through `backend/app/llm/client.py`; provider adapters live in `backend/app/llm/providers/`
 - Frontend: React + Vite + TypeScript, Tailwind, shadcn/ui, TanStack Query
 - Tests: pytest (+ httpx AsyncClient), Vitest
 
@@ -37,7 +39,8 @@ If code and a doc disagree, stop and report it. Do not "fix" the doc to match yo
 docker compose up                      # hindsight :8888/:9999, api :8000, web :5173
 cd backend && uv run pytest            # unit tests (fakes, no network)
 cd backend && uv run pytest -m live    # Hindsight contract test
-cd backend && uv run pytest -m golden  # golden scenarios G-1..G-4 (real Hindsight + Groq)
+cd backend && uv run pytest -m live_llm  # LLM smoke test per provider (skipped without that key)
+cd backend && uv run pytest -m golden  # golden scenarios G-1..G-4 (real Hindsight + configured LLM providers)
 cd backend && uv run ruff check . && uv run mypy app
 cd frontend && npm run lint && npx tsc --noEmit && npm test
 cd frontend && npm run gen:api         # regenerate API client from /openapi.json
@@ -47,7 +50,8 @@ make reset-demo                        # wipe SQLite + demo bank, reseed
 ## Hard rules
 
 1. **Gateways only.** Only `app/memory/memory_service.py` imports `hindsight_client`.
-   Only `app/db/repository.py` touches DB sessions. Only `app/llm/client.py` calls Groq.
+   Only `app/db/repository.py` touches DB sessions. Only `app/llm/client.py` (and its adapters in `app/llm/providers/`) calls an LLM provider;
+   provider SDKs (openai, groq, anthropic) are imported only inside `app/llm/providers/`.
 2. **Tags via `app/memory/tags.py`.** Never type a tag string by hand.
 3. **Hindsight signatures from the docs, never guessed.** Use the `hindsight-docs` skill
    (`npx skills add vectorize-io/hindsight-skills --skill hindsight-docs`) or the official docs.
@@ -59,8 +63,12 @@ make reset-demo                        # wipe SQLite + demo bank, reseed
    and the prompt's fixture test is rerun.
 9. **Schema changes** update the schemas doc, the model, and the generated frontend client in the same PR.
 10. **No new dependencies** without saying why in the PR description.
-11. **Secrets** only from `.env`; never commit keys. `.env.example` lists every variable.
+11. **Secrets** only from the root `.env` (gitignored); never commit, print or log keys. `.env.example` lists every
+    variable, including one key per provider. Never change `LLM_PROVIDER` / `HINDSIGHT_LLM_PROVIDER` in `.env`
+    yourself; switching providers is the user's decision.
 12. **Never regenerate seed transcripts at demo time.** `m6_finedge_live.txt` is hand-edited; do not overwrite it.
+13. **Provider-neutral code.** Nothing outside `app/llm/` may depend on which provider is selected. Hindsight's
+    model must support tool calling, whatever the provider.
 
 ## Working a ticket
 
