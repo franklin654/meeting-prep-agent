@@ -1,0 +1,68 @@
+# Meeting Prep Agent — local dev / demo stack.
+# One command per AGENTS.md: `docker compose up`.
+#
+# Services (docs/technical-design.md, "Config, local dev and deployment"):
+#   hindsight  -> self-hosted memory service, API :8888, UI :9999
+#   api        -> FastAPI backend, :8000                (backend/, built by T01)
+#   web        -> Vite dev server, :5173, proxies /api  (frontend/, built by T03)
+#
+# All env vars come from `.env` (copy `.env.example` -> `.env` and fill in real
+# keys; never commit `.env`). Do not put secrets in this file.
+
+services:
+  hindsight:
+    image: ghcr.io/vectorize-io/hindsight:latest # TODO: pin a version tag once chosen
+    ports:
+      - "8888:8888" # API
+      - "9999:9999" # UI
+    environment:
+      # Hindsight's own LLM settings — names per docs/hindsight-integration.md
+      # "Setup". Reflect drives structured tool calls, so the chosen Groq model
+      # must support tool use (see technical-design.md Config section).
+      HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_API_LLM_PROVIDER}
+      HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_API_LLM_API_KEY}
+      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_API_LLM_MODEL}
+      # Stable worker id: a rotating Docker hostname leaves background jobs
+      # stuck after a restart, so this must stay fixed across restarts.
+      HINDSIGHT_API_WORKER_ID: ${HINDSIGHT_API_WORKER_ID:-hindsight-demo-1}
+    volumes:
+      - hindsight-data:/home/hindsight/.pg0
+    restart: unless-stopped
+
+  api:
+    # backend/Dockerfile is owned by T01 (backend scaffold), landing in
+    # parallel with this ticket. Build will fail until that lands — expected.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Reach Hindsight over the compose network, not localhost, regardless
+      # of what HINDSIGHT_URL is set to for host-side tooling in .env.
+      HINDSIGHT_URL: http://hindsight:8888
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - hindsight
+
+  web:
+    # frontend/Dockerfile is owned by T03 (frontend scaffold), landing in
+    # parallel with this ticket. Build will fail until that lands — expected.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  hindsight-data:
