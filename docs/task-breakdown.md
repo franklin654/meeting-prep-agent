@@ -30,6 +30,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Backend scaffold: uv project, FastAPI app, `config.py` with `demo_today`, error handler, `/api/health` stub | BE-core | — | `backend/app/main.py`, `config.py`, `core/` | App starts; health returns 200; error shape matches schemas doc | Done |
 | T02 | Docker Compose: hindsight (Groq, stable worker id, volume), api, web; `.env.example` | BE-core | — | `docker-compose.yml`, `.env.example` | `docker compose up` brings up all three; Hindsight UI on 9999 | Done |
+| T02b | `backend/Dockerfile` and `frontend/Dockerfile` | BE-core, FE | T01, T03 | `backend/Dockerfile`, `frontend/Dockerfile` | `docker compose build` and `docker compose up` bring up all three services (hindsight, api, web) cleanly | Not started |
 | T03 | Frontend scaffold: Vite, React, TS, Tailwind, shadcn/ui, router, layout, OpenAPI client script | FE | — | `frontend/src/`, `package.json` | Three empty routes render; `npm run gen:api` works | Done |
 | T04 | AGENTS.md, hindsight-docs skill, CI (ruff, mypy, pytest, eslint, tsc) | BE-core | T01, T03 | `AGENTS.md`, `.github/workflows/ci.yml` | CI green on PR | Done |
 | T05 | All Pydantic models and enums from Data Model & Schemas | BE-core | T01 | `app/schemas/*` | Models import; round-trip JSON tests pass | Not started |
