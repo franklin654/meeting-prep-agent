@@ -41,10 +41,11 @@ FinEdge is the hero account the demo follows; the other three give the dashboard
 
 ## Contacts
 
-Twelve contacts, each with a distinct voice so generated transcripts don't blur into one speaker.
+Thirteen contacts, each with a distinct voice so generated transcripts don't blur into one speaker.
 
 | ID | Name | Account | Role | Deal role | Voice and traits |
 | --- | --- | --- | --- | --- | --- |
+| `c_priya` | Priya Nair | Tracewise | Account Executive | Our side | Our AE, Bengaluru, 4 years in SaaS sales, 22 active deals. Runs every call. |
 | `c_rahul` | Rahul Mehta | FinEdge | VP Engineering | Technical decision maker | Direct, impatient with fluff, jokes about on-call pain |
 | `c_anita` | Anita Desai | FinEdge | CFO | Economic buyer | Numbers-first, asks "what does this replace?", polite but brief |
 | `c_karan` | Karan Shah | FinEdge | Data Platform Lead | Champion | Enthusiastic, over-shares, alias "KS" in notes |
