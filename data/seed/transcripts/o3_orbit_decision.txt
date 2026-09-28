@@ -1,0 +1,149 @@
+[2026-08-04T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): Hi, Lakshmi. Can you hear me okay?
+[2026-08-04T10:00:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yep, loud and clear. Hi, Priya.
+[2026-08-04T10:00:13+05:30] Priya Nair (Account Executive, Tracewise): Great. How are things? Is your week behaving itself so far?
+[2026-08-04T10:00:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mostly. We had a couple of early starts, but nothing unusual. How about you?
+[2026-08-04T10:00:28+05:30] Priya Nair (Account Executive, Tracewise): Pretty good. Bengaluru has been doing that thing where it rains for ten minutes and then gets sunny again.
+[2026-08-04T10:00:36+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That sounds familiar. I got caught in one of those showers last week, without an umbrella, naturally.
+[2026-08-04T10:00:43+05:30] Priya Nair (Account Executive, Tracewise): Oh, no. The umbrella only ever seems useful when you leave it at home.
+[2026-08-04T10:00:49+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. Anyway, I have about half an hour. I’m glad we could close the loop.
+[2026-08-04T10:00:57+05:30] Priya Nair (Account Executive, Tracewise): Same here. I called this one “Decision” so we can be clear about where things stand and what, if anything, makes sense next. Still good?
+[2026-08-04T10:01:07+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, that’s what I wanted too. No need to turn this into another product tour.
+[2026-08-04T10:01:14+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. To start with, did the value comparison I sent over get to you?
+[2026-08-04T10:01:22+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, I received the value comparison you sent by Jun 25. I read it, and it was useful.
+[2026-08-04T10:01:31+05:30] Priya Nair (Account Executive, Tracewise): Good, thank you. Was there anything in it that felt off or that you wanted me to explain?
+[2026-08-04T10:01:39+05:30] Lakshmi Pillai (VP Data, Orbit Retail): The assumptions were fair. I liked that you separated the operational savings from the risk reduction instead of making one big savings claim.
+[2026-08-04T10:01:50+05:30] Priya Nair (Account Executive, Tracewise): I’m glad that came through. We didn’t want to pretend we could put a precise number on every avoided incident.
+[2026-08-04T10:01:59+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Right. For us, the difficult part is still that stock-level pipelines can fail silently. We don’t always find out until someone sees a mismatch downstream.
+[2026-08-04T10:02:12+05:30] Priya Nair (Account Executive, Tracewise): That’s what you described in discovery. And it’s a frustrating class of problem because the pipeline can look healthy while the data is already stale.
+[2026-08-04T10:02:22+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. We’ve improved some checks internally, but there are gaps. I’m not saying the problem disappeared.
+[2026-08-04T10:02:34+05:30] Priya Nair (Account Executive, Tracewise): Understood. Before we get into the outcome, could you give me the short version of how you evaluated it after we last spoke?
+[2026-08-04T10:02:44+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We looked at the cost, the rollout effort, and whether the solution fits our data handling requirements. Then I had to get a recommendation through our leadership group.
+[2026-08-04T10:02:57+05:30] Priya Nair (Account Executive, Tracewise): And where did you land?
+[2026-08-04T10:03:02+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We lost to DataHawk on price. We’ve decided to proceed with them for now.
+[2026-08-04T10:03:13+05:30] Priya Nair (Account Executive, Tracewise): Thanks for being direct. I appreciate it. Was price the deciding factor on its own, or did it tip a close decision?
+[2026-08-04T10:03:23+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It tipped it, but it wasn’t the only consideration. The budget is tight this year, and I had to make a case for the spend against other work.
+[2026-08-04T10:03:36+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. At the pricing discussion, Sameer mentioned their proposal was about 40% lower. Did that remain the comparison you were working from?
+[2026-08-04T10:03:47+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. The actual scope wasn’t perfectly like-for-like, but the difference was still large enough that I couldn’t ignore it.
+[2026-08-04T10:04:00+05:30] Priya Nair (Account Executive, Tracewise): Was there any point where the comparison we sent changed the internal discussion, or was the price gap simply too wide?
+[2026-08-04T10:04:11+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It helped explain why your scope was broader. It didn’t give me enough to justify paying the difference right now.
+[2026-08-04T10:04:23+05:30] Priya Nair (Account Executive, Tracewise): I hear you. I don’t want to argue you out of a decision you’ve made. It would help me to understand which parts of the scope mattered most to your team.
+[2026-08-04T10:04:35+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Detection coverage mattered. So did how quickly our engineers could get it running without taking on a lot of extra maintenance.
+[2026-08-04T10:04:46+05:30] Priya Nair (Account Executive, Tracewise): And were you comfortable that the option you chose can cover the key stock-level checks you were worried about?
+[2026-08-04T10:04:55+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We think it can cover enough to start. There are details we’ll have to validate as we configure it.
+[2026-08-04T10:05:05+05:30] Priya Nair (Account Executive, Tracewise): Sure. What does a sensible first phase look like on your side?
+[2026-08-04T10:05:12+05:30] Lakshmi Pillai (VP Data, Orbit Retail): A limited rollout against the feeds where a missed update causes the most confusion. We won’t try to bring every pipeline in at once.
+[2026-08-04T10:05:25+05:30] Priya Nair (Account Executive, Tracewise): That sounds sensible. Are those mainly replenishment feeds, or do you have a mix?
+[2026-08-04T10:05:33+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mostly replenishment to begin with. There are a few reporting feeds we might include later, depending on how the first phase goes.
+[2026-08-04T10:05:46+05:30] Priya Nair (Account Executive, Tracewise): And who will own that rollout day to day?
+[2026-08-04T10:05:52+05:30] Lakshmi Pillai (VP Data, Orbit Retail): One of my data platform leads, with support from the analysts who know those feeds. I want the ownership to stay with the team that can actually respond to alerts.
+[2026-08-04T10:06:06+05:30] Priya Nair (Account Executive, Tracewise): That’s a good point. If alerts land with a team that can’t act, you’ve just moved the delay rather than solved it.
+[2026-08-04T10:06:17+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. We’ve had enough of that with other tools.
+[2026-08-04T10:06:25+05:30] Priya Nair (Account Executive, Tracewise): How are you thinking about measuring whether the rollout is working?
+[2026-08-04T10:06:31+05:30] Lakshmi Pillai (VP Data, Orbit Retail): First, whether it catches real failures that we would otherwise have found late. Second, whether it produces too much noise. If the team starts ignoring alerts, it won’t matter how many checks we have.
+[2026-08-04T10:06:47+05:30] Priya Nair (Account Executive, Tracewise): Completely fair. Would you have a baseline for how often those failures are found late?
+[2026-08-04T10:06:56+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not a clean one. We can look at incident notes, but people don’t record every manual correction consistently.
+[2026-08-04T10:07:08+05:30] Priya Nair (Account Executive, Tracewise): So you’d want the first phase to establish that baseline as much as prove the tooling.
+[2026-08-04T10:07:16+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. I don’t want someone claiming a big percentage improvement when we didn’t have a reliable starting point.
+[2026-08-04T10:07:28+05:30] Priya Nair (Account Executive, Tracewise): That’s sensible. The value comparison used a range for that reason, rather than assuming every incident had a known cost.
+[2026-08-04T10:07:39+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Right. That was one of the parts I thought was well handled.
+[2026-08-04T10:07:47+05:30] Priya Nair (Account Executive, Tracewise): Thanks. I also want to ask about residency, because that came up in the evaluation. How much did that affect the decision?
+[2026-08-04T10:07:58+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It matters, but it wasn’t the immediate blocker. We’re still waiting on a clearer roadmap from the provider we chose.
+[2026-08-04T10:08:11+05:30] Priya Nair (Account Executive, Tracewise): Is the open question the location of stored data, processing, or both?
+[2026-08-04T10:08:19+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Both, eventually. For now, we need enough clarity to know what data is sent where and what the controls are.
+[2026-08-04T10:08:31+05:30] Priya Nair (Account Executive, Tracewise): Has your security team reviewed their current documentation?
+[2026-08-04T10:08:37+05:30] Lakshmi Pillai (VP Data, Orbit Retail): They’re reviewing it. I don’t want to get ahead of them or suggest they’ve signed off.
+[2026-08-04T10:08:46+05:30] Priya Nair (Account Executive, Tracewise): Of course. And if they come back with a concern, do you expect that to reopen the vendor decision?
+[2026-08-04T10:08:55+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Not automatically. We’d first ask for clarification or a mitigation. We’ve already spent time choosing and getting the work scheduled.
+[2026-08-04T10:09:08+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. I’m not asking because I want to manufacture a reason to restart the evaluation.
+[2026-08-04T10:09:17+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I know. I’m just trying to be realistic about the amount of change our team can absorb.
+[2026-08-04T10:09:29+05:30] Priya Nair (Account Executive, Tracewise): On our side, would it be helpful to share a concise residency overview for your security team, or would that just create another review?
+[2026-08-04T10:09:40+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Probably another review. We have your materials already. If the situation changes, I can come back to them.
+[2026-08-04T10:09:51+05:30] Priya Nair (Account Executive, Tracewise): Understood. I won’t send a new pack just to keep something moving.
+[2026-08-04T10:10:00+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Appreciate that.
+[2026-08-04T10:10:05+05:30] Priya Nair (Account Executive, Tracewise): Just so I’m clear, the decision is made, and you’re not looking for us to revise the commercial proposal today?
+[2026-08-04T10:10:14+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Correct. I don’t want you to spend time discounting it further when we’ve committed to a different path.
+[2026-08-04T10:10:26+05:30] Priya Nair (Account Executive, Tracewise): Thanks, that’s clear. I’ll close the active evaluation on our side rather than leave you with a stream of follow-ups.
+[2026-08-04T10:10:37+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That would be good. I don’t mind a relevant check-in later, but I don’t need a weekly “just circling back.”
+[2026-08-04T10:10:47+05:30] Priya Nair (Account Executive, Tracewise): Completely fair. And for my own learning, was there anything we could have done differently earlier in the process?
+[2026-08-04T10:10:56+05:30] Lakshmi Pillai (VP Data, Orbit Retail): The main thing was timing. We needed to understand cost before we had a strong enough internal case for the broader scope.
+[2026-08-04T10:11:09+05:30] Priya Nair (Account Executive, Tracewise): So it would have helped to connect the technical requirements and the budget conversation sooner?
+[2026-08-04T10:11:17+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. By the time we had the full comparison, the budget conversation was already quite constrained.
+[2026-08-04T10:11:29+05:30] Priya Nair (Account Executive, Tracewise): That’s useful feedback. I should have tested the commercial range earlier, instead of waiting until we had walked through every detail.
+[2026-08-04T10:11:39+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Maybe. I also could have been more direct about the constraint at the start.
+[2026-08-04T10:11:48+05:30] Priya Nair (Account Executive, Tracewise): You did flag that the budget was tight this year. I could have followed up with a more practical question about the range rather than just acknowledging it.
+[2026-08-04T10:12:00+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That might have saved some time, yes.
+[2026-08-04T10:12:07+05:30] Priya Nair (Account Executive, Tracewise): Did the team feel the implementation estimate was realistic, by the way?
+[2026-08-04T10:12:15+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mostly. They wanted to know how much setup would fall on our side, but no one thought the estimate was wildly off.
+[2026-08-04T10:12:28+05:30] Priya Nair (Account Executive, Tracewise): Good to know. And did you have a chance to look at the example rollout plan?
+[2026-08-04T10:12:35+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes. The phased approach made sense. We’d still tailor it to our team, of course.
+[2026-08-04T10:12:46+05:30] Priya Nair (Account Executive, Tracewise): Definitely. The plan is a starting point, not a prescription.
+[2026-08-04T10:12:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mm-hm.
+[2026-08-04T10:12:56+05:30] Priya Nair (Account Executive, Tracewise): I’ve got a quick tangent, if you don’t mind. You mentioned your team had early starts this week—is that because of the rollout planning, or something else?
+[2026-08-04T10:13:07+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Something else. We’ve got a planning session with a few teams in different time zones, so someone always ends up with the early slot.
+[2026-08-04T10:13:19+05:30] Priya Nair (Account Executive, Tracewise): Ah, the joys of finding a time that’s reasonable for everyone.
+[2026-08-04T10:13:26+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. We tried rotating the awkward slot, which is fair in theory and somehow still unpopular with everyone.
+[2026-08-04T10:13:37+05:30] Priya Nair (Account Executive, Tracewise): I can imagine. All right, back to the decision. For the work you’re starting, what would make you revisit the tooling choice later?
+[2026-08-04T10:13:48+05:30] Lakshmi Pillai (VP Data, Orbit Retail): A serious gap in the checks, too much maintenance, or a security issue. But I don’t want to speculate before we’ve tried the setup.
+[2026-08-04T10:14:00+05:30] Priya Nair (Account Executive, Tracewise): That seems reasonable. And what about the roadmap question—would you expect an update soon?
+[2026-08-04T10:14:08+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I haven’t been given a firm date, so I’m not going to promise one. I’ve asked them to give us something concrete.
+[2026-08-04T10:14:20+05:30] Priya Nair (Account Executive, Tracewise): Got it. Would a check-in from me after the rollout starts be useful, or would you rather not have one on the calendar?
+[2026-08-04T10:14:31+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I’d rather not schedule a generic check-in. If there’s a specific development around residency, that would be different.
+[2026-08-04T10:14:43+05:30] Priya Nair (Account Executive, Tracewise): That’s helpful. I can make a note to contact you only if there’s something relevant to that requirement.
+[2026-08-04T10:14:52+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Okay.
+[2026-08-04T10:14:55+05:30] Priya Nair (Account Executive, Tracewise): Would it be useful if I kept the comparison handy in case someone asks what was included in our proposal?
+[2026-08-04T10:15:04+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, keep it on file. I don’t need a new version.
+[2026-08-04T10:15:15+05:30] Priya Nair (Account Executive, Tracewise): Will do. And just to make sure there’s no loose end from our side, do you need anything from me for your records?
+[2026-08-04T10:15:24+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No. We have the proposal and the technical notes. That should be enough.
+[2026-08-04T10:15:34+05:30] Priya Nair (Account Executive, Tracewise): Great. On the rollout itself, do you already have a start window, or is it still being worked out?
+[2026-08-04T10:15:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): It’s being worked out. We need to make sure the platform lead has room to take it on.
+[2026-08-04T10:15:54+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. I won’t assume the purchase means you can start immediately.
+[2026-08-04T10:16:02+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Right. We have a few other commitments already on the board.
+[2026-08-04T10:16:12+05:30] Priya Nair (Account Executive, Tracewise): If your lead asks you for a way to prioritize the feeds, what would you use?
+[2026-08-04T10:16:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Impact if stale, how often it changes, and how easy it is to detect an issue today. That gives us a practical shortlist.
+[2026-08-04T10:16:33+05:30] Priya Nair (Account Executive, Tracewise): Good criteria. Are there any dependencies with the teams that maintain the upstream systems?
+[2026-08-04T10:16:40+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, for a couple of feeds. We’ll need to agree on what counts as a genuine failure before we start alerting people.
+[2026-08-04T10:16:53+05:30] Priya Nair (Account Executive, Tracewise): Right, otherwise the alert rules just become a debate about definitions.
+[2026-08-04T10:17:00+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Exactly. The business owners need to be part of that conversation, not just the engineering team.
+[2026-08-04T10:17:12+05:30] Priya Nair (Account Executive, Tracewise): Sounds like you’ve got a thoughtful plan for the first phase.
+[2026-08-04T10:17:19+05:30] Lakshmi Pillai (VP Data, Orbit Retail): We’re trying. I’m not expecting the first configuration to be perfect.
+[2026-08-04T10:17:28+05:30] Priya Nair (Account Executive, Tracewise): That’s usually the right expectation. It takes a little tuning to make alerts useful.
+[2026-08-04T10:17:38+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Mm. And we’ll need to see what the team actually responds to, not just what looks good in a demo.
+[2026-08-04T10:17:48+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. I appreciate you sharing how you’re approaching it, even though we’re not the ones implementing this phase.
+[2026-08-04T10:17:59+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No problem. The evaluation was useful. You were responsive, and the conversations were straightforward.
+[2026-08-04T10:18:10+05:30] Priya Nair (Account Executive, Tracewise): Thank you. I know the outcome isn’t the one we hoped for, but it’s still good to hear that.
+[2026-08-04T10:18:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I don’t want you to take it as a criticism of the team. It was a commercial decision under a real constraint.
+[2026-08-04T10:18:31+05:30] Priya Nair (Account Executive, Tracewise): Understood. We’ll mark it accurately, and I’ll make sure the notes say that rather than suggesting the technical fit was the issue.
+[2026-08-04T10:18:42+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s accurate.
+[2026-08-04T10:18:47+05:30] Priya Nair (Account Executive, Tracewise): One last question on timing. Is there a particular point in the year when you’d be open to revisiting this, assuming nothing changes before then?
+[2026-08-04T10:18:58+05:30] Lakshmi Pillai (VP Data, Orbit Retail): I wouldn’t set a meeting now. If the residency plan changes, or if the rollout uncovers something significant, we can talk then.
+[2026-08-04T10:19:10+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. So no calendar hold, and no routine check-ins. I’ll leave the door open without creating noise.
+[2026-08-04T10:19:20+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, that’s the right balance.
+[2026-08-04T10:19:25+05:30] Priya Nair (Account Executive, Tracewise): If I see a relevant update in the meantime, I’ll send a short note and you can decide whether it’s worth discussing.
+[2026-08-04T10:19:35+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Fine, as long as it’s genuinely relevant.
+[2026-08-04T10:19:42+05:30] Priya Nair (Account Executive, Tracewise): It will be. And just to be clear, I won’t interpret no response as an invitation to keep chasing.
+[2026-08-04T10:19:52+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thank you.
+[2026-08-04T10:19:56+05:30] Priya Nair (Account Executive, Tracewise): Is there anything else you wanted to cover while we have the time?
+[2026-08-04T10:20:03+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No, I think we’ve covered it. I wanted to make sure the decision was clear and that there wasn’t an assumption we were waiting on a revised offer.
+[2026-08-04T10:20:15+05:30] Priya Nair (Account Executive, Tracewise): It’s clear. I’ll close the evaluation as lost, note the reason, and keep the materials on file. No revised offer or follow-up sequence.
+[2026-08-04T10:20:27+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Yes, that matches what we discussed.
+[2026-08-04T10:20:32+05:30] Priya Nair (Account Executive, Tracewise): And if their residency roadmap slips, what would be the right timing for me to check back?
+[2026-08-04T10:20:41+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Priya, reach back out in Q1 if their residency roadmap slips.
+[2026-08-04T10:20:50+05:30] Priya Nair (Account Executive, Tracewise): Understood. I’ll make that conditional, not a standing reminder, and I’ll keep the outreach focused on the residency point.
+[2026-08-04T10:21:01+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Good. If the roadmap holds, there’s no need to reopen this just for the sake of it.
+[2026-08-04T10:21:12+05:30] Priya Nair (Account Executive, Tracewise): Agreed. If it doesn’t slip, I’ll leave things alone.
+[2026-08-04T10:21:19+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Perfect.
+[2026-08-04T10:21:23+05:30] Priya Nair (Account Executive, Tracewise): Before we wrap, is there anyone else on your side I should keep informed about the status?
+[2026-08-04T10:21:32+05:30] Lakshmi Pillai (VP Data, Orbit Retail): No, I’ll handle the internal update. You can just send me a brief note confirming the evaluation is closed.
+[2026-08-04T10:21:43+05:30] Priya Nair (Account Executive, Tracewise): Sure. I’ll keep it brief: decision recorded, no proposal changes, and no scheduled follow-up.
+[2026-08-04T10:21:53+05:30] Lakshmi Pillai (VP Data, Orbit Retail): That’s all I need.
+[2026-08-04T10:21:57+05:30] Priya Nair (Account Executive, Tracewise): Great. And thanks again for the candid feedback on timing and the budget conversation.
+[2026-08-04T10:22:06+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Of course. It’s better to be clear than to leave you guessing.
+[2026-08-04T10:22:15+05:30] Priya Nair (Account Executive, Tracewise): Definitely. I hope the rollout goes smoothly and the first set of checks gives your team a useful baseline.
+[2026-08-04T10:22:25+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks. We’ll take it one phase at a time.
+[2026-08-04T10:22:30+05:30] Priya Nair (Account Executive, Tracewise): That sounds like the right approach.
+[2026-08-04T10:22:36+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Okay, I think I’m all set.
+[2026-08-04T10:22:41+05:30] Priya Nair (Account Executive, Tracewise): Same here. I’ll send the short confirmation after this call, and then I’ll leave you to your day.
+[2026-08-04T10:22:50+05:30] Lakshmi Pillai (VP Data, Orbit Retail): Thanks, Priya. Appreciate the straightforward conversation.
+[2026-08-04T10:22:57+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Lakshmi. Take care.
+[2026-08-04T10:23:02+05:30] Lakshmi Pillai (VP Data, Orbit Retail): You too. Bye.
+[2026-08-04T10:23:06+05:30] Priya Nair (Account Executive, Tracewise): Bye.

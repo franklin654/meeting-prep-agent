@@ -1,0 +1,120 @@
+[2026-08-20T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): Hi, Farah. Hi, Nikhil. Can you both hear me okay?
+[2026-08-20T10:00:12+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Yes, all good. Hi, Priya.
+[2026-08-20T10:00:18+05:30] Nikhil Reddy (Data Engineer, Veda Health): Yep, I can hear you. Hi.
+[2026-08-20T10:00:25+05:30] Priya Nair (Account Executive, Tracewise): Great. How’s your morning going?
+[2026-08-20T10:00:32+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Busy, but manageable. We’ve got a release going out, so there’s a bit of activity.
+[2026-08-20T10:00:40+05:30] Nikhil Reddy (Data Engineer, Veda Health): Same here. I’m between a couple of pipeline checks.
+[2026-08-20T10:00:47+05:30] Priya Nair (Account Executive, Tracewise): I’ll try to make this useful and keep us on time. Since this is our first conversation, I’d love to understand how your team works today, where you’re running into friction, and then we can see whether Tracewise is relevant. Sound okay?
+[2026-08-20T10:01:02+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That works. I’ll give the broader picture, and Nikhil can fill in the details.
+[2026-08-20T10:01:11+05:30] Priya Nair (Account Executive, Tracewise): Perfect. Farah, could you start with the team and what you’re responsible for?
+[2026-08-20T10:01:18+05:30] Farah Siddiqui (Director of Engineering, Veda Health): I lead engineering across our platform and data groups. We support products used by care teams, and we also have internal analytics for operations and clinical programs. My main concern is that the data stays dependable without creating extra risk around patient information.
+[2026-08-20T10:01:42+05:30] Priya Nair (Account Executive, Tracewise): Understood. And Nikhil, where do you sit in that setup?
+[2026-08-20T10:01:48+05:30] Nikhil Reddy (Data Engineer, Veda Health): I’m on the data engineering team. I look after ingestion and transformations, and I’m usually the person who gets pulled in when a downstream report looks off.
+[2026-08-20T10:02:02+05:30] Priya Nair (Account Executive, Tracewise): What does the pipeline environment look like at the moment?
+[2026-08-20T10:02:08+05:30] Nikhil Reddy (Data Engineer, Veda Health): We have about 25 patient-analytics pipelines, plus a few operational feeds. Most of the transformations are scheduled, with a mix of warehouse jobs and Python.
+[2026-08-20T10:02:23+05:30] Priya Nair (Account Executive, Tracewise): And how do you know when something has gone wrong?
+[2026-08-20T10:02:29+05:30] Nikhil Reddy (Data Engineer, Veda Health): Some failures trigger alerts, but those are mostly job-level. A run can succeed and still produce something that’s incomplete or unusual. Usually a user notices first, then we work backward through logs and checks.
+[2026-08-20T10:02:49+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That’s the bit I want to improve. We don’t want a care team finding a problem before we do.
+[2026-08-20T10:03:00+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. How often does that happen, roughly?
+[2026-08-20T10:03:06+05:30] Nikhil Reddy (Data Engineer, Veda Health): It varies. We have quiet weeks, and then a change in an upstream system causes a few issues together. The hard part is that the symptoms can look unrelated.
+[2026-08-20T10:03:21+05:30] Priya Nair (Account Executive, Tracewise): Can you walk me through a recent example?
+[2026-08-20T10:03:27+05:30] Nikhil Reddy (Data Engineer, Veda Health): A source changed how it represented a status field. The pipeline still ran, but some records landed under a value our downstream logic didn’t expect. We caught it after a dashboard didn’t line up with what the operations team was seeing.
+[2026-08-20T10:03:51+05:30] Priya Nair (Account Executive, Tracewise): How long did it take to isolate?
+[2026-08-20T10:03:56+05:30] Nikhil Reddy (Data Engineer, Veda Health): A few hours. We had to compare the source, the transformed table, and the dashboard query. It wasn’t difficult once we knew where to look, but finding the starting point took time.
+[2026-08-20T10:04:12+05:30] Priya Nair (Account Executive, Tracewise): Farah, when that happens, what does the impact look like for you?
+[2026-08-20T10:04:18+05:30] Farah Siddiqui (Director of Engineering, Veda Health): It pulls engineers off planned work. More importantly, we need to understand whether the issue affected a report or a decision someone made. We’re careful about how we handle that, so clear lineage and a reliable record of what happened matter to us.
+[2026-08-20T10:04:39+05:30] Priya Nair (Account Executive, Tracewise): When you say a reliable record, what would you want to be able to answer quickly?
+[2026-08-20T10:04:46+05:30] Farah Siddiqui (Director of Engineering, Veda Health): What changed, which datasets were affected, who investigated it, and when we restored the expected output. We also need to be thoughtful about what information is visible to a tool or a person.
+[2026-08-20T10:05:06+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. Does your current setup give you lineage across those steps?
+[2026-08-20T10:05:12+05:30] Nikhil Reddy (Data Engineer, Veda Health): Not end to end. We have some documentation and job logs, but they’re in different places. I can usually trace things, though it depends on who made the change and whether the notes are up to date.
+[2026-08-20T10:05:30+05:30] Priya Nair (Account Executive, Tracewise): What checks are you running today beyond whether a job completes?
+[2026-08-20T10:05:37+05:30] Nikhil Reddy (Data Engineer, Veda Health): We have a few row-count checks and some custom validation in the transformations. Those checks are useful, but they’re not consistent across every pipeline. Adding more has been a little manual.
+[2026-08-20T10:05:55+05:30] Priya Nair (Account Executive, Tracewise): Is the main blocker engineering time, or are there other reasons it’s been hard to standardize?
+[2026-08-20T10:06:02+05:30] Nikhil Reddy (Data Engineer, Veda Health): Time is one. Another is deciding what a meaningful alert should be. If we alert on every small variation, people stop paying attention. We need context, not just another notification.
+[2026-08-20T10:06:19+05:30] Priya Nair (Account Executive, Tracewise): That’s fair. What does the team use for alerting and incident coordination now?
+[2026-08-20T10:06:25+05:30] Nikhil Reddy (Data Engineer, Veda Health): Alerts go to our team channel for a few jobs. For anything that needs investigation, we make a ticket and coordinate there.
+[2026-08-20T10:06:37+05:30] Priya Nair (Account Executive, Tracewise): Got it. I should give you a quick picture of Tracewise, then I’ll check whether it lines up with what you’re looking for. We help teams monitor data workflows and changes, connect issues to the assets they affect, and route findings to the people who can act on them.
+[2026-08-20T10:06:57+05:30] Farah Siddiqui (Director of Engineering, Veda Health): How does that work with patient data? We’d need to understand what the product sees and what it stores.
+[2026-08-20T10:07:07+05:30] Priya Nair (Account Executive, Tracewise): That’s an important question. The details depend on the connection and configuration. We can map out what metadata is collected, what stays in your environment, and which permissions are needed before anyone evaluates it. I don’t want to guess at the specifics on this call.
+[2026-08-20T10:07:25+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Good. We’d want our privacy and platform people involved before we connect anything.
+[2026-08-20T10:07:33+05:30] Priya Nair (Account Executive, Tracewise): Of course. Would you be comfortable sharing at a high level what your team uses for the warehouse and orchestration?
+[2026-08-20T10:07:41+05:30] Nikhil Reddy (Data Engineer, Veda Health): The warehouse is Snowflake. Scheduling is split between Airflow and a couple of managed jobs. We’ve been trying to reduce the number of places engineers have to check.
+[2026-08-20T10:08:01+05:30] Priya Nair (Account Executive, Tracewise): That helps. Is there a particular workflow you’d choose first if you were testing whether this is useful?
+[2026-08-20T10:08:08+05:30] Nikhil Reddy (Data Engineer, Veda Health): I’d start with a pipeline that feeds an internal operations dashboard. It’s important enough to be representative, but we can validate the results without disrupting a live care workflow.
+[2026-08-20T10:08:24+05:30] Priya Nair (Account Executive, Tracewise): That sounds like a sensible starting point. What would you want to see in that evaluation?
+[2026-08-20T10:08:30+05:30] Nikhil Reddy (Data Engineer, Veda Health): I want a sandbox where I can connect a non-production dataset, see what gets detected, and check whether the lineage is actually helpful. I’d also want to tune the checks instead of just accepting default alerts.
+[2026-08-20T10:08:52+05:30] Priya Nair (Account Executive, Tracewise): That’s clear. We can plan around a non-production workflow and define the boundaries with your team first. Farah, what would you need to see to feel comfortable with that approach?
+[2026-08-20T10:09:04+05:30] Farah Siddiqui (Director of Engineering, Veda Health): A clear explanation of the data involved, permissions, retention, and how we can stop the connection if needed. I’d also want us to agree on the success criteria before we start.
+[2026-08-20T10:09:22+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. What would count as a successful first evaluation for you?
+[2026-08-20T10:09:29+05:30] Farah Siddiqui (Director of Engineering, Veda Health): We should be able to identify a change that matters, understand what it could affect, and get the right engineer to it without a lot of noise. And we need to be confident the setup fits our data-handling expectations.
+[2026-08-20T10:09:50+05:30] Nikhil Reddy (Data Engineer, Veda Health): I’d add that setup can’t become a project of its own. If it takes days of custom work just to get a useful signal, that’s going to be hard to justify.
+[2026-08-20T10:10:05+05:30] Priya Nair (Account Executive, Tracewise): Definitely. What’s your usual process for deciding whether a tool gets adopted?
+[2026-08-20T10:10:13+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Engineering would test the workflow, and I’d coordinate with our platform and privacy teams. If it looks promising, we’d need to bring the relevant leads into a decision. I can’t commit to a timeline today.
+[2026-08-20T10:10:34+05:30] Priya Nair (Account Executive, Tracewise): Understood. Is there a specific event or deadline that’s prompting you to look now?
+[2026-08-20T10:10:40+05:30] Farah Siddiqui (Director of Engineering, Veda Health): No hard deadline. We’ve had enough small incidents that it’s worth exploring whether we can catch issues earlier, but we’re not trying to buy something just to check a box.
+[2026-08-20T10:10:59+05:30] Priya Nair (Account Executive, Tracewise): That’s helpful context. Nikhil, when you investigate an issue, what’s the most frustrating part of the process?
+[2026-08-20T10:11:06+05:30] Nikhil Reddy (Data Engineer, Veda Health): Finding the change that matters. Sometimes there are several upstream changes around the same time. I end up checking job history, comparing tables, and asking someone what they changed.
+[2026-08-20T10:11:24+05:30] Priya Nair (Account Executive, Tracewise): Do those changes usually come from your team, or from upstream systems as well?
+[2026-08-20T10:11:30+05:30] Nikhil Reddy (Data Engineer, Veda Health): Both. Our team owns the transformations, but we depend on other teams for some source data. If their schema or conventions change, we don’t always find out early.
+[2026-08-20T10:11:46+05:30] Farah Siddiqui (Director of Engineering, Veda Health): And coordination across teams is part of the issue. A clear signal gives us something concrete to take to the source owner.
+[2026-08-20T10:11:58+05:30] Priya Nair (Account Executive, Tracewise): Right. Does your team have a standard way to document dataset ownership?
+[2026-08-20T10:12:04+05:30] Nikhil Reddy (Data Engineer, Veda Health): We have owners for the important tables, but the information isn’t always next to the pipeline details. There are a couple of places to check.
+[2026-08-20T10:12:18+05:30] Priya Nair (Account Executive, Tracewise): If we could bring those pieces together, would that be valuable on its own, or is detection the bigger priority?
+[2026-08-20T10:12:27+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Detection comes first. Better context around ownership would make it more actionable, but we’re not looking for a catalog project.
+[2026-08-20T10:12:41+05:30] Priya Nair (Account Executive, Tracewise): Got it. I want to be careful not to overstate what we can cover. In a technical session, we can take one workflow and check the actual connections, the signals, and what lineage is available.
+[2026-08-20T10:12:56+05:30] Nikhil Reddy (Data Engineer, Veda Health): That would be useful. I’d rather see it against something close to our setup than sit through a broad feature tour.
+[2026-08-20T10:13:10+05:30] Priya Nair (Account Executive, Tracewise): Agreed. We can keep it practical. Farah, would you want your platform or privacy colleagues on that session?
+[2026-08-20T10:13:18+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Yes, at least one person from each group. They’ll have questions I can’t answer on their behalf.
+[2026-08-20T10:13:31+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. Before we wrap, can I ask what your team’s preferred way is to evaluate a tool like this? Do you usually begin with a walkthrough, or start with architecture and documentation?
+[2026-08-20T10:13:41+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Documentation first, then a focused walkthrough. If the basics make sense, we can decide whether to explore a trial.
+[2026-08-20T10:13:53+05:30] Priya Nair (Account Executive, Tracewise): That’s easy enough. I’ll send an overview of the product and the information about data handling and permissions, then we can use the next call to work through your questions.
+[2026-08-20T10:14:07+05:30] Nikhil Reddy (Data Engineer, Veda Health): Can you include what the initial setup actually asks us to do? That’ll help me tell whether it’s manageable.
+[2026-08-20T10:14:16+05:30] Priya Nair (Account Executive, Tracewise): Yes, I’ll include the setup outline and flag anything that depends on your environment rather than implying it’s identical for everyone.
+[2026-08-20T10:14:29+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Thanks. Also, please don’t send anything that assumes we can use production data. We’ll want to keep the first pass non-production.
+[2026-08-20T10:14:40+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. We’ll frame it around a non-production dataset, and your team can confirm what’s appropriate before connecting anything.
+[2026-08-20T10:14:52+05:30] Nikhil Reddy (Data Engineer, Veda Health): Great. I can identify a candidate pipeline and check with its owner.
+[2026-08-20T10:15:00+05:30] Priya Nair (Account Executive, Tracewise): Perfect. What should we use as the main measure for whether the walkthrough was worthwhile?
+[2026-08-20T10:15:08+05:30] Nikhil Reddy (Data Engineer, Veda Health): Whether I can follow an issue from the signal back to the affected dataset without having to stitch together five different views.
+[2026-08-20T10:15:22+05:30] Farah Siddiqui (Director of Engineering, Veda Health): And whether the information shown is appropriate for the people who need to use it. I don’t want broad visibility just for convenience.
+[2026-08-20T10:15:37+05:30] Priya Nair (Account Executive, Tracewise): Good criteria. We’ll cover the workflow and permissions separately so we don’t blur those questions together.
+[2026-08-20T10:15:50+05:30] Nikhil Reddy (Data Engineer, Veda Health): By the way, sorry if you hear a little noise. Someone’s testing the fire alarm in our building.
+[2026-08-20T10:15:58+05:30] Priya Nair (Account Executive, Tracewise): Oh, no worries. I thought it was someone’s phone for a second.
+[2026-08-20T10:16:04+05:30] Farah Siddiqui (Director of Engineering, Veda Health): They’re doing the whole floor today. It’s a good reminder to keep meetings short.
+[2026-08-20T10:16:11+05:30] Priya Nair (Account Executive, Tracewise): Fair point. We’re doing all right on time. One question on the alerts: who would you expect to receive them first?
+[2026-08-20T10:16:20+05:30] Nikhil Reddy (Data Engineer, Veda Health): Probably the owner of the pipeline or the data team channel, depending on how serious it is. The notification needs enough detail to decide whether I should jump in.
+[2026-08-20T10:16:34+05:30] Priya Nair (Account Executive, Tracewise): Would you want different thresholds for different datasets?
+[2026-08-20T10:16:40+05:30] Nikhil Reddy (Data Engineer, Veda Health): Yes. A small shift in one dataset could be normal, while the same shift elsewhere could mean something is broken. We’d need to set expectations based on how each one is used.
+[2026-08-20T10:16:57+05:30] Priya Nair (Account Executive, Tracewise): That’s useful. And how do you handle changes to transformations now? Do you have a review process?
+[2026-08-20T10:17:03+05:30] Nikhil Reddy (Data Engineer, Veda Health): Changes go through code review. The review covers the logic, but it doesn’t always tell us what the output will look like once the job runs with actual data.
+[2026-08-20T10:17:19+05:30] Priya Nair (Account Executive, Tracewise): So seeing the effect after a change could complement the existing review rather than replace it.
+[2026-08-20T10:17:27+05:30] Nikhil Reddy (Data Engineer, Veda Health): Exactly. We don’t need another approval step. We need a quicker way to see whether the output still makes sense.
+[2026-08-20T10:17:40+05:30] Farah Siddiqui (Director of Engineering, Veda Health): And a clear distinction between something that’s informational and something that needs action. That helps us avoid alert fatigue.
+[2026-08-20T10:17:53+05:30] Priya Nair (Account Executive, Tracewise): I hear you. When you’ve tried monitoring tools in the past, what worked or didn’t?
+[2026-08-20T10:18:00+05:30] Farah Siddiqui (Director of Engineering, Veda Health): We’ve used internal checks and a few platform features. The tools did what they were configured to do, but maintaining the rules became a burden. I’d want to understand how much ongoing tuning is realistic.
+[2026-08-20T10:18:19+05:30] Priya Nair (Account Executive, Tracewise): That’s a good thing to test directly. Nikhil, how much time do you think your team could put into an initial evaluation?
+[2026-08-20T10:18:28+05:30] Nikhil Reddy (Data Engineer, Veda Health): I could put in some time each week, as long as we pick a narrow workflow. If it needs several engineers all at once, it’ll be harder to schedule.
+[2026-08-20T10:18:43+05:30] Priya Nair (Account Executive, Tracewise): We can keep the first pass focused, then decide whether there’s a reason to expand. Farah, is there anything you’d want us to avoid in how we present the product?
+[2026-08-20T10:18:53+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Please be precise about what’s included and what needs configuration. We’re used to vendors presenting an ideal flow that turns out to be quite different from the real setup.
+[2026-08-20T10:19:10+05:30] Priya Nair (Account Executive, Tracewise): Fair. I’ll make sure the technical session is explicit about what’s standard, what depends on your environment, and what we don’t know yet.
+[2026-08-20T10:19:23+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Great, that would help.
+[2026-08-20T10:19:27+05:30] Priya Nair (Account Executive, Tracewise): Let me recap to see if I’ve got it right. You want to catch meaningful data issues earlier, understand their downstream impact, and route them to the right owner. You’d like to begin with a non-production workflow, and any evaluation needs to fit your privacy and access requirements.
+[2026-08-20T10:19:47+05:30] Nikhil Reddy (Data Engineer, Veda Health): Yes. And I want to make sure the hands-on part is real, not just a demo with a prebuilt example.
+[2026-08-20T10:20:01+05:30] Priya Nair (Account Executive, Tracewise): Understood. We’ll aim to use a workflow that resembles your environment, subject to what your team is comfortable sharing and connecting.
+[2026-08-20T10:20:14+05:30] Farah Siddiqui (Director of Engineering, Veda Health): That’s the right framing.
+[2026-08-20T10:20:19+05:30] Priya Nair (Account Executive, Tracewise): For next steps, I’ll send the product overview, the data-handling details, the permissions outline, and the setup requirements. Nikhil, if you can identify a candidate pipeline and its owner, we can tailor the session around that.
+[2026-08-20T10:20:38+05:30] Nikhil Reddy (Data Engineer, Veda Health): I can do that. I’ll check which non-production dataset is suitable and confirm with the owner before we schedule.
+[2026-08-20T10:20:48+05:30] Priya Nair (Account Executive, Tracewise): Thanks. Farah, could you bring in someone from platform and privacy once you’ve had a chance to look at the materials?
+[2026-08-20T10:20:57+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Yes. I’ll share the materials with them and see who should join. They may send questions ahead of time.
+[2026-08-20T10:21:11+05:30] Priya Nair (Account Executive, Tracewise): Please do. I can get answers before the session where possible, rather than using your meeting time to look things up.
+[2026-08-20T10:21:23+05:30] Nikhil Reddy (Data Engineer, Veda Health): Could we set the next call for next week, or is it better to wait until I’ve identified the workflow?
+[2026-08-20T10:21:32+05:30] Priya Nair (Account Executive, Tracewise): We can hold a tentative time next week and adjust if needed. That gives everyone a target without locking you into anything.
+[2026-08-20T10:21:44+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Tentative is fine. I’ll need to check calendars, but next week should be possible.
+[2026-08-20T10:21:54+05:30] Priya Nair (Account Executive, Tracewise): Great. I’ll send a few options along with the follow-up notes. Is there anything important we haven’t covered?
+[2026-08-20T10:22:04+05:30] Farah Siddiqui (Director of Engineering, Veda Health): I think we’ve covered the main points. I’ll reserve judgment until I’ve read the material, but this is a useful start.
+[2026-08-20T10:22:16+05:30] Nikhil Reddy (Data Engineer, Veda Health): Same. If I can get a look at the workflow and try it against a safe dataset, I’ll have a much better sense of the fit.
+[2026-08-20T10:22:29+05:30] Priya Nair (Account Executive, Tracewise): That’s exactly what we should aim for. Thanks for being candid about the requirements. I’ll send the recap and materials after this, and we’ll take it from there.
+[2026-08-20T10:22:42+05:30] Farah Siddiqui (Director of Engineering, Veda Health): Thanks, Priya. Appreciate you keeping it grounded.
+[2026-08-20T10:22:49+05:30] Nikhil Reddy (Data Engineer, Veda Health): Thanks. I’ll follow up once I’ve checked on the candidate pipeline.
+[2026-08-20T10:22:56+05:30] Priya Nair (Account Executive, Tracewise): Sounds good. Thanks, both. Have a good rest of the morning.
+[2026-08-20T10:23:03+05:30] Farah Siddiqui (Director of Engineering, Veda Health): You too. Bye.
+[2026-08-20T10:23:06+05:30] Nikhil Reddy (Data Engineer, Veda Health): Bye, thanks.

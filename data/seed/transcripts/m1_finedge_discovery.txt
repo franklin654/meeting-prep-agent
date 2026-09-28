@@ -1,0 +1,169 @@
+[2026-07-14T10:00:04+05:30] Priya Nair (Account Executive, Tracewise): Hi, Rahul. Hi, Karan. Thanks for making the time. Can you both hear me okay?
+[2026-07-14T10:00:11+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Yep. I can hear you. Karan, are you on?
+[2026-07-14T10:00:15+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’m here. Sorry, my headset decided to connect to the meeting room speaker too.
+[2026-07-14T10:00:21+05:30] Priya Nair (Account Executive, Tracewise): No worries. Good to meet you both. I’m Priya, I’ll run us through the conversation. I had us down for Discovery today.
+[2026-07-14T10:00:29+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Sounds right. Let’s keep it practical.
+[2026-07-14T10:00:33+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. My thought was to understand how you’re monitoring data pipelines today, where the pain is, and then I can show how Tracewise might fit—or say plainly if it doesn’t. Anything you’d add?
+[2026-07-14T10:00:45+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s good. I’m mostly interested in whether you can help us catch failures before somebody has to go digging through Airflow logs.
+[2026-07-14T10:00:53+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): And whether it’s going to create another dashboard that we have to babysit.
+[2026-07-14T10:00:59+05:30] Priya Nair (Account Executive, Tracewise): Fair question. I’ll try not to make you sit through a dashboard tour before I know what you need. Karan, could you start with how the setup works now?
+[2026-07-14T10:01:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Sure. We have about 40 pipelines, mostly supporting settlements, reconciliation, risk reporting, and some internal finance workflows. The critical ones have tighter expectations, obviously, but the dependencies get messy.
+[2026-07-14T10:01:24+05:30] Priya Nair (Account Executive, Tracewise): When you say messy, do you mean the dependencies aren’t documented, or more that a break in one place is hard to connect to the downstream impact?
+[2026-07-14T10:01:34+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): More the second. We know the jobs, and there’s documentation, but it’s not always current. A source changes, something downstream behaves oddly, and the person looking has to piece the chain together.
+[2026-07-14T10:01:48+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): The documentation exists in the sense that someone wrote it once.
+[2026-07-14T10:01:53+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That’s a little harsh. It exists in several places.
+[2026-07-14T10:01:57+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Exactly.
+[2026-07-14T10:02:00+05:30] Priya Nair (Account Executive, Tracewise): Got it. And what actually tells the team something is wrong today?
+[2026-07-14T10:02:07+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Our current alerts are homegrown Airflow checks. Some check task status, some check whether a table landed by a particular time, and we have a few row-count thresholds. I wrote the first ones, and then people added their own.
+[2026-07-14T10:02:23+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Which is why you get alerts for jobs that technically succeeded but produced nothing useful.
+[2026-07-14T10:02:31+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Right, yes. We’re improving those. We have checks for freshness, but the coverage is uneven. Some checks are very specific; others are basically “did the task finish?”
+[2026-07-14T10:02:44+05:30] Priya Nair (Account Executive, Tracewise): When an alert comes in, where does it go?
+[2026-07-14T10:02:49+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Mostly Slack and PagerDuty, depending on what it is. There are routing rules, but the ownership isn’t consistent. A couple of alerts still land in a channel that nobody checks outside the day shift.
+[2026-07-14T10:03:03+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): And then the person who gets paged has to work out whether it’s their pipeline or just an upstream team having a bad morning.
+[2026-07-14T10:03:12+05:30] Priya Nair (Account Executive, Tracewise): How often has that led to a meaningful incident recently?
+[2026-07-14T10:03:17+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): We had 3 pipeline incidents last quarter, and one delayed a settlement report. The count isn’t the whole story; the time spent figuring out the blast radius is what gets me.
+[2026-07-14T10:03:32+05:30] Priya Nair (Account Executive, Tracewise): Understood. For that settlement report, what was the first signal, and how long before the right person was looking at it?
+[2026-07-14T10:03:42+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): The first signal was a downstream check. It said the data was late. It didn’t say why, or which upstream dependency had stopped moving.
+[2026-07-14T10:03:55+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): The source job had retried and eventually finished, so the basic success alert wasn’t useful. We found the delay when the report check failed. Then we went through task history and compared timestamps.
+[2026-07-14T10:04:13+05:30] Priya Nair (Account Executive, Tracewise): Was that mostly an investigation problem, or did the team also have trouble deciding what to do once the cause was clear?
+[2026-07-14T10:04:21+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Investigation. If a job is broken, we can usually fix it. The slow part is answering, “Is this isolated, who owns it, and what else is now at risk?”
+[2026-07-14T10:04:34+05:30] Priya Nair (Account Executive, Tracewise): That’s helpful. Karan, how much of the investigation is repeatable versus people remembering the right query or log to check?
+[2026-07-14T10:04:43+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Some of it is repeatable. I have a few queries I use all the time. I’ve tried to put them in a runbook, but then we have different schemas, different owners, and a query that works for one pipeline isn’t quite right for another. I could show you my folder of notes; it’s a bit of a museum.
+[2026-07-14T10:05:02+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Please don’t show the museum.
+[2026-07-14T10:05:06+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): It has some beautiful archaeology in it.
+[2026-07-14T10:05:10+05:30] Priya Nair (Account Executive, Tracewise): I’ll spare everyone the guided tour. What systems are the pipelines running across?
+[2026-07-14T10:05:17+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Airflow is the orchestrator. Data is in our warehouse and a couple of operational stores. There are some event streams feeding into it too. We’ve got internal Python jobs around the edges, and a few teams publish their own tables.
+[2026-07-14T10:05:34+05:30] Priya Nair (Account Executive, Tracewise): And are you looking for monitoring inside Airflow, or would you want visibility across the whole path, including what lands in the warehouse?
+[2026-07-14T10:05:44+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Across the whole path, ideally. Airflow tells us what it ran. It doesn’t always tell us whether the resulting data is sensible or whether a downstream consumer is going to be unhappy.
+[2026-07-14T10:05:58+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I’d phrase it as: tell us something useful, not just that a green box is green.
+[2026-07-14T10:06:05+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. What does “useful” look like to you in the first alert?
+[2026-07-14T10:06:11+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Which data is affected, what changed, who owns the failing part, and whether we need to wake somebody up. If the answer is “here’s a link to a generic page,” that’s not much better than what we have.
+[2026-07-14T10:06:27+05:30] Priya Nair (Account Executive, Tracewise): That’s a good bar. We can connect pipeline runs and datasets so an alert can show the upstream and downstream context, then route it based on ownership and severity. I don’t want to claim that fixes every root cause; it’s meant to make the signal and investigation more actionable.
+[2026-07-14T10:06:45+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): How do you establish ownership? We have team tags in some places, but not everywhere.
+[2026-07-14T10:06:53+05:30] Priya Nair (Account Executive, Tracewise): We can ingest the ownership metadata you already have and let you map gaps where it’s missing. I’d want to see how your teams represent ownership before promising a clean auto-map. What do you use today—tags in Airflow, a service catalog, something else?
+[2026-07-14T10:07:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Mostly tags in DAG definitions and a spreadsheet. There’s a catalog project, but it’s not yet the source of truth. We’re also talking about adding ownership into the deployment metadata.
+[2026-07-14T10:07:24+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): We’re talking about it. That’s not the same as having it.
+[2026-07-14T10:07:28+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): We have a draft.
+[2026-07-14T10:07:31+05:30] Priya Nair (Account Executive, Tracewise): That’s fine. A draft is still useful for understanding the direction. Is the bigger goal reducing incident time, improving data quality coverage, or getting a clearer view of dependencies?
+[2026-07-14T10:07:44+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Incident time first. If we reduce the time from page to useful diagnosis, I’ll listen. I’m not looking for a big transformation program.
+[2026-07-14T10:07:56+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’d add coverage. Right now I’m the person who knows which checks exist and why. I don’t want the team to depend on me remembering that one table has a late-arrival quirk.
+[2026-07-14T10:08:10+05:30] Priya Nair (Account Executive, Tracewise): KS, when you say coverage, do you mean more automated checks, or better visibility into whether the checks you already have are actually catching problems?
+[2026-07-14T10:08:20+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Both, I think. More checks, but not hundreds of thresholds that someone has to tune forever. We need a sensible starting point and a way to see what’s noisy.
+[2026-07-14T10:08:34+05:30] Priya Nair (Account Executive, Tracewise): Right. How do you decide today whether a check is noisy enough to change?
+[2026-07-14T10:08:41+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Usually someone complains. Then I pull the history, work out whether it’s a bad threshold or an actual pattern, and adjust it. We don’t have a proper review loop.
+[2026-07-14T10:08:55+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): By the time we discuss it, the alert has been ignored for a week.
+[2026-07-14T10:09:00+05:30] Priya Nair (Account Executive, Tracewise): Understood. If you could change one part of that workflow tomorrow, what would you pick?
+[2026-07-14T10:09:08+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): A page that tells me what’s broken and what it affects. Not ten separate alerts for the same upstream issue.
+[2026-07-14T10:09:18+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): And I’d want to see the lineage without manually opening DAG files. If one table feeds multiple reports, that should be obvious.
+[2026-07-14T10:09:31+05:30] Priya Nair (Account Executive, Tracewise): That gives me a clear picture. Before I show a little of the product, can I ask about the on-call setup? Who receives the first page today?
+[2026-07-14T10:09:41+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): It depends on the system. We have a data rotation, but some things still go to the service owner, and a couple of critical workflows have a separate escalation. The on-call person is already juggling application issues, so vague data alerts are not popular.
+[2026-07-14T10:10:01+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’ve been trying to standardize it. There are different expectations across teams, and the scheduling rules don’t line up neatly with the pipeline ownership. We also have a handoff issue when somebody’s on leave.
+[2026-07-14T10:10:17+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Which is why my phone starts buzzing when I’m not even the owner.
+[2026-07-14T10:10:24+05:30] Priya Nair (Account Executive, Tracewise): That sounds rough.
+[2026-07-14T10:10:27+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): On-call is a great way to learn which alerts were designed by someone who doesn’t get paged.
+[2026-07-14T10:10:33+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I feel like that was directed at me.
+[2026-07-14T10:10:37+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): It was directed at the alert from Tuesday.
+[2026-07-14T10:10:42+05:30] Priya Nair (Account Executive, Tracewise): I’ll note that the alert has a named critic. Let me share a simple example of the incident view, then we can test it against the settlement workflow you described.
+[2026-07-14T10:10:52+05:30] Priya Nair (Account Executive, Tracewise): Can you see my screen?
+[2026-07-14T10:10:56+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Yes.
+[2026-07-14T10:10:58+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yep.
+[2026-07-14T10:11:01+05:30] Priya Nair (Account Executive, Tracewise): This is a sample pipeline view. At the top, you have the alert summary and the affected dataset. Below that is the run timeline, the upstream dependencies, downstream consumers, and the owner mapping. The point is to give the responder one place to start, rather than making them assemble the context from several tools.
+[2026-07-14T10:11:22+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Is the dependency graph built from Airflow alone, or are you also looking at what reads and writes the tables?
+[2026-07-14T10:11:31+05:30] Priya Nair (Account Executive, Tracewise): Both, where the connectors and metadata allow it. Airflow gives us the job structure. Dataset activity can add more detail about what’s being produced and consumed. I’d need to validate your specific sources to say exactly how complete that graph would be.
+[2026-07-14T10:11:49+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): We have jobs that write to staging, then a warehouse model, then a reporting table. Sometimes the handoff is through a stored procedure. Would that show up?
+[2026-07-14T10:12:00+05:30] Priya Nair (Account Executive, Tracewise): It depends on how we can observe that procedure and the metadata around it. We can map the Airflow run, and then verify whether the table-level lineage is available for that part. I’d rather check than assume.
+[2026-07-14T10:12:14+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Good answer. I’ve sat through enough “it just works” demos.
+[2026-07-14T10:12:20+05:30] Priya Nair (Account Executive, Tracewise): I appreciate that. On this incident panel, the alert is grouped around the upstream cause. The downstream impact is listed here, so instead of several disconnected notifications, the responder can see which consumers may be affected.
+[2026-07-14T10:12:37+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): How do you decide those are the same incident? If one job is late and another has a quality issue, I don’t want you bundling unrelated things.
+[2026-07-14T10:12:50+05:30] Priya Nair (Account Executive, Tracewise): The grouping uses dependency and timing context, but the rules are configurable. You can separate signals that should stay independent. In an evaluation, we’d want to run it against actual incidents and see where the grouping helps or gets it wrong.
+[2026-07-14T10:13:08+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Can we inspect the individual alerts from a grouped incident?
+[2026-07-14T10:13:12+05:30] Priya Nair (Account Executive, Tracewise): Yes. The incident view should summarize them, and you can open the individual signals and their source details.
+[2026-07-14T10:13:23+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Okay. What’s this “expected arrival” panel showing?
+[2026-07-14T10:13:29+05:30] Priya Nair (Account Executive, Tracewise): It estimates a normal arrival window from historical runs, then flags a meaningful delay against that pattern. You can also set explicit expectations for a critical dataset. You don’t have to use the estimate if your schedule is already well defined.
+[2026-07-14T10:13:46+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That could help with our feeds that vary by day. We have one source that’s normally quick and then occasionally sits for a while because the partner sends a larger batch.
+[2026-07-14T10:14:01+05:30] Priya Nair (Account Executive, Tracewise): Would you want an alert for that delay, or just a warning if it passes the point where it threatens a downstream deadline?
+[2026-07-14T10:14:10+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): The second. If the data is still on track, a page is unnecessary. We’ve got a few patterns like that, and I can send you examples.
+[2026-07-14T10:14:21+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Please send two or three, not the whole museum.
+[2026-07-14T10:14:26+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can curate. I know, I know.
+[2026-07-14T10:14:31+05:30] Priya Nair (Account Executive, Tracewise): That would be useful. We can look at arrival behavior and the actual business deadline together, rather than treating every late run the same way.
+[2026-07-14T10:14:43+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Does it detect changes in the data itself, or is this mostly freshness and job status?
+[2026-07-14T10:14:52+05:30] Priya Nair (Account Executive, Tracewise): It can monitor freshness, volume, schema, and selected data-quality patterns. Which checks are available depends on the source and what you want to monitor. For unusual values, you can define rules or use patterns that learn from historical behavior, then tune them with your team.
+[2026-07-14T10:15:13+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Can it notice a column that suddenly becomes null-heavy? We had one of those last year. The pipeline completed, the row count looked normal, and the report was technically there but not useful.
+[2026-07-14T10:15:29+05:30] Priya Nair (Account Executive, Tracewise): Yes, that’s the sort of quality signal you can configure. We’d need to understand the table and the acceptable variation so it doesn’t page for a normal fluctuation.
+[2026-07-14T10:15:43+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Who maintains those expectations? I don’t want Karan to become the person configuring every table.
+[2026-07-14T10:15:51+05:30] Priya Nair (Account Executive, Tracewise): It can be shared across the platform team and data owners. You can set defaults and assign ownership so teams can manage checks for their own assets. In practice, the right split depends on how much control you want centralized.
+[2026-07-14T10:16:09+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’d want central visibility, but I don’t want to approve every threshold. Teams know their own data better than I do. I’d probably own the baseline and the critical workflows, then let teams maintain their checks.
+[2026-07-14T10:16:25+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): As long as there’s still a way to see if a team has turned off something important.
+[2026-07-14T10:16:31+05:30] Priya Nair (Account Executive, Tracewise): You can track check status and ownership centrally. We should include that in a follow-up walkthrough, since I don’t want to hand-wave the exact review controls.
+[2026-07-14T10:16:44+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Fine.
+[2026-07-14T10:16:47+05:30] Priya Nair (Account Executive, Tracewise): Karan, if you were choosing an initial workflow to test, would settlement be the one?
+[2026-07-14T10:16:55+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Probably. It has the clearest timing expectation and enough dependencies to make a useful test. I’d want to include the report output, not just the jobs that feed it.
+[2026-07-14T10:17:10+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I agree, provided we don’t spend a month modeling everything before it tells us anything.
+[2026-07-14T10:17:18+05:30] Priya Nair (Account Executive, Tracewise): We can start with a small slice and validate the result. I’d suggest one critical workflow, its key upstream inputs, the report dataset, and a few known failure examples. Then we can see whether the lineage and alert context are accurate.
+[2026-07-14T10:17:36+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): What do you need from us to set that up?
+[2026-07-14T10:17:40+05:30] Priya Nair (Account Executive, Tracewise): First, a technical session with whoever owns the Airflow environment and the warehouse access. We’d map the connection method, permissions, and which metadata is available. Then we’d agree on the workflow and success criteria before doing any configuration.
+[2026-07-14T10:17:58+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Is this read-only? I’m not letting a new tool trigger jobs in production.
+[2026-07-14T10:18:05+05:30] Priya Nair (Account Executive, Tracewise): For monitoring, the integration is read-only. It observes metadata and data signals; it won’t trigger or change your production jobs. We can confirm the exact permissions with your platform team.
+[2026-07-14T10:18:20+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): And where does the data go? We’re careful about what gets copied out.
+[2026-07-14T10:18:25+05:30] Priya Nair (Account Executive, Tracewise): We can cover that in the technical review. The setup can focus on metadata and selected checks; the specifics depend on the connector and configuration. I’ll bring the architecture details, and we can have your security or infrastructure contact review them before proceeding.
+[2026-07-14T10:18:45+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That’s a reasonable next step. Don’t send a generic security packet before we know which integration we’re discussing.
+[2026-07-14T10:18:53+05:30] Priya Nair (Account Executive, Tracewise): Agreed. We’ll keep the follow-up relevant. On success criteria, would you measure time to diagnose, alert noise, coverage of the critical workflow, or some combination?
+[2026-07-14T10:19:05+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Time to diagnose and whether the first page gives enough context. Alert noise matters too, but it’s hard to claim improvement if nobody agrees what counts as noise.
+[2026-07-14T10:19:20+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): We could compare the test workflow against a couple of past incidents. See what the product would have shown, and what it would have missed.
+[2026-07-14T10:19:31+05:30] Priya Nair (Account Executive, Tracewise): That’s a strong evaluation approach. We can take a recent incident timeline, map the relevant signals, and check whether the dependency view would have narrowed the investigation.
+[2026-07-14T10:19:47+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Can we use a sanitized example? I don’t want incident details floating around in a sales workspace.
+[2026-07-14T10:19:56+05:30] Priya Nair (Account Executive, Tracewise): Yes. We can work with a sanitized timeline and sample metadata. If we need anything more specific, we’ll agree on that separately before you share it.
+[2026-07-14T10:20:10+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can put together the job sequence and the timestamps without including any customer data. I’ll also include what the alert said at the time.
+[2026-07-14T10:20:22+05:30] Priya Nair (Account Executive, Tracewise): Perfect. Rahul, who else should be in the technical session?
+[2026-07-14T10:20:28+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Someone who owns the Airflow deployment and someone from the warehouse team. I’ll ask the platform manager who has capacity.
+[2026-07-14T10:20:38+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I can invite the Airflow owner. I’ll check who’s best from the warehouse side; there’s been a bit of team reshuffling.
+[2026-07-14T10:20:48+05:30] Priya Nair (Account Executive, Tracewise): Great. I’ll send a short agenda with the integration questions and the example workflow we discussed. Karan, if you can send the sanitized incident outline and a couple of arrival-pattern examples, that’ll help us make the next session concrete.
+[2026-07-14T10:21:03+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Sure. I’ll probably send more context than you need, so tell me if I’ve overdone it.
+[2026-07-14T10:21:10+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): We’ll tell you.
+[2026-07-14T10:21:14+05:30] Priya Nair (Account Executive, Tracewise): I’ll put a limit on the attachment count, then.
+[2026-07-14T10:21:19+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): That may be necessary.
+[2026-07-14T10:21:24+05:30] Priya Nair (Account Executive, Tracewise): Before we wrap, I want to check one thing about timing. Is there a particular internal milestone driving this, or are you exploring options at this stage?
+[2026-07-14T10:21:37+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): We’re exploring. I don’t have a date when we must buy something. I’ll put effort into it if the technical session shows a real path to less incident time.
+[2026-07-14T10:21:49+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’m pushing for it because the current checks have grown organically and I’m spending too much time maintaining them. But I agree we should prove it on a real workflow.
+[2026-07-14T10:22:04+05:30] Priya Nair (Account Executive, Tracewise): That’s useful context. I won’t assume a buying timeline. If the test looks promising, we can talk about what a broader rollout would require and who needs to weigh in.
+[2026-07-14T10:22:18+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Good. Anything else you need to know from us today?
+[2026-07-14T10:22:24+05:30] Priya Nair (Account Executive, Tracewise): Maybe the audience for the incident view. Is it just the data team, or do the finance and operations teams need a summary too?
+[2026-07-14T10:22:35+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): The responders are mostly engineering. Finance wants to know if a report is going to be late, but they don’t need task logs. Operations may need a simple status view for a few workflows.
+[2026-07-14T10:22:51+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I’d keep the first phase engineering-focused. We can decide later whether there’s a useful view for anyone else.
+[2026-07-14T10:23:00+05:30] Priya Nair (Account Executive, Tracewise): Makes sense. We can keep the initial scope narrow and avoid building a whole reporting layer around it.
+[2026-07-14T10:23:11+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): On the alert itself, can it include a run link that opens the right Airflow page? That sounds small, but right now we sometimes get a DAG name and no useful URL.
+[2026-07-14T10:23:23+05:30] Priya Nair (Account Executive, Tracewise): Yes, we can include links back to the source system when the connector exposes the run reference. I’ll confirm how that behaves with your Airflow setup.
+[2026-07-14T10:23:37+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That’s one of those boring details that saves time.
+[2026-07-14T10:23:43+05:30] Priya Nair (Account Executive, Tracewise): Exactly. And if a responder needs to jump from the alert into a run or a dataset, that handoff should be direct.
+[2026-07-14T10:23:56+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Can we also see when a check was last changed? If something suddenly starts paging, I want to know whether someone edited the threshold.
+[2026-07-14T10:24:07+05:30] Priya Nair (Account Executive, Tracewise): There’s a history for check configuration and changes. I’ll include that in the next walkthrough, along with the ownership controls we mentioned.
+[2026-07-14T10:24:21+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Okay. One last product question from me. If the pipeline is healthy but the report is delayed because an external source hasn’t sent its data, will it point to that gap?
+[2026-07-14T10:24:35+05:30] Priya Nair (Account Executive, Tracewise): If we can observe the expected source dataset and its arrival, we can show that the data hasn’t landed and which downstream workflow is waiting on it. It won’t tell you why the external partner is late unless there’s another signal for that, but it can identify the missing input.
+[2026-07-14T10:24:56+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That distinction is important.
+[2026-07-14T10:25:00+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): We can give you one of those examples. It’s a good test because the job itself looks fine while the report is blocked.
+[2026-07-14T10:25:11+05:30] Priya Nair (Account Executive, Tracewise): Great. That might be even more useful than a straightforward failed task.
+[2026-07-14T10:25:21+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Sorry, I need to jump at the half hour. My daughter Ananya starts college in Pune in September, and I’ve got a call with the family about the move.
+[2026-07-14T10:25:32+05:30] Priya Nair (Account Executive, Tracewise): Oh, exciting. I hope the move goes smoothly.
+[2026-07-14T10:25:38+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Thanks. We’re currently arguing about how many boxes a student needs, which I suspect is a trick question.
+[2026-07-14T10:25:46+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): There’s no correct answer. You find out after the first trip.
+[2026-07-14T10:25:51+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That is not reassuring.
+[2026-07-14T10:25:56+05:30] Priya Nair (Account Executive, Tracewise): I’ll let you get back to the logistics before we become a moving consultancy. We’re near the end here. For next steps, I’ll send the technical agenda and a couple of time options. Karan will share the sanitized incident outline and arrival examples, and Rahul will help identify the Airflow and warehouse contacts.
+[2026-07-14T10:26:19+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Yes, that works. I’ll send the examples over once I’ve checked there’s nothing sensitive in them.
+[2026-07-14T10:26:27+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): I’ll find the right people. Send me the proposed times and keep the session to the technical questions.
+[2026-07-14T10:26:35+05:30] Priya Nair (Account Executive, Tracewise): Will do. I’ll also send a fintech case study by Jul 17, focused on the incident response and pipeline visibility side rather than a broad product overview.
+[2026-07-14T10:26:49+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): That’s useful. Make it short enough that I can actually read it.
+[2026-07-14T10:26:54+05:30] Priya Nair (Account Executive, Tracewise): Understood. A concise summary and the relevant details.
+[2026-07-14T10:27:02+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): And if it includes an example where the job succeeded but the data was wrong, I’d be interested in that.
+[2026-07-14T10:27:10+05:30] Priya Nair (Account Executive, Tracewise): I’ll check for one that matches. If I don’t have a clean example, I’ll say so instead of stretching it.
+[2026-07-14T10:27:22+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Great.
+[2026-07-14T10:27:25+05:30] Priya Nair (Account Executive, Tracewise): Any concerns about the next step that we haven’t covered?
+[2026-07-14T10:27:31+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Not yet. The integration and permissions are the big questions. If those are manageable, we can test the workflow.
+[2026-07-14T10:27:42+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): I’d also like to see how much setup is needed to get a useful lineage view. I don’t want to spend the session looking at a blank graph.
+[2026-07-14T10:27:54+05:30] Priya Nair (Account Executive, Tracewise): I’ll make that a specific agenda item. We can use the workflow outline you share to show what metadata we’d need and where the gaps might be.
+[2026-07-14T10:28:07+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Good.
+[2026-07-14T10:28:10+05:30] Priya Nair (Account Executive, Tracewise): Thanks, both. I’ll send the recap and options shortly. We’ll keep the next meeting focused on access, lineage coverage, and the settlement workflow.
+[2026-07-14T10:28:22+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): Thanks, Priya. Nice meeting you.
+[2026-07-14T10:28:26+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Thanks. Talk soon.
+[2026-07-14T10:28:29+05:30] Priya Nair (Account Executive, Tracewise): Thanks, Rahul. Thanks, Karan. Have a good one.
+[2026-07-14T10:28:34+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): You too. Bye.
+[2026-07-14T10:28:37+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): Bye.

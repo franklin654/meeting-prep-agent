@@ -1,0 +1,113 @@
+[2026-06-02T09:00:04+05:30] Priya Nair (Account Executive, Tracewise): Hi, Meera. Good morning! Can you hear me all right?
+[2026-06-02T09:00:11+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Morning, Priya. Yep, loud and clear. How are you?
+[2026-06-02T09:00:18+05:30] Priya Nair (Account Executive, Tracewise): Doing well, thanks. It’s been a bit of a week already, but I’ve got coffee, so we’re in good shape.
+[2026-06-02T09:00:26+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’s the important part. I’m between two internal reviews, so I may have to keep an eye on the clock.
+[2026-06-02T09:00:34+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. I’ve held half an hour for us. We can cover the contract, agree on a kickoff plan, and leave room for questions.
+[2026-06-02T09:00:43+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Perfect. And thanks for sending the agenda. It made it easy to get the right people lined up on our side.
+[2026-06-02T09:01:02+05:30] Priya Nair (Account Executive, Tracewise): Great. Before we get into logistics, how are things looking with the reporting issue we started with?
+[2026-06-02T09:01:13+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Still the same story. Late shipment data comes in at different times, and the weekly reports don’t always agree. The team ends up chasing down which pipeline is behind instead of looking at the actual numbers.
+[2026-06-02T09:01:34+05:30] Priya Nair (Account Executive, Tracewise): Right, and we’re aiming to make the delays visible early, so your team can see what changed and where, without doing that detective work each week.
+[2026-06-02T09:01:44+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Exactly. We have about 70 pipelines in the area we discussed, so we need to start with a sensible slice rather than trying to boil the ocean.
+[2026-06-02T09:02:02+05:30] Priya Nair (Account Executive, Tracewise): Agreed. Let’s start with the late-shipment reporting paths and the dependencies that feed those reports. We can validate the first group, then decide together what to bring in next.
+[2026-06-02T09:02:16+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That works. One thing I want to be careful about is not disrupting the existing weekly process while we set this up.
+[2026-06-02T09:02:27+05:30] Priya Nair (Account Executive, Tracewise): Definitely. We’ll begin in read-only mode, map the relevant sources and schedules, and review the results with your team before we make any changes to alerting or workflows.
+[2026-06-02T09:02:43+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good. And on the paperwork side, we got the final version through procurement.
+[2026-06-02T09:02:51+05:30] Priya Nair (Account Executive, Tracewise): Excellent. Anything still open there, or are we good to treat the commercial terms as settled?
+[2026-06-02T09:03:00+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): We’re good. I’ve signed Enterprise at $62K.
+[2026-06-02T09:03:12+05:30] Priya Nair (Account Executive, Tracewise): Thank you, Meera. I appreciate you getting that over the line. I’ll confirm our side has the executed copy and send you the fully countersigned version.
+[2026-06-02T09:03:25+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Sounds good. Please copy our procurement contact, Rohan, when you send it. He’s tracking the final paperwork.
+[2026-06-02T09:03:34+05:30] Priya Nair (Account Executive, Tracewise): Will do. And I know Deepak was involved in the security review. Is he comfortable with the handoff now?
+[2026-06-02T09:03:45+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes. He confirmed the security sign-off after reviewing the materials. He’s happy with where it landed.
+[2026-06-02T09:03:57+05:30] Priya Nair (Account Executive, Tracewise): Great. I’ll make sure the implementation team has that context, so you don’t have to reopen the same questions during kickoff.
+[2026-06-02T09:04:09+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Appreciate that. We’ve got enough threads going already.
+[2026-06-02T09:04:17+05:30] Priya Nair (Account Executive, Tracewise): For kickoff, I suggest we bring in your data platform lead, whoever owns the shipment sources, and the person who maintains the weekly reports. From our side, I’ll have an implementation lead and a solutions engineer.
+[2026-06-02T09:04:33+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’s right. Arjun owns the platform side, and Kavya’s team maintains those reports. I’ll ask them to join.
+[2026-06-02T09:04:44+05:30] Priya Nair (Account Executive, Tracewise): Perfect. We’ll use that session to confirm the data paths, access requirements, and what a successful first rollout looks like.
+[2026-06-02T09:05:01+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): For success, I’d want the team to know when a feed is late before it breaks the report. And then be able to point to the affected downstream output without manually tracing it.
+[2026-06-02T09:05:18+05:30] Priya Nair (Account Executive, Tracewise): That’s clear. We can turn those into the first acceptance checks: detect a late arrival, show the affected report, and make the timing understandable to the people on call.
+[2026-06-02T09:05:32+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes, and let’s not alert everyone for every little fluctuation. The current process already has enough noise.
+[2026-06-02T09:05:43+05:30] Priya Nair (Account Executive, Tracewise): Totally. We’ll review thresholds with the owners and keep the initial notifications limited to the people who can actually respond.
+[2026-06-02T09:05:57+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Okay. For access, we can provide a service account, but our platform team will want to review the permissions first.
+[2026-06-02T09:06:09+05:30] Priya Nair (Account Executive, Tracewise): That’s no problem. We’ll send the proposed permissions ahead of time, and your team can approve or adjust them before anything connects.
+[2026-06-02T09:06:22+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good. We’ve had vendors say “read-only” and then ask for broader access later, so I’ll want that spelled out.
+[2026-06-02T09:06:35+05:30] Priya Nair (Account Executive, Tracewise): Fair point. We’ll document what’s needed for the initial setup separately from anything optional, and we won’t expand access without your team’s approval.
+[2026-06-02T09:06:50+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Nice. And who’s our day-to-day contact once we’re underway?
+[2026-06-02T09:06:58+05:30] Priya Nair (Account Executive, Tracewise): Our implementation lead will be your primary contact for setup and working sessions. I’ll stay involved for the commercial side and check in at the milestones, but you won’t have to route technical questions through me.
+[2026-06-02T09:07:13+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’s helpful. We can be pretty hands-on, especially at the start.
+[2026-06-02T09:07:22+05:30] Priya Nair (Account Executive, Tracewise): That’s the best way to get the setup right. We’ll keep the sessions focused and make sure there’s time between them for your team to test what we configure.
+[2026-06-02T09:07:37+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Do you have a standard cadence in mind?
+[2026-06-02T09:07:43+05:30] Priya Nair (Account Executive, Tracewise): I’d suggest a kickoff, then a working session each week during initial setup. Once the first group is running reliably, we can move to a lighter check-in cadence.
+[2026-06-02T09:07:58+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Weekly should work. Mornings are usually easier for Arjun, but Kavya is more flexible.
+[2026-06-02T09:08:09+05:30] Priya Nair (Account Executive, Tracewise): Okay. I’ll ask the implementation lead for a couple of morning options and send them to you, Arjun, and Kavya.
+[2026-06-02T09:08:23+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Great. I’ll make sure they hold a slot.
+[2026-06-02T09:08:29+05:30] Priya Nair (Account Executive, Tracewise): Before we settle dates, is there anything on your calendar or in the data team’s schedule that we should plan around?
+[2026-06-02T09:08:37+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): We have a planning day coming up, and the platform team will be tied up most of that day. Other than that, no big blockers.
+[2026-06-02T09:08:49+05:30] Priya Nair (Account Executive, Tracewise): Got it. We can avoid that and still use the time before it to gather the basic details.
+[2026-06-02T09:09:02+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes. I can send over the names of the relevant pipelines and reports beforehand.
+[2026-06-02T09:09:12+05:30] Priya Nair (Account Executive, Tracewise): That would be great. A list of the source systems, report owners, and any known timing quirks will give our team a useful starting point.
+[2026-06-02T09:09:28+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): There are a few quirks. Some shipments update in batches, and a handful of regions report later because of their local handoff.
+[2026-06-02T09:09:40+05:30] Priya Nair (Account Executive, Tracewise): That’s exactly the kind of context that helps us avoid treating normal variation as a problem. We can capture expected timing by source and review it with the owners.
+[2026-06-02T09:09:54+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Right. One of the regional teams actually sends a spreadsheet around when they’re waiting on a carrier update, which is not ideal.
+[2026-06-02T09:10:06+05:30] Priya Nair (Account Executive, Tracewise): Oh, the spreadsheet relay. I’ve seen that become its own little workflow.
+[2026-06-02T09:10:14+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): It has tabs. Lots of tabs.
+[2026-06-02T09:10:22+05:30] Priya Nair (Account Executive, Tracewise): That may deserve its own conversation someday, but we’ll keep this rollout centered on the shipment data and weekly reporting. We don’t want to accidentally turn the first project into a spreadsheet renovation.
+[2026-06-02T09:10:39+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Thank you. If we touch the spreadsheet, people will start asking for formatting changes.
+[2026-06-02T09:10:47+05:30] Priya Nair (Account Executive, Tracewise): Understood. We’ll note the dependency, not the tabs.
+[2026-06-02T09:10:54+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good distinction.
+[2026-06-02T09:11:01+05:30] Priya Nair (Account Executive, Tracewise): Let’s talk about how we’ll measure the first phase. Beyond alerting, should we track how often the weekly report needs manual correction?
+[2026-06-02T09:11:12+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes, but I’d rather use that as a trend than promise an immediate number. Some corrections come from upstream business changes, not a late feed.
+[2026-06-02T09:11:26+05:30] Priya Nair (Account Executive, Tracewise): That makes sense. We can establish the baseline with your team and then separate data freshness issues from other reasons for corrections.
+[2026-06-02T09:11:39+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Exactly. I don’t want people to feel like we’re grading them when we’re really trying to fix the process.
+[2026-06-02T09:11:50+05:30] Priya Nair (Account Executive, Tracewise): We’ll frame it as operational visibility, not a performance scorecard.
+[2026-06-02T09:12:01+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’ll go over better.
+[2026-06-02T09:12:08+05:30] Priya Nair (Account Executive, Tracewise): On the kickoff, I’ll have the implementation lead walk through the workspace and then spend most of the time on your actual data flow. We can keep the product tour short.
+[2026-06-02T09:12:23+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Please do. The team learns more from seeing their own setup than from a long slide deck.
+[2026-06-02T09:12:35+05:30] Priya Nair (Account Executive, Tracewise): Agreed. We’ll use your examples, and we’ll send notes and decisions after each session so everyone has the same record.
+[2026-06-02T09:12:48+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’ll also help people who can’t make every meeting.
+[2026-06-02T09:12:57+05:30] Priya Nair (Account Executive, Tracewise): Exactly. I’ll also ask the team to keep a running list of questions and owners, so smaller issues don’t get lost between sessions.
+[2026-06-02T09:13:10+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Nice. Is there anything you need from me to get the implementation team assigned?
+[2026-06-02T09:13:18+05:30] Priya Nair (Account Executive, Tracewise): Just the attendee list and the report examples. I’ll take care of the internal handoff and share the account summary with the implementation lead.
+[2026-06-02T09:13:31+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I can send the list today. I’ll include Deepak too, at least for the kickoff, so he can confirm there aren’t any loose ends.
+[2026-06-02T09:13:43+05:30] Priya Nair (Account Executive, Tracewise): That’s a good idea. We can give him a short slot to confirm the security handoff, then let him drop if there’s nothing else he needs.
+[2026-06-02T09:13:56+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good. He’ll appreciate not having to sit through the whole implementation discussion.
+[2026-06-02T09:14:05+05:30] Priya Nair (Account Executive, Tracewise): I’ll make that clear in the invite. Anything else you want to make sure we cover before we move into next steps?
+[2026-06-02T09:14:15+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): One thing: our weekly report is used by people outside the data team. We should probably bring one of them in to validate whether the alerts are actually useful.
+[2026-06-02T09:14:27+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. Maybe one report consumer who can tell us what they need to know when something is late, without making the group too large.
+[2026-06-02T09:14:40+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I’ll ask our operations planning manager. She’s direct, which is useful.
+[2026-06-02T09:14:49+05:30] Priya Nair (Account Executive, Tracewise): Direct is good. We’d rather hear early if an alert is confusing than find out after everyone’s built a workaround.
+[2026-06-02T09:15:03+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I’ll check with her and send you the name.
+[2026-06-02T09:15:11+05:30] Priya Nair (Account Executive, Tracewise): Thanks. For comms, do you prefer email for meeting notes and decisions, or is there a shared channel your team uses?
+[2026-06-02T09:15:21+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Email for anything we need to keep on record. We can use our project channel for quick questions once the team is set up.
+[2026-06-02T09:15:33+05:30] Priya Nair (Account Executive, Tracewise): Great. We’ll use email for decisions, then follow your lead on the project channel.
+[2026-06-02T09:15:45+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Sounds good.
+[2026-06-02T09:15:52+05:30] Priya Nair (Account Executive, Tracewise): I’ll also send a short kickoff questionnaire, nothing heavy. It’s mainly to capture owners, source systems, and what the team considers a normal late arrival.
+[2026-06-02T09:16:07+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’s fine. If it’s more than a page, I may hand it to Arjun.
+[2026-06-02T09:16:15+05:30] Priya Nair (Account Executive, Tracewise): Fair warning received. I’ll keep it brief and make sure it’s not just a form for the sake of having a form.
+[2026-06-02T09:16:26+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Appreciate that.
+[2026-06-02T09:16:32+05:30] Priya Nair (Account Executive, Tracewise): One other thing on onboarding: we’ll share a draft view of the pipeline map once it’s populated, then ask your team to check whether the dependencies match how you understand them.
+[2026-06-02T09:16:46+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Good. The documentation isn’t always perfectly up to date, so it’ll be useful to compare.
+[2026-06-02T09:16:58+05:30] Priya Nair (Account Executive, Tracewise): That’s normal. We’ll treat your team as the source of truth and note any places where the map differs from the documentation.
+[2026-06-02T09:17:10+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Great. It might even help us clean up our own notes a bit.
+[2026-06-02T09:17:18+05:30] Priya Nair (Account Executive, Tracewise): It often does. And if we find something outside the agreed scope, we’ll flag it rather than quietly adding work.
+[2026-06-02T09:17:30+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): That’s appreciated. We need to manage expectations internally, too.
+[2026-06-02T09:17:40+05:30] Priya Nair (Account Executive, Tracewise): Of course. We’ll be explicit about what’s included in this first phase and what would need a separate decision.
+[2026-06-02T09:17:51+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Okay. I think we’ve covered the main points.
+[2026-06-02T09:17:57+05:30] Priya Nair (Account Executive, Tracewise): Before I do the wrap-up, I wanted to ask: if the rollout goes well, would you be open to sharing your experience with another data team considering Tracewise?
+[2026-06-02T09:18:09+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Sure, I can be a reference. I know a couple of people who are dealing with similar reporting headaches, and I’m happy to talk once we’ve got some results to point to.
+[2026-06-02T09:18:24+05:30] Priya Nair (Account Executive, Tracewise): Thank you, Meera. That’s very kind. We’ll wait until you’re comfortable and have had a chance to see the rollout working.
+[2026-06-02T09:18:37+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Yes, let’s do that. I’d rather speak from actual experience than make it sound like a polished endorsement.
+[2026-06-02T09:18:48+05:30] Priya Nair (Account Executive, Tracewise): Completely fair. It should be your honest perspective, not a script.
+[2026-06-02T09:19:00+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Exactly.
+[2026-06-02T09:19:06+05:30] Priya Nair (Account Executive, Tracewise): All right, let me recap the next steps. I’ll confirm the countersigned contract with Rohan copied, assign the implementation lead, and send the kickoff options and brief questionnaire.
+[2026-06-02T09:19:20+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): I’ll send the attendee list, report examples, and the initial pipeline list. I’ll also check whether the operations planning manager can join.
+[2026-06-02T09:19:31+05:30] Priya Nair (Account Executive, Tracewise): And we’ll include the proposed read-only permissions for Arjun’s team to review before any connection is made.
+[2026-06-02T09:19:41+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Right. I’ll ask Arjun to look out for that.
+[2026-06-02T09:19:48+05:30] Priya Nair (Account Executive, Tracewise): Once we have a kickoff time, I’ll send a calendar invite with the agenda and note that Deepak can join for the security handoff portion.
+[2026-06-02T09:20:01+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Perfect. And please keep the first session practical—real flows, actual owners, no long intro.
+[2026-06-02T09:20:11+05:30] Priya Nair (Account Executive, Tracewise): Absolutely. We’ll get straight into your setup.
+[2026-06-02T09:20:20+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Great. I think that’s everything from me.
+[2026-06-02T09:20:25+05:30] Priya Nair (Account Executive, Tracewise): Good. Thanks for making the time, Meera. I’ll follow up with those items, and we’ll get the kickoff on the calendar.
+[2026-06-02T09:20:36+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): Thanks, Priya. Looking forward to getting this moving.
+[2026-06-02T09:20:42+05:30] Priya Nair (Account Executive, Tracewise): Same here. Have a good rest of your morning.
+[2026-06-02T09:20:48+05:30] Meera Kulkarni (Head of Data, Nimbus Logistics): You too. Bye.
+[2026-06-02T09:20:52+05:30] Priya Nair (Account Executive, Tracewise): Bye, Meera.
