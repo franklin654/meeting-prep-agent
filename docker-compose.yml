@@ -22,6 +22,11 @@ services:
       HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_API_LLM_PROVIDER}
       HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_API_LLM_API_KEY}
       HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_API_LLM_MODEL}
+      # Free-tier Groq keys don't have the `auto` service tier Hindsight
+      # requests by default, which fails retain's fact extraction with a 400
+      # ("service_tier auto is not available for this org"). Override to
+      # on_demand per the Hindsight docs (developer/configuration.md).
+      HINDSIGHT_API_LLM_GROQ_SERVICE_TIER: ${HINDSIGHT_API_LLM_GROQ_SERVICE_TIER:-on_demand}
       # Stable worker id: a rotating Docker hostname leaves background jobs
       # stuck after a restart, so this must stay fixed across restarts.
       HINDSIGHT_API_WORKER_ID: ${HINDSIGHT_API_WORKER_ID:-hindsight-demo-1}
