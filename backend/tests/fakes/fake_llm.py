@@ -28,12 +28,51 @@ class RecordedCall:
     system: str | None
 
 
+@dataclass
+class RecordedTextCall:
+    """One `complete_text` call, kept for test assertions."""
+
+    prompt: str
+    temperature: float
+    system: str | None
+
+
 class FakeLLM(LLMClient):
     """Returns pre-registered responses/errors in FIFO order; records every call."""
 
     def __init__(self) -> None:
         self._queue: list[BaseModel | Exception] = []
         self.calls: list[RecordedCall] = []
+        self._text_queue: list[str | Exception] = []
+        self.text_calls: list[RecordedTextCall] = []
+
+    def queue_text(self, text: str) -> None:
+        """Register a plain-text response for the next `complete_text` call."""
+        self._text_queue.append(text)
+
+    def queue_text_error(self, error: Exception) -> None:
+        """Register an exception to raise on the next `complete_text` call."""
+        self._text_queue.append(error)
+
+    async def complete_text(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.0,
+        system: str | None = None,
+    ) -> str:
+        self.text_calls.append(
+            RecordedTextCall(prompt=prompt, temperature=temperature, system=system)
+        )
+        if not self._text_queue:
+            raise AssertionError(
+                "FakeLLM.complete_text called with no canned response queued. "
+                "Call queue_text()/queue_text_error() in the test first."
+            )
+        item = self._text_queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
 
     def queue_response(self, response: BaseModel) -> None:
         """Register a response to return on the next `complete_json` call."""
