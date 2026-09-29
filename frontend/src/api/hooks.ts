@@ -7,6 +7,8 @@ import type { components } from './schema'
 export type Brief = components['schemas']['Brief']
 export type MeetingSummary = components['schemas']['MeetingSummary']
 export type JobStatus = components['schemas']['JobStatus']
+export type CaptureDraft = components['schemas']['CaptureDraftResponse']
+export type CaptureItem = components['schemas']['CaptureItem']
 export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
 export type Nudge = components['schemas']['Nudge']
@@ -281,6 +283,40 @@ export function useSubmitNotes(meetingId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.meetingsAll() })
+    },
+  })
+}
+
+export function usePreviewCapture(meetingId: string) {
+  return useMutation({
+    mutationFn: async (transcript: string) => {
+      const { data } = await api.POST('/api/meetings/{meeting_id}/capture/preview', {
+        params: { path: { meeting_id: meetingId } },
+        body: { transcript },
+      })
+      return data as components['schemas']['JobAccepted']
+    },
+  })
+}
+
+export function useSaveCapture(draftId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (uncheckedItemIds: string[]) => {
+      const { data } = await api.POST('/api/capture/{draft_id}/save', {
+        params: { path: { draft_id: draftId } },
+        body: { unchecked_item_ids: uncheckedItemIds },
+      })
+      return data as components['schemas']['JobAccepted']
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.meetingsAll() }),
+  })
+}
+
+export function useDiscardCapture(draftId: string) {
+  return useMutation({
+    mutationFn: async () => {
+      await api.DELETE('/api/capture/{draft_id}', { params: { path: { draft_id: draftId } } })
     },
   })
 }
