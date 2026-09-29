@@ -21,17 +21,13 @@ from datetime import UTC, datetime
 from sqlmodel import Session, select
 
 from app.core.errors import NotFoundError
+from app.core.time import utcnow
 from app.db import repository
 from app.db.models import Account, BriefRecord, Commitment, Contact, Meeting
 from app.schemas.brief import Brief
 from app.schemas.enums import CommitmentStatus
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
-
-
-def _utcnow() -> datetime:
-    # switch to app.core.time.utcnow once T12 merges
-    return datetime.now(UTC)
 
 
 def as_utc(value: datetime) -> datetime:
@@ -108,7 +104,7 @@ def new_brief_stamp(
     with session_factory() as session:
         record = _find_record(session, meeting_id, mode)
         brief_id = record.id if record is not None else f"br_{uuid.uuid4().hex[:8]}"
-    return brief_id, _utcnow()
+    return brief_id, utcnow()
 
 
 def save_brief(session_factory: SessionFactory, brief: Brief) -> None:
