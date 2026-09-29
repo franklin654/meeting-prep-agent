@@ -7,11 +7,13 @@ this is a DB module: only these modules touch a `Session` (AGENTS.md hard rule 1
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from sqlmodel import Session, col, select
 
 from app.core.errors import NotFoundError
+from app.db import brief_repo
 from app.db.models import Account, BriefRecord, Contact, Meeting, MeetingAttendee
 
 
@@ -47,11 +49,20 @@ def list_meeting_rows(session: Session, status: str | None = None) -> list[Meeti
     attendees: dict[str, list[Contact]] = {}
     for meeting_id, contact in attendee_rows:
         attendees.setdefault(meeting_id, []).append(contact)
-    with_brief = set(
+    # `brief_ready` = a FRESH MEMORY brief exists: the exact rule GET /brief uses
+    # (brief_repo.get_fresh_brief), applied only where a memory record exists.
+    with_memory_brief = set(
         session.exec(
-            select(BriefRecord.meeting_id).where(col(BriefRecord.meeting_id).in_(ids)).distinct()
+            select(BriefRecord.meeting_id)
+            .where(col(BriefRecord.meeting_id).in_(ids), BriefRecord.mode == "memory")
+            .distinct()
         ).all()
     )
+    with_brief = {
+        mid
+        for mid in with_memory_brief
+        if brief_repo.get_fresh_brief(lambda: nullcontext(session), mid, "memory") is not None
+    }
     return [
         MeetingRow(
             meeting=m,

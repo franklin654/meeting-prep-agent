@@ -55,6 +55,18 @@ def fact_kind_tag(fact_kind: FactKind) -> str:
 
 
 _MEETING_TAG_PREFIX = meeting_tag("")
+_FACT_KIND_PREFIX = "fact_kind:"
+
+
+def fact_kind_from_tags(tags: Sequence[str]) -> FactKind | None:
+    """The `FactKind` in a `fact_kind:<value>` tag, or None when absent or unknown."""
+    for tag in tags:
+        if tag.startswith(_FACT_KIND_PREFIX):
+            try:
+                return FactKind(tag[len(_FACT_KIND_PREFIX) :])
+            except ValueError:
+                continue
+    return None
 
 
 def meeting_ids_from_tags(tags: Sequence[str]) -> list[str]:
