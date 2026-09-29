@@ -7,12 +7,17 @@ this is a DB module: only these modules touch a `Session` (AGENTS.md hard rule 1
 
 from __future__ import annotations
 
+import logging
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from sqlmodel import Session, col, select
 
 from app.core.errors import NotFoundError
+from app.db import brief_repo
 from app.db.models import Account, BriefRecord, Contact, Meeting, MeetingAttendee
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -23,6 +28,21 @@ class MeetingRow:
     account_name: str
     attendees: list[Contact]
     brief_ready: bool
+
+
+def _has_fresh_memory_brief(session: Session, meeting_id: str) -> bool:
+    """Same rule as GET /brief (`get_fresh_brief`); a record that cannot be read is not ready.
+
+    The dashboard must never fail because one stored brief is corrupt, so any error from
+    reading or validating that record means `False`. Only the meeting id and the exception
+    type are logged, never the content.
+    """
+    try:
+        fresh = brief_repo.get_fresh_brief(lambda: nullcontext(session), meeting_id, "memory")
+    except Exception as exc:  # deliberately broad, see docstring
+        logger.warning("brief_ready.unreadable meeting=%s error=%s", meeting_id, type(exc).__name__)
+        return False
+    return fresh is not None
 
 
 def list_meeting_rows(session: Session, status: str | None = None) -> list[MeetingRow]:
@@ -47,11 +67,16 @@ def list_meeting_rows(session: Session, status: str | None = None) -> list[Meeti
     attendees: dict[str, list[Contact]] = {}
     for meeting_id, contact in attendee_rows:
         attendees.setdefault(meeting_id, []).append(contact)
-    with_brief = set(
+    # `brief_ready` = a FRESH MEMORY brief exists: the exact rule GET /brief uses
+    # (brief_repo.get_fresh_brief), applied only where a memory record exists.
+    with_memory_brief = set(
         session.exec(
-            select(BriefRecord.meeting_id).where(col(BriefRecord.meeting_id).in_(ids)).distinct()
+            select(BriefRecord.meeting_id)
+            .where(col(BriefRecord.meeting_id).in_(ids), BriefRecord.mode == "memory")
+            .distinct()
         ).all()
     )
+    with_brief = {mid for mid in with_memory_brief if _has_fresh_memory_brief(session, mid)}
     return [
         MeetingRow(
             meeting=m,

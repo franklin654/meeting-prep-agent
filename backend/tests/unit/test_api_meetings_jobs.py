@@ -165,7 +165,7 @@ def test_list_meetings_sorted_with_attendees_and_brief_ready(client: TestClient)
         ("c_rahul", "Rahul Mehta", "VP Engineering"),
     ]
     assert by_id["m4_finedge"].attendees[0].role is None
-    assert m6.brief_ready is True
+    assert m6.brief_ready is False  # B18: only a fresh memory brief counts; this one is no_memory
     assert by_id["m4_finedge"].brief_ready is False
     assert by_id["m_old"].attendees == []
 
