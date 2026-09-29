@@ -82,7 +82,8 @@ def test_hit_from_reflect_fact_has_no_meeting_id_or_tags() -> None:
     assert hit.memory_id == "fact-3"
     assert hit.meeting_id is None
     assert hit.tags == []
-    assert hit.meeting_date == date(2026, 8, 27)
+    # occurred_start is an event date in the text, never the meeting date.
+    assert hit.meeting_date is None
 
 
 def test_hit_from_reflect_fact_handles_missing_occurred_start() -> None:

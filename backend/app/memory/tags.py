@@ -15,6 +15,7 @@ else in the codebase types a `"account:..."` / `"kind:..."` string by hand.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import StrEnum
 
 from app.schemas.enums import FactKind
@@ -51,3 +52,27 @@ def kind_tag(kind: MemoryKind) -> str:
 
 def fact_kind_tag(fact_kind: FactKind) -> str:
     return f"fact_kind:{fact_kind.value}"
+
+
+_MEETING_TAG_PREFIX = meeting_tag("")
+
+
+def meeting_ids_from_tags(tags: Sequence[str]) -> list[str]:
+    """Every meeting id carried by `meeting:<id>` tags, in order, without duplicates."""
+    found: list[str] = []
+    for tag in tags:
+        if tag.startswith(_MEETING_TAG_PREFIX):
+            meeting_id = tag[len(_MEETING_TAG_PREFIX) :]
+            if meeting_id and meeting_id not in found:
+                found.append(meeting_id)
+    return found
+
+
+def meeting_id_from_tags(tags: Sequence[str]) -> str | None:
+    """The meeting id when `tags` carry exactly one `meeting:<id>` tag, else None.
+
+    Zero tags mean unknown; several mean a consolidated observation spanning
+    meetings, which the caller must resolve through its source memories.
+    """
+    ids = meeting_ids_from_tags(tags)
+    return ids[0] if len(ids) == 1 else None
