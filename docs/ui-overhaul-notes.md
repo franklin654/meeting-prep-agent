@@ -51,6 +51,27 @@
 - Detached sequential real-DB backfill completed: 15 P1 calls, 15 meetings processed, 133 verified facts (`deal_fact:89`, `objection:26`, `personal:15`, `competitor:3`); all 15 meetings have at least two facts. Per-meeting counts are in the ignored log `artifacts/overhaul/a3-facts-backfill.log`. One expected `gpt-6-luna` temperature rejection was retried without temperature and succeeded. No Hindsight calls occurred.
 - Token totals for the original real-DB run are unavailable: A0 usage records went through a module logger that was not visible in the normal Uvicorn logger configuration. Do not rerun the real backfill solely to recover these counts.
 - A3 checks: 127 tests passed; Ruff and mypy passed. The requested fact-kind per-meeting tally was added to the script output.
+- Read-only real-DB audit against `/home/saisivakesh/meeting-prep-backups/app.db.pre-overhaul`: both DBs pass `PRAGMA integrity_check`; current DB added exactly `capturedraft`, `extractedfact`, `meetingprepared`, and `memoryoverride`; no existing table schema or row hashes changed. `extractedfact` has 133 rows; the other three new tables are empty. Backup/current both have 17 meetings, 33 commitments (7 done, 26 open), and 0 feedback rows. Cached brief JSON hashes are unchanged: `br_ae8ce076` SHA-256 `e20dbc69ff717ee83ecb71fc07c91c3292365e234b5d0e2c99fa4c29ad5918d0`; `br_07e16a63` SHA-256 `b29b896ef3a89fd1f9fa71a148b59b8495dff4dfa27db16b94d22158391c949e`.
+
+| Meeting | Title | Facts by kind | Total |
+| --- | --- | --- | ---: |
+| `n1_nimbus` | Discovery | deal_fact 8; objection 3; personal 2 | 13 |
+| `n2_nimbus` | Security review | deal_fact 2; objection 1; personal 1 | 4 |
+| `n3_nimbus` | Security follow-up | deal_fact 6; objection 1; personal 1 | 8 |
+| `o1_orbit` | Discovery | deal_fact 4; objection 2; personal 2 | 8 |
+| `n4_nimbus` | Contract and kickoff | deal_fact 7; objection 3 | 10 |
+| `o2_orbit` | Pricing | competitor 1; deal_fact 3; objection 1 | 5 |
+| `m1_finedge` | Discovery | deal_fact 4; objection 2; personal 1 | 7 |
+| `m2_finedge` | Budget and process | deal_fact 8; objection 4; personal 1 | 13 |
+| `o3_orbit` | Decision | competitor 1; deal_fact 8; personal 1 | 10 |
+| `m3_finedge` | Technical deep dive | competitor 1; deal_fact 4; objection 3; personal 1 | 9 |
+| `v1_veda` | Discovery | deal_fact 9; objection 1 | 10 |
+| `m4_finedge` | Pilot scoping | deal_fact 9; objection 1; personal 1 | 11 |
+| `v2_veda` | Technical review | deal_fact 5; objection 2; personal 2 | 9 |
+| `m5_finedge` | Check-in | deal_fact 5; objection 1; personal 1 | 7 |
+| `v3_veda` | Sandbox check-in | deal_fact 7; objection 1; personal 1 | 9 |
+
+All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used SQLite URI `mode=ro`; no writes were made.
 - Created `backend/app.sandbox.db` and `backend/app.sandbox-r.db` using SQLite's online backup command from the completed real DB; both pass `PRAGMA integrity_check`. Both paths are ignored by Git.
 - A4: added `POST /api/meetings/{meeting_id}/capture/preview`, `POST /api/capture/{draft_id}/save`, and `DELETE /api/capture/{draft_id}`. Preview runs P1 and conditional P2, writes only the capture draft/job, validates quotes, and annotates duplicates, closes, and due-date renewals. Save applies checked items, retains the transcript without rerunning P1/P2, and is idempotent; discard leaves the ledger and memory untouched. `JobStatus` now carries a draft response. Offline `app.openapi()` generation updated the frontend API client to 20 paths. No new DB table or application error code.
 - A4 checks: plain pytest 678 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Capture API tests cover preview isolation, selected-only save, no second extraction, save idempotency, discard, transcript length, duplicate and renewal badges. No live LLM or Hindsight calls in A4.
