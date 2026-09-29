@@ -63,7 +63,7 @@ jobs:
         working-directory: frontend
 
       - name: tsc --noEmit
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit -p tsconfig.app.json
         working-directory: frontend
 
       - name: vitest

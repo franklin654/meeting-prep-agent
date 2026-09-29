@@ -42,7 +42,7 @@ cd backend && uv run pytest -m live    # Hindsight contract test
 cd backend && uv run pytest -m live_llm  # LLM smoke test per provider (skipped without that key)
 cd backend && uv run pytest -m golden  # golden scenarios G-1..G-4 (real Hindsight + configured LLM providers)
 cd backend && uv run ruff check . && uv run mypy app
-cd frontend && npm run lint && npx tsc --noEmit && npm test
+cd frontend && npm run lint && npx tsc --noEmit -p tsconfig.app.json && npm test
 cd frontend && npm run gen:api         # regenerate API client from /openapi.json
 make reset-demo                        # wipe SQLite + demo bank, reseed
 ```
