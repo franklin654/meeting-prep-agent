@@ -82,6 +82,7 @@ from app.services.preferences import (
 )
 
 logger = logging.getLogger(__name__)
+timing_logger = logging.getLogger("uvicorn.error")
 
 BriefMode = Literal["memory", "no_memory"]
 
@@ -535,6 +536,45 @@ def _apply_severity_cap(
         ]
 
 
+def _drop_repeated_competitor_objections(
+    sections: dict[SectionKey, list[BriefItem]], competitors: Sequence[str]
+) -> None:
+    """Keep a competitor watch-out when an objection repeats its cited fact and meeting."""
+    watch_outs = sections.get(SectionKey.watch_outs, [])
+    objections = sections.get(SectionKey.unresolved_objections, [])
+    if not watch_outs or not objections or not competitors:
+        return
+
+    def competitor_in(text: str) -> str | None:
+        return next((name for name in competitors if name.casefold() in text.casefold()), None)
+
+    retained: list[BriefItem] = []
+    for objection in objections:
+        objection_name = competitor_in(
+            " ".join(
+                [objection.text, *(citation.quote or "" for citation in objection.citations)]
+            )
+        )
+        repeats_watch_out = objection_name is not None and any(
+            competitor_in(watch.text) == objection_name
+            and any(
+                objection_citation.meeting_id == watch_citation.meeting_id
+                for objection_citation in objection.citations
+                for watch_citation in watch.citations
+            )
+            for watch in watch_outs
+        )
+        if repeats_watch_out:
+            logger.info(
+                "brief.item_dropped section=unresolved_objections "
+                "reason=duplicate_competitor_watchout competitor=%s",
+                objection_name,
+            )
+        else:
+            retained.append(objection)
+    sections[SectionKey.unresolved_objections] = retained
+
+
 def _map_draft(
     draft: BriefDraft,
     table: EvidenceTable,
@@ -719,6 +759,7 @@ def assemble_brief(
                     ],
                 )
             )
+        _drop_repeated_competitor_objections(sections, competitors)
 
     if mode == "memory":
         for commitment in sorted(inputs.open_commitments, key=lambda c: c.due_date or date.max):
@@ -853,7 +894,7 @@ async def generate_brief(
         timings.ms["total"],
     )
     ms = timings.ms
-    logger.info(
+    timing_logger.info(
         "brief.timing meeting=%s mode=%s load_ms=%d recall_ms=%d reflect_ms=%d resolve_ms=%d "
         "mental_model_ms=%d gather_ms=%d p3_ms=%d post_ms=%d total_ms=%d",
         meeting_id,
