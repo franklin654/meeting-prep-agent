@@ -54,7 +54,10 @@ def _start(monkeypatch: pytest.MonkeyPatch, **overrides: Any) -> None:
 def test_valid_config_starts_and_serves_health(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(main_module, "settings", _settings())
     with TestClient(main_module.app) as client:
-        assert client.get("/api/health").json() == {"status": "ok"}
+        assert client.get("/api/health").json() == {
+            "status": "ok",
+            "demo_today": "2026-09-28",
+        }
 
 
 def test_unknown_app_provider_names_variable(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import date
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import FastAPI
 

@@ -271,7 +271,10 @@ def test_startup_does_not_build_memory_or_llm(
     monkeypatch.setattr(main_module, "settings", _settings())
     monkeypatch.setattr(db_session, "engine", engine)
     with TestClient(main_module.app) as started:
-        assert started.get("/api/health").json() == {"status": "ok"}
+        assert started.get("/api/health").json() == {
+            "status": "ok",
+            "demo_today": "2026-09-28",
+        }
     assert built == []
     engine.dispose()
 
