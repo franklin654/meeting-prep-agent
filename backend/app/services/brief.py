@@ -348,6 +348,10 @@ def _overdue_item(
     commitment: Commitment, info: MeetingInfo, known_contact_ids: set[str]
 ) -> BriefItem:
     due = f", due {format_date(commitment.due_date)}" if commitment.due_date else ""
+    # An empty source_quote falls back to the commitment's own text.
+    quote = truncate(commitment.source_quote, QUOTE_MAX_CHARS) or truncate(
+        commitment.text, QUOTE_MAX_CHARS
+    )
     return BriefItem(
         id=f"{SectionKey.open_commitments.value}-overdue-{commitment.id}",
         text=f"Overdue: {truncate(commitment.text, 120)}{due}.",
@@ -361,7 +365,7 @@ def _overdue_item(
                 meeting_id=info.id,
                 meeting_date=info.date,
                 label=f"Ledger, {call_label(info.date)}",
-                quote=truncate(commitment.source_quote, QUOTE_MAX_CHARS),
+                quote=quote,
                 memory_id=None,
             )
         ],
@@ -375,9 +379,7 @@ def _attendee_items(inputs: BriefInputs, *, mode: BriefMode) -> list[BriefItem]:
         (
             m
             for m in inputs.account_meetings
-            if m.id != inputs.meeting.id
-            and m.status == "done"
-            and _meeting_date(m) < this_date
+            if m.id != inputs.meeting.id and m.status == "done" and _meeting_date(m) < this_date
         ),
         key=lambda m: m.scheduled_at,
         reverse=True,
@@ -414,8 +416,7 @@ def _attendee_citation(
         meeting_date = _meeting_date(meeting)
         quote = first_line_spoken_by(meeting.transcript, [contact.name, *contact.aliases])
         if quote is None:
-            # Attendance is recorded in SQLite even when no line of theirs can be found.
-            quote = f"{contact.name} attended {meeting.title} on {format_date(meeting_date)}"
+            return None  # a quote must be real transcript text, never synthesized
         return Citation(
             source_type=SourceType.meeting,
             meeting_id=meeting.id,
@@ -504,9 +505,7 @@ async def generate_brief(
         context = await _gather_memory(inputs, memory, today())
         gathered_at = time.monotonic()
         done = [
-            m
-            for m in inputs.account_meetings
-            if m.status == "done" and m.id != inputs.meeting.id
+            m for m in inputs.account_meetings if m.status == "done" and m.id != inputs.meeting.id
         ]
         latest = max(done, key=lambda m: m.scheduled_at, default=None)
         table = build_evidence(

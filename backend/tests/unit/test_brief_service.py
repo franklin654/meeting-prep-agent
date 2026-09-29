@@ -242,8 +242,9 @@ async def test_attendees_section_built_in_code_with_citations(world: World) -> N
     brief, _ = await make(world)
 
     by_contact = {i.contact_ids[0]: i for i in section(brief, SectionKey.attendees)}
-    # Ours (c_priya) is not listed; Vikram was never met so is dropped.
-    assert set(by_contact) == {"c_rahul", "c_anita", "c_karan"}
+    # Ours (c_priya) is not listed; Vikram was never met and Karan has no spoken
+    # line in his latest prior meeting, so both are dropped.
+    assert set(by_contact) == {"c_rahul", "c_anita"}
     rahul = by_contact["c_rahul"]
     assert rahul.text == "Rahul Mehta, VP Engineering"
     (c,) = rahul.citations
@@ -252,10 +253,26 @@ async def test_attendees_section_built_in_code_with_citations(world: World) -> N
     assert c.label == "Pilot scoping on Aug 27, 2026"
     anita_c = by_contact["c_anita"].citations[0]
     assert (anita_c.meeting_id, anita_c.quote) == ("m2_finedge", ANITA_M2_LINE)
-    # Karan's most recent prior meeting is M5, which has no line by him: attendance fallback.
-    karan_c = by_contact["c_karan"].citations[0]
-    assert karan_c.meeting_id == "m5_finedge"
-    assert "Karan Shah attended Check-in" in (karan_c.quote or "")
+    for it in by_contact.values():
+        assert all("attended" not in (c.quote or "") for c in it.citations)
+
+
+async def test_overdue_item_with_empty_source_quote_falls_back_to_commitment_text(
+    world: World,
+) -> None:
+    with Session(world.engine) as s:
+        deck = s.get(Commitment, "cm_deck")
+        assert deck is not None
+        deck.source_quote = ""
+        s.add(deck)
+        s.commit()
+
+    brief, _ = await make(world, lambda p: BriefDraft(sections={}))
+
+    (forced,) = section(brief, SectionKey.open_commitments)
+    (c,) = forced.citations
+    assert c.quote == "Send revised pricing deck with pilot option"
+    assert c.meeting_id == "m4_finedge" and c.meeting_date == date(2026, 8, 27)
 
 
 # ---- no_memory ----------------------------------------------------------------------------
