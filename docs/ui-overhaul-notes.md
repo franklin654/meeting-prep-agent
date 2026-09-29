@@ -11,7 +11,7 @@
 | A3 | complete | `4599067` |
 | A4 | complete | implementation `532f731` |
 | A5 | complete | implementation `dc12c17` |
-| A6 | complete | pending commit |
+| A6 | complete | implementation `2b59262` |
 | A7 | planned | — |
 | B1 | planned | — |
 | B2 | planned | — |
