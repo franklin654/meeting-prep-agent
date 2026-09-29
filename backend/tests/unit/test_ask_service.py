@@ -12,11 +12,12 @@ from sqlmodel import Session
 from app.core.time import utcnow
 from app.db import brief_repo, ingest_repo, repository
 from app.db.models import AskAnswer
-from app.schemas.ask import AskRequest, AskTurn, NoteRequest, ReflectAnswer
+from app.schemas.ask import AskRequest, AskTurn, NoteRequest, ReflectAnswer, SuggestedQuestions
 from app.schemas.brief import Brief, SectionKey
 from app.schemas.enums import ScopeType
 from app.schemas.memory import MemoryHit, ReflectResult
-from app.services.ask import ask_question, pin_answer, run_note_job
+from app.services.ask import ask_question, pin_answer, run_note_job, suggest_questions
+from tests.fakes.fake_llm import FakeLLM
 from tests.fakes.fake_memory_service import FakeMemoryService
 from tests.unit.brief_world import M6, World, make_world
 
@@ -177,3 +178,28 @@ async def test_remember_this_retains_scoped_note_and_finishes_job(world: World) 
     with Session(world.engine) as session:
         saved_job = repository.get_job(session, job.id)
         assert saved_job is not None and saved_job.status == "done"
+
+
+async def test_p4_suggestions_use_only_cached_brief_and_fake_llm(world: World) -> None:
+    cached = Brief(
+        id="br_p4",
+        meeting_id=M6,
+        mode="memory",
+        generated_at=utcnow(),
+        sections=[],
+        facts_used=0,
+        preferences_applied=[],
+    )
+    brief_repo.save_brief(world.session_factory, cached)
+    fake = FakeLLM()
+    fake.queue_response(
+        SuggestedQuestions(
+            questions=["What changed in the budget?", "Who owns the deck?", "Any objections?"]
+        )
+    )
+
+    result = await suggest_questions(M6, llm=fake, session_factory=world.session_factory)
+
+    assert len(fake.calls) == 1 and fake.calls[0].schema is SuggestedQuestions
+    assert "FinEdge Payments" in fake.calls[0].prompt
+    assert len(result.questions) == 3
