@@ -1,0 +1,268 @@
+"""Evidence assembly for the brief prompt (docs/prompt-specs.md P3 "Evidence assembly").
+
+Pure code, no I/O. Turns memory hits, reflect output, the ledger and the mental model
+into a numbered evidence list with short ids (`mm:1`, `mem:1`, `led:1`, `ask:1`) and a
+code-side table mapping each id back to what it may cite. The LLM only ever sees the
+rendered lines; citations are built from the table, never from model output.
+
+Order: mental model, recall hits, reflect outputs, ledger rows, pinned Ask answers
+(none yet). Newest first within each group, capped at `EVIDENCE_CAP`. Mental model,
+ledger and Ask entries are never cut by the cap (open commitments must always reach
+the prompt); recall and reflect entries share what is left.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import date
+
+from pydantic import BaseModel
+
+from app.db.models import Commitment
+from app.memory.memory_service import MentalModelText
+from app.schemas.brief import SourceType
+from app.schemas.memory import MemoryHit
+
+logger = logging.getLogger(__name__)
+
+EVIDENCE_CAP = 40
+QUOTE_MAX_CHARS = 200
+PROMPT_TEXT_MAX_CHARS = 300
+PROMPT_MENTAL_MODEL_MAX_CHARS = 800
+
+
+# ---- R1 output model (prompt: reflect_objections.md) ----
+class Objection(BaseModel):
+    concern: str
+    raised_by: str
+    raised_on: date
+    resolved: bool
+    resolution: str | None = None
+
+
+class ObjectionReport(BaseModel):
+    objections: list[Objection]
+
+
+@dataclass(frozen=True)
+class MeetingInfo:
+    """What evidence needs to know about a meeting, read from SQLite."""
+
+    id: str
+    title: str
+    date: date
+
+
+class EvidenceRef(BaseModel):
+    key: str  # short id shown to the LLM: "mem:1"
+    source_type: SourceType
+    meeting_id: str | None
+    meeting_date: date | None
+    quote: str | None
+    memory_id: str | None
+    text: str  # prompt-facing line body
+    label: str
+    commitment_id: str | None = None
+    overdue: bool = False
+
+
+class EvidenceTable:
+    def __init__(self, refs: Sequence[EvidenceRef]) -> None:
+        self.refs = list(refs)
+        self._by_key = {r.key: r for r in self.refs}
+
+    def get(self, key: str) -> EvidenceRef | None:
+        return self._by_key.get(key.strip().strip("[]"))
+
+    def render(self) -> str:
+        """One compact line per evidence entry; `(none)` when empty."""
+        if not self.refs:
+            return "(none)"
+        return "\n".join(f"[{r.key}] {r.text}" for r in self.refs)
+
+
+def truncate(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
+
+
+def format_date(d: date) -> str:
+    return f"{d:%b} {d.day}, {d.year}"
+
+
+def call_label(d: date) -> str:
+    return f"Call on {format_date(d)}"
+
+
+def _words(text: str) -> set[str]:
+    return {w.strip(".,;:!?\"'()").lower() for w in text.split() if len(w) > 3}
+
+
+def match_objection_sources(
+    report: ObjectionReport, sources: Sequence[MemoryHit]
+) -> list[tuple[Objection, MemoryHit]]:
+    """Pair each UNRESOLVED objection with the resolved source memory that supports it.
+
+    The structured objection has no meeting id, so it cannot be cited by itself. Pick the
+    source (with a resolved meeting) sharing the most words with the concern; failing
+    that, one whose meeting date equals `raised_on`. An objection with no supporting
+    source is dropped: it has nothing to cite.
+    """
+    usable = [s for s in sources if s.meeting_id is not None]
+    pairs: list[tuple[Objection, MemoryHit]] = []
+    for objection in report.objections:
+        if objection.resolved:
+            continue
+        target = _words(f"{objection.concern} {objection.raised_by}")
+        scored = [(len(target & _words(s.text)), s) for s in usable]
+        best_score, best = max(scored, key=lambda p: p[0], default=(0, None))
+        if best is None or best_score == 0:
+            best = next((s for s in usable if s.meeting_date == objection.raised_on), None)
+        if best is None:
+            logger.info("brief.objection_dropped reason=no_supporting_source")
+            continue
+        pairs.append((objection, best))
+    return pairs
+
+
+def _newest_first(refs: Sequence[EvidenceRef]) -> list[EvidenceRef]:
+    return sorted(refs, key=lambda r: r.meeting_date or date.min, reverse=True)
+
+
+def build_evidence(
+    *,
+    mental_model: MentalModelText | None,
+    latest_done_meeting: MeetingInfo | None,
+    recall_hits: Sequence[MemoryHit],
+    objections: Sequence[tuple[Objection, MemoryHit]],
+    commitments: Sequence[Commitment],
+    meetings: Mapping[str, MeetingInfo],
+    today: date,
+    cap: int = EVIDENCE_CAP,
+) -> EvidenceTable:
+    """Assemble the capped, numbered evidence table.
+
+    `commitments` are the account's OPEN ledger rows. Recall hits and objection sources
+    must already be resolved (`MemoryService.resolve_sources`); any without a `meeting_id`
+    are unusable as evidence and skipped. A meeting's date comes from SQLite when the
+    meeting is known there, else from the hit.
+    """
+    protected: list[EvidenceRef] = []
+
+    if mental_model is not None and mental_model.content.strip() and latest_done_meeting:
+        content = mental_model.content.strip()
+        protected.append(
+            EvidenceRef(
+                key="",
+                source_type=SourceType.mental_model,
+                meeting_id=latest_done_meeting.id,
+                meeting_date=latest_done_meeting.date,
+                quote=truncate(content, QUOTE_MAX_CHARS),
+                memory_id=mental_model.id,
+                text="Relationship summary: " + truncate(content, PROMPT_MENTAL_MODEL_MAX_CHARS),
+                label=f"Relationship summary as of {format_date(latest_done_meeting.date)}",
+            )
+        )
+
+    recall_refs = _memory_refs(recall_hits, meetings, prefix=None)
+    reflect_refs = _memory_refs(
+        [hit for _, hit in objections],
+        meetings,
+        prefix=[
+            f"Unresolved concern ({o.raised_by}): {o.concern}" for o, _ in objections
+        ],
+    )
+
+    ledger_refs = _ledger_refs(commitments, meetings, today)
+
+    budget = max(0, cap - len(protected) - len(ledger_refs))
+    recall_kept = recall_refs[:budget]
+    reflect_kept = reflect_refs[: max(0, budget - len(recall_kept))]
+    if len(recall_refs) + len(reflect_refs) > budget:
+        logger.info(
+            "brief.evidence_capped kept=%d dropped=%d",
+            len(recall_kept) + len(reflect_kept),
+            len(recall_refs) + len(reflect_refs) - len(recall_kept) - len(reflect_kept),
+        )
+
+    ordered = [*protected, *recall_kept, *reflect_kept, *ledger_refs]
+    counters = {"mm": 0, "mem": 0, "led": 0, "ask": 0}
+    prefix_of = {
+        SourceType.mental_model: "mm",
+        SourceType.meeting: "mem",
+        SourceType.ledger: "led",
+        SourceType.ask: "ask",
+    }
+    numbered: list[EvidenceRef] = []
+    for ref in ordered:
+        p = prefix_of[ref.source_type]
+        counters[p] += 1
+        numbered.append(ref.model_copy(update={"key": f"{p}:{counters[p]}"}))
+    return EvidenceTable(numbered)
+
+
+def _memory_refs(
+    hits: Sequence[MemoryHit],
+    meetings: Mapping[str, MeetingInfo],
+    *,
+    prefix: Sequence[str] | None,
+) -> list[EvidenceRef]:
+    seen: set[str] = set()
+    refs: list[EvidenceRef] = []
+    for i, hit in enumerate(hits):
+        if hit.meeting_id is None or (prefix is None and hit.memory_id in seen):
+            continue
+        info = meetings.get(hit.meeting_id)
+        meeting_date = info.date if info is not None else hit.meeting_date
+        if meeting_date is None:
+            continue
+        seen.add(hit.memory_id)
+        label = call_label(meeting_date)
+        body = prefix[i] if prefix is not None else truncate(hit.text, PROMPT_TEXT_MAX_CHARS)
+        refs.append(
+            EvidenceRef(
+                key="",
+                source_type=SourceType.meeting,
+                meeting_id=hit.meeting_id,
+                meeting_date=meeting_date,
+                quote=truncate(hit.text, QUOTE_MAX_CHARS),
+                memory_id=hit.memory_id,
+                text=f"({label}) {body}",
+                label=label,
+            )
+        )
+    return _newest_first(refs)
+
+
+def _ledger_refs(
+    commitments: Sequence[Commitment], meetings: Mapping[str, MeetingInfo], today: date
+) -> list[EvidenceRef]:
+    refs: list[EvidenceRef] = []
+    for c in commitments:
+        info = meetings.get(c.meeting_id)
+        if info is None:
+            continue
+        overdue = c.due_date is not None and c.due_date < today
+        status = "OPEN, OVERDUE" if overdue else "OPEN"
+        due = f", due {c.due_date.isoformat()}" if c.due_date else ""
+        label = f"Ledger, {call_label(info.date)}"
+        refs.append(
+            EvidenceRef(
+                key="",
+                source_type=SourceType.ledger,
+                meeting_id=info.id,
+                meeting_date=info.date,
+                quote=truncate(c.source_quote, QUOTE_MAX_CHARS),
+                memory_id=None,
+                text=(
+                    f"{status}: {c.owner.value} -> {truncate(c.text, PROMPT_TEXT_MAX_CHARS)}"
+                    f"{due} ({call_label(info.date)})"
+                ),
+                label=label,
+                commitment_id=c.id,
+                overdue=overdue,
+            )
+        )
+    return _newest_first(refs)
