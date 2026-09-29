@@ -11,6 +11,7 @@ from datetime import date
 import pytest
 from pydantic import BaseModel
 
+from app.core.errors import MemoryReadOnlyError
 from app.memory.tags import account_tag, contact_tag
 from app.schemas.enums import FactKind, ScopeType
 from app.schemas.memory import MemoryHit, ReflectResult
@@ -33,6 +34,38 @@ async def test_ensure_bank_is_idempotent(memory: FakeMemoryService) -> None:
     await memory.ensure_bank()
     await memory.ensure_bank()
     assert memory.bank_ensured is True
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["ensure_bank", "ensure_mental_models", "retain_meeting", "retain_note", "retain_preference"],
+)
+async def test_read_only_fake_rejects_every_memory_write(operation: str) -> None:
+    memory = FakeMemoryService(read_only=True)
+
+    with pytest.raises(MemoryReadOnlyError, match="MEMORY_READ_ONLY"):
+        if operation == "ensure_bank":
+            await memory.ensure_bank()
+        elif operation == "ensure_mental_models":
+            await memory.ensure_mental_models([("acc_finedge", "FinEdge")])
+        elif operation == "retain_meeting":
+            await memory.retain_meeting(
+                meeting_id="m4_finedge",
+                account_id="acc_finedge",
+                contact_ids=[],
+                meeting_date=date(2026, 8, 27),
+                title="Pilot scoping",
+                transcript="A sufficiently long test transcript for the write guard.",
+            )
+        elif operation == "retain_note":
+            await memory.retain_note(
+                text="note", scope_type=ScopeType.account, scope_id="acc_finedge"
+            )
+        else:
+            await memory.retain_preference("short briefs")
+
+    assert memory.items == []
+    assert memory.mental_models == {}
 
 
 async def test_ensure_mental_models_creates_one_per_account_plus_style(

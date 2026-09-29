@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     hindsight_llm_provider: str = "groq"
     hindsight_llm_model: str | None = None
     hindsight_llm_api_key: str | None = None
+    memory_read_only: bool = False
 
     @property
     def app_llm_api_key(self) -> str | None:

@@ -253,7 +253,7 @@ Open commitments come from the SQLite ledger, not recall, so overdue logic stays
 
 ## SQLite tables
 
-Nine SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers), and nothing about memory itself is stored here.
+Thirteen SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers), and nothing about Hindsight memories is stored here.
 
 ```python
 class Account(SQLModel, table=True):
@@ -328,6 +328,25 @@ class Job(SQLModel, table=True):
     error: str | None = None
     created_at: datetime
     finished_at: datetime | None = None
+
+class ExtractedFact(SQLModel, table=True):
+    id: str; account_id: str; meeting_id: str; contact_id: str | None
+    kind: FactKind; text: str; source_quote: str; created_at: datetime
+
+class CaptureDraft(SQLModel, table=True):
+    id: str; meeting_id: str; transcript: str
+    extraction: dict; items: list[dict]
+    status: str  # open | saved | discarded
+    created_at: datetime
+
+class MeetingPrepared(SQLModel, table=True):
+    meeting_id: str  # primary key
+    prepared_at: datetime
+
+class MemoryOverride(SQLModel, table=True):
+    id: str; target_type: str  # fact | memory
+    target_id: str; action: str  # hidden | corrected
+    corrected_text: str | None; created_at: datetime
 ```
 
 Overdue is computed, never stored: `status == open and due_date < settings.demo_today`.
@@ -340,11 +359,36 @@ Request and response bodies for the endpoints in the Technical design; routes re
 class ContactRef(BaseModel):
     id: str; name: str; role: str | None
 
+# POST/GET /api/accounts
+class AccountCreate(BaseModel):
+    name: str; industry: str | None = None
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"] = "discovery"
+
+class AccountResponse(BaseModel):
+    id: str; name: str; industry: str
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"]
+
+# POST/GET /api/contacts; GET supports query and account_id filters.
+class ContactCreate(BaseModel):
+    account_id: str; name: str; role: str | None; aliases: list[str]
+
+class ContactSummary(ContactRef):
+    account_id: str | None; account_name: str | None
+    meetings_count: int; open_followups: int; last_meeting_date: date | None
+
+# POST /api/meetings; POST/DELETE /api/meetings/{id}/prepared
+class MeetingCreate(BaseModel):
+    account_id: str; title: str; scheduled_at: datetime; attendee_ids: list[str]
+
 class MeetingSummary(BaseModel):          # GET /api/meetings
     id: str; account_id: str; account_name: str; title: str
     scheduled_at: datetime; status: str
     attendees: list[ContactRef]
     brief_ready: bool
+    prepared: bool = False; open_followups: int = 0
+    past_meetings: int = 0; has_history: bool = False
+
+# DELETE /api/meetings/{id} cancels an upcoming meeting without a transcript.
 
 class NotesRequest(BaseModel):            # POST /api/meetings/{id}/notes
     transcript: str = Field(min_length=50)
@@ -402,6 +446,7 @@ class ErrorResponse(BaseModel):
 | `not_found` | 404 | Unknown meeting, contact, brief or job |
 | `validation_error` | 422 | Request body fails its model |
 | `memory_unavailable` | 503 | Hindsight unreachable or timing out |
+| `memory_read_only` | 409 | A Hindsight write was requested while `MEMORY_READ_ONLY` is enabled |
 | `llm_timeout` | 504 | LLM call exceeded 30 s |
 | `llm_invalid_output` | 502 | LLM output failed validation after one retry |
 | `rate_limited` | 429 | LLM provider (app or Hindsight) returned 429 after retries |

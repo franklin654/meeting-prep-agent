@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.core.errors import MemoryReadOnlyError
 from app.memory.memory_service import (
     MemoryService,
     MentalModelText,
@@ -57,7 +58,7 @@ class FakeMemoryService(MemoryService):
     per test and handed back in FIFO order (`queue_reflect_response`).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
         self.items: list[_RetainedItem] = []
         self.mental_models: dict[str, MentalModelText] = {}
         self._reflect_queue: list[ReflectResult | Exception] = []
@@ -71,6 +72,13 @@ class FakeMemoryService(MemoryService):
         self.get_memory_calls: list[str] = []
         self.recall_calls: list[tuple[str, list[str], FactKind | None]] = []
         self.recall_timeouts: list[float | None] = []
+        self.read_only = read_only
+
+    def _require_writable(self, operation: str) -> None:
+        if self.read_only:
+            raise MemoryReadOnlyError(
+                f"MEMORY_READ_ONLY is enabled; Hindsight write {operation!r} is not allowed."
+            )
 
     # -- test helpers ---------------------------------------------------
 
@@ -132,9 +140,11 @@ class FakeMemoryService(MemoryService):
         self.closed = True
 
     async def ensure_bank(self) -> None:
+        self._require_writable("ensure_bank")
         self.bank_ensured = True
 
     async def ensure_mental_models(self, accounts: Sequence[tuple[str, str]]) -> None:
+        self._require_writable("ensure_mental_models")
         for account_id, account_name in accounts:
             model_id = f"relationship-{account_id}"
             if model_id not in self.mental_models:
@@ -158,6 +168,7 @@ class FakeMemoryService(MemoryService):
         source: str = "ingest",
         timeout_s: float | None = None,
     ) -> None:
+        self._require_writable("retain_meeting")
         self.retain_timeouts.append(timeout_s)
         tags = [account_tag(account_id)]
         tags.extend(contact_tag(cid) for cid in contact_ids)
@@ -180,6 +191,7 @@ class FakeMemoryService(MemoryService):
         )
 
     async def retain_note(self, *, text: str, scope_type: ScopeType, scope_id: str) -> None:
+        self._require_writable("retain_note")
         tags = [kind_tag(MemoryKind.note)]
         if scope_type == ScopeType.account:
             tags.append(account_tag(scope_id))
@@ -190,6 +202,7 @@ class FakeMemoryService(MemoryService):
         self.items.append(_RetainedItem(memory_id=self._new_id(), text=text, tags=tags))
 
     async def retain_preference(self, sentence: str) -> None:
+        self._require_writable("retain_preference")
         self.items.append(
             _RetainedItem(
                 memory_id=self._new_id(), text=sentence, tags=[kind_tag(MemoryKind.preference)]

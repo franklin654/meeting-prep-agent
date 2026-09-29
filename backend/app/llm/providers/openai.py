@@ -79,10 +79,12 @@ class OpenAIProvider(BaseProvider):
                 },
             },
         )
+        self._log_usage(response, call_type="json")
         return str(response.choices[0].message.content or "")
 
     async def _request_text(self, prompt: str, temperature: float, system: str | None) -> str:
         response = await self._create(temperature, messages=_messages(prompt, system))
+        self._log_usage(response, call_type="text")
         return str(response.choices[0].message.content or "")
 
     async def _create(self, temperature: float, **kwargs: Any) -> Any:

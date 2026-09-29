@@ -19,7 +19,7 @@ from sqlalchemy import UniqueConstraint
 from sqlmodel import JSON, Column, Field, SQLModel
 
 from app.schemas.brief import SectionKey
-from app.schemas.enums import CommitmentStatus, Owner, ScopeType
+from app.schemas.enums import CommitmentStatus, FactKind, Owner, ScopeType
 
 
 class Account(SQLModel, table=True):
@@ -108,3 +108,38 @@ class Job(SQLModel, table=True):
     error: str | None = None
     created_at: datetime
     finished_at: datetime | None = None
+
+
+class ExtractedFact(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    account_id: str = Field(foreign_key="account.id", index=True)
+    meeting_id: str = Field(foreign_key="meeting.id", index=True)
+    contact_id: str | None = Field(default=None, foreign_key="contact.id")
+    kind: FactKind
+    text: str
+    source_quote: str
+    created_at: datetime
+
+
+class CaptureDraft(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    meeting_id: str = Field(foreign_key="meeting.id", index=True)
+    transcript: str
+    extraction: dict[str, Any] = Field(sa_column=Column(JSON))
+    items: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    status: str = "open"  # open | saved | discarded
+    created_at: datetime
+
+
+class MeetingPrepared(SQLModel, table=True):
+    meeting_id: str = Field(foreign_key="meeting.id", primary_key=True)
+    prepared_at: datetime
+
+
+class MemoryOverride(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    target_type: str  # fact | memory
+    target_id: str
+    action: str  # hidden | corrected
+    corrected_text: str | None = None
+    created_at: datetime

@@ -37,7 +37,7 @@ from datetime import date
 from sqlmodel import Session
 
 from app.core.errors import AppError, MemoryUnavailableError, NotFoundError
-from app.db import ingest_repo, repository
+from app.db import facts_repo, ingest_repo, repository
 from app.db.models import Commitment, Contact
 from app.llm.client import LLMClient, get_llm_client
 from app.llm.prompt_loader import render_prompt
@@ -834,7 +834,8 @@ async def _ingest(
             open_commitments="\n".join(open_lines),
             new_commitments="\n".join(
                 _format_new_commitment(i, item) for i, item in enumerate(verified.commitments)
-            ) or "(none)",
+            )
+            or "(none)",
             meeting_date=meeting_date.isoformat(),
             acknowledgements="\n".join(
                 _format_ack(i, a) for i, a in enumerate(verified.acknowledgements)
@@ -846,9 +847,7 @@ async def _ingest(
             "ingest p2 meeting=%s duration_ms=%d", meeting_id, int((time.monotonic() - t0) * 1000)
         )
         closed_ids = _match_commitment_ids(matches, earlier_open, len(verified.acknowledgements))
-        renewed = _match_renewed_commitments(
-            matches, earlier_open, verified.commitments, resolver
-        )
+        renewed = _match_renewed_commitments(matches, earlier_open, verified.commitments, resolver)
         closed_ids = [commitment_id for commitment_id in closed_ids if commitment_id not in renewed]
 
     # 6. Close matched commitments.
@@ -889,6 +888,22 @@ async def _ingest(
         ingest_repo.update_account_deal_value(session, account_id, budget)
         if previous is not None and previous != budget:
             facts.insert(0, f"Budget now {_format_usd(budget)} (was {_format_usd(previous)})")
+
+    fact_rows = []
+    for fact_item in verified.facts:
+        text = fact_item.text.strip()
+        if not text:
+            continue
+        contact = resolver.find(fact_item.about_person) if fact_item.about_person else None
+        fact_rows.append(
+            (
+                contact.id if contact else None,
+                fact_item.kind,
+                text,
+                _clip(fact_item.source_quote),
+            )
+        )
+    facts_repo.replace_meeting_facts(session, meeting_id, account_id, fact_rows)
 
     # 9. Retain. Any failure here leaves the meeting not ingested.
     t0 = time.monotonic()

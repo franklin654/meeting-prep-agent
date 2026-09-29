@@ -65,6 +65,7 @@ class GroqProvider(BaseProvider):
             response_format={"type": "json_object"},
             timeout=self._timeout_seconds,
         )
+        self._log_usage(response, call_type="json")
         return str(response.choices[0].message.content or "")
 
     async def _request_text(self, prompt: str, temperature: float, system: str | None) -> str:
@@ -74,6 +75,7 @@ class GroqProvider(BaseProvider):
             temperature=temperature,
             timeout=self._timeout_seconds,
         )
+        self._log_usage(response, call_type="text")
         return str(response.choices[0].message.content or "")
 
     def _classify_error(self, exc: Exception) -> ErrorKind | None:

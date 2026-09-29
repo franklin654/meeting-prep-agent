@@ -50,6 +50,13 @@ class MemoryUnavailableError(AppError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
 
+class MemoryReadOnlyError(AppError):
+    """A request attempted a Hindsight write while read-only mode is enabled."""
+
+    code = "memory_read_only"
+    status_code = status.HTTP_409_CONFLICT
+
+
 class LLMTimeoutError(AppError):
     """LLM call exceeded the 30s timeout."""
 

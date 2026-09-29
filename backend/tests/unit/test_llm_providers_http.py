@@ -74,6 +74,7 @@ def oa_ok(content: str) -> tuple[int, dict[str, Any]]:
                 "message": {"role": "assistant", "content": content},
             }
         ],
+        "usage": {"prompt_tokens": 11, "completion_tokens": 7},
     }
 
 
@@ -215,6 +216,26 @@ async def test_complete_text_returns_plain_text(
     assert "be terse" in json.dumps(body)
     assert "response_format" not in body
     assert "tools" not in body
+
+
+@PROVIDERS
+async def test_logs_usage_without_prompt_or_completion_text(
+    maker: Maker, ok_json: Any, ok_text: Any, bad: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    client, _, _ = maker([ok_json(GOOD)])
+
+    with caplog.at_level("INFO"):
+        await client.complete_json("secret prompt text", Widget)
+
+    messages = [
+        record.getMessage() for record in caplog.records if "llm.usage" in record.getMessage()
+    ]
+    assert len(messages) == 1
+    assert "call_type=json" in messages[0]
+    assert "model=test-model" in messages[0]
+    assert "prompt_tokens=" in messages[0]
+    assert "completion_tokens=" in messages[0]
+    assert "secret prompt text" not in messages[0]
 
 
 @PROVIDERS

@@ -52,6 +52,7 @@ services:
       HINDSIGHT_URL: http://hindsight:8888
     volumes:
       - ./backend:/app
+      - ./data:/data:ro
     depends_on:
       - hindsight
 

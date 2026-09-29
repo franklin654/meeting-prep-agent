@@ -84,6 +84,7 @@ def seeded(engine: Engine) -> None:
         )
         for cid, name, role, acct in [
             ("c_priya", "Priya Nair", "Account Executive", None),
+            ("c_arjun", "Arjun Menon", "Sales Engineer", None),
             ("c_rahul", "Rahul Mehta", "VP Engineering", "acc_finedge"),
             ("c_karan", "Karan Shah", None, "acc_finedge"),
         ]:
@@ -168,6 +169,70 @@ def test_list_meetings_sorted_with_attendees_and_brief_ready(client: TestClient)
     assert m6.brief_ready is False  # B18: only a fresh memory brief counts; this one is no_memory
     assert by_id["m4_finedge"].brief_ready is False
     assert by_id["m_old"].attendees == []
+    assert by_id["m6_finedge"].has_history is False
+
+
+def test_entity_and_schedule_endpoints(client: TestClient) -> None:
+    account = client.post("/api/accounts", json={"name": "New account"})
+    assert account.status_code == 200
+    account_body = account.json()
+    assert account_body["id"].startswith("acc_")
+    assert account_body["stage"] == "discovery"
+    contact = client.post(
+        "/api/contacts", json={"account_id": account_body["id"], "name": "New contact"}
+    )
+    assert contact.status_code == 200
+    contact_body = contact.json()
+    assert contact_body["id"].startswith("c_")
+    listing = client.get("/api/contacts", params={"query": "New", "account_id": account_body["id"]})
+    assert listing.json()[0]["meetings_count"] == 0
+    scheduled = client.post(
+        "/api/meetings",
+        json={
+            "account_id": account_body["id"],
+            "title": "First call",
+            "scheduled_at": "2026-09-28T10:00:00Z",
+            "attendee_ids": [contact_body["id"]],
+        },
+    )
+    assert scheduled.status_code == 201
+    meeting = scheduled.json()
+    assert meeting["id"].startswith("m_")
+    assert meeting["status"] == "upcoming"
+    assert meeting["has_history"] is False
+    assert client.post(f"/api/meetings/{meeting['id']}/prepared").status_code == 204
+    assert client.get("/api/meetings").json()[-1]["prepared"] is True
+    assert client.delete(f"/api/meetings/{meeting['id']}/prepared").status_code == 204
+    assert client.delete(f"/api/meetings/{meeting['id']}").status_code == 204
+    assert client.delete(f"/api/meetings/{meeting['id']}").status_code == 404
+
+
+def test_schedule_rejects_wrong_account_contact_and_past_day(client: TestClient) -> None:
+    response = client.post(
+        "/api/meetings",
+        json={
+            "account_id": "acc_finedge",
+            "title": "Bad attendees",
+            "scheduled_at": "2026-09-28T10:00:00Z",
+            "attendee_ids": ["missing"],
+        },
+    )
+    assert response.status_code == 422
+    wrong_vendor_contact = client.post(
+        "/api/meetings",
+        json={
+            "account_id": "acc_finedge",
+            "title": "Wrong Tracewise attendee",
+            "scheduled_at": "2026-09-28T10:00:00Z",
+            "attendee_ids": ["c_arjun"],
+        },
+    )
+    assert wrong_vendor_contact.status_code == 422
+    past = client.post(
+        "/api/meetings",
+        json={"account_id": "acc_finedge", "title": "Past", "scheduled_at": "2026-09-27T10:00:00Z"},
+    )
+    assert past.status_code == 422
 
 
 def test_list_meetings_status_filter(client: TestClient) -> None:
@@ -337,7 +402,10 @@ def test_pending_job_status(client: TestClient, engine: Engine) -> None:
 def test_openapi_paths_and_models(client: TestClient) -> None:
     spec = client.get("/openapi.json").json()
     paths = spec["paths"]
-    assert set(paths["/api/meetings"]) == {"get"}
+    assert set(paths["/api/meetings"]) == {"get", "post"}
+    assert "/api/accounts" in paths
+    assert "/api/contacts" in paths
+    assert "/api/meetings/{meeting_id}/prepared" in paths
     assert "202" in paths["/api/meetings/{meeting_id}/notes"]["post"]["responses"]
     assert "/api/jobs/{job_id}" in paths
     schemas = spec["components"]["schemas"]
@@ -378,11 +446,15 @@ def test_app_starts_without_touching_hindsight(
     assert plain.get("/api/health").json() == {
         "status": "ok",
         "demo_today": "2026-09-28",
+        "ae_name": "Priya Nair",
+        "company_name": "Tracewise",
     }
     with TestClient(main_module.app) as started:
         assert started.get("/api/health").json() == {
             "status": "ok",
             "demo_today": "2026-09-28",
+            "ae_name": "Priya Nair",
+            "company_name": "Tracewise",
         }
         assert started.get("/api/meetings").json() == []  # tables created by the lifespan
     assert constructed == []
