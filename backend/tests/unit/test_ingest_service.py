@@ -29,7 +29,7 @@ from app.db import ingest_repo
 from app.db import repository as repo
 from app.db.models import Account, Commitment, Contact, Job, Meeting
 from app.llm.prompt_loader import prompt_placeholders, render_prompt
-from app.schemas.ack import AckMatches, ClosedMatch
+from app.schemas.ack import AckMatches, ClosedMatch, RenewedMatch
 from app.schemas.enums import CommitmentStatus, Owner
 from app.schemas.extraction import (
     Acknowledgement,
@@ -180,6 +180,12 @@ def test_p1_p2_render_and_placeholders() -> None:
         "known_contacts",
         "transcript",
     ]
+    assert prompt_placeholders("match_acknowledgements") == [
+        "open_commitments",
+        "new_commitments",
+        "meeting_date",
+        "acknowledgements",
+    ]
     text = render_prompt(
         "extract_meeting",
         our_company="Tracewise",
@@ -194,10 +200,12 @@ def test_p1_p2_render_and_placeholders() -> None:
     p2 = render_prompt(
         "match_acknowledgements",
         open_commitments="cm_1: a",
+        new_commitments="0: Send the revised pricing deck",
         meeting_date="2026-09-15",
         acknowledgements="0: x",
     )
     assert '{"closed": [' in p2 and "never a match" in p2
+    assert "renewed" in p2 and "new commitments" in p2
 
 
 def test_ack_matches_forbids_extra_fields() -> None:
@@ -207,6 +215,14 @@ def test_ack_matches_forbids_extra_fields() -> None:
     assert parsed.closed == [ClosedMatch(commitment_id="cm_1", acknowledgement_index=0)]
     with pytest.raises(PydanticValidationError):
         AckMatches.model_validate({"closed": [], "extra": 1})
+
+
+def test_ack_matches_renewed_is_optional_and_has_a_commitment_index() -> None:
+    assert AckMatches.model_validate({"closed": []}).renewed == []
+    parsed = AckMatches.model_validate(
+        {"closed": [], "renewed": [{"commitment_id": "cm_1", "commitment_index": 0}]}
+    )
+    assert parsed.renewed == [RenewedMatch(commitment_id="cm_1", commitment_index=0)]
 
 
 def test_normalize_text_forgives_case_quotes_and_whitespace_only() -> None:
@@ -316,6 +332,118 @@ async def test_m5_closes_dag_configs_and_keeps_deck_open_and_overdue(
     assert acct is not None and acct.deal_value_usd == 40000
 
 
+async def test_m6_repromised_pricing_deck_updates_existing_commitment_without_duplicate(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    await _ingest_m4(seeded, factory, llm, memory)
+    deck = _by_text(seeded, "pricing deck")
+    m6 = seeded.get(Meeting, "m6_finedge")
+    assert m6 is not None
+    quote = (
+        "Priya apologises and will send the revised pricing deck with the pilot option by Oct 1."
+    )
+    m6.transcript = (
+        "[2026-09-29T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): "
+        "Rahul says they never got the deck. " + quote
+    )
+    seeded.add(m6)
+    seeded.commit()
+    llm.queue_response(
+        MeetingExtraction(
+            people=[],
+            commitments=[
+                ExtractedCommitment(
+                    owner=Owner.us,
+                    owner_person="Priya Nair",
+                    text="Send revised pricing deck with pilot option",
+                    due_date=date(2026, 10, 1),
+                    source_quote=quote,
+                )
+            ],
+            acknowledgements=[],
+            facts=[],
+            deal_budget_usd=None,
+        )
+    )
+    llm.queue_response(
+        AckMatches(closed=[], renewed=[RenewedMatch(commitment_id=deck.id, commitment_index=0)])
+    )
+
+    summary = await run_ingest(
+        _job(seeded), "m6_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+
+    deck_rows = [c for c in _commitments(seeded) if "pricing deck" in c.text.lower()]
+    assert len(deck_rows) == 1
+    assert deck_rows[0].id == deck.id
+    assert deck_rows[0].due_date == date(2026, 10, 1)
+    assert deck_rows[0].status == CommitmentStatus.open
+    assert summary.new_commitments == summary.closed_commitments == 0
+    p2 = llm.calls[-1]
+    assert p2.schema is AckMatches
+    assert "new commitments" in p2.prompt.lower()
+    assert "Priya Nair" in p2.prompt and "owner: us" in p2.prompt
+
+
+@pytest.mark.parametrize(
+    ("owner", "text"),
+    [
+        (Owner.them, "Send revised pricing deck with pilot option"),
+        (Owner.us, "Send a security report"),
+    ],
+)
+async def test_p2_renewed_match_must_have_same_owner_and_deliverable(
+    seeded: Session, factory: SessionFactory, owner: Owner, text: str
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    await _ingest_m4(seeded, factory, llm, memory)
+    deck = _by_text(seeded, "pricing deck")
+    m6 = seeded.get(Meeting, "m6_finedge")
+    assert m6 is not None
+    quote = (
+        "Priya will send the revised pricing deck with pilot option by Oct 1."
+        if "deck" in text.lower()
+        else "Priya will send a security report by Oct 1."
+    )
+    m6.transcript = (
+        f"[2026-09-29T10:00:00+05:30] Priya Nair "
+        f"(Account Executive, Tracewise): {quote}"
+    )
+    seeded.add(m6)
+    seeded.commit()
+    llm.queue_response(
+        MeetingExtraction(
+            people=[],
+            commitments=[
+                ExtractedCommitment(
+                    owner=owner,
+                    owner_person="Priya Nair",
+                    text=text,
+                    due_date=date(2026, 10, 1),
+                    source_quote=quote,
+                )
+            ],
+            acknowledgements=[],
+            facts=[],
+            deal_budget_usd=None,
+        )
+    )
+    llm.queue_response(
+        AckMatches(closed=[], renewed=[RenewedMatch(commitment_id=deck.id, commitment_index=0)])
+    )
+
+    await run_ingest(_job(seeded), "m6_finedge", llm=llm, memory=memory, session_factory=factory)
+
+    assert _by_text(seeded, "pricing deck").due_date == date(2026, 9, 3)
+    if owner == Owner.them:
+        deck_rows = [c for c in _commitments(seeded) if "pricing deck" in c.text.lower()]
+        assert len(deck_rows) == 2
+        assert any(c.owner == Owner.them and c.due_date == date(2026, 10, 1) for c in deck_rows)
+    else:
+        assert len([c for c in _commitments(seeded) if "security report" in c.text.lower()]) == 1
+
+
 async def test_p2_unknown_ids_and_out_of_range_indexes_are_dropped(
     seeded: Session, factory: SessionFactory
 ) -> None:
@@ -406,6 +534,7 @@ async def test_later_meeting_commitments_are_not_matchable_by_earlier_rerun(
         ],
     )
     llm.queue_response(m6)
+    llm.queue_response(AckMatches(closed=[]))
     await run_ingest(_job(seeded), "m6_finedge", llm=llm, memory=memory, session_factory=factory)
     assert len(_commitments(seeded)) == 3
     # Rerunning M5 must not see M6's commitment as matchable.

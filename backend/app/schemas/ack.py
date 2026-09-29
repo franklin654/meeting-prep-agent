@@ -8,7 +8,7 @@ The prompt spec names the item class `AckMatch`; the ticket names it `ClosedMatc
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ClosedMatch(BaseModel):
@@ -21,7 +21,15 @@ class ClosedMatch(BaseModel):
 AckMatch = ClosedMatch
 
 
+class RenewedMatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    commitment_id: str
+    commitment_index: int
+
+
 class AckMatches(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     closed: list[ClosedMatch]
+    renewed: list[RenewedMatch] = Field(default_factory=list)
