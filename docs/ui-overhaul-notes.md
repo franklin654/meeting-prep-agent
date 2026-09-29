@@ -10,7 +10,7 @@
 | A2 | complete | `f5f7585` |
 | A3 | complete | `4599067` |
 | A4 | complete | implementation `532f731` |
-| A5 | complete | pending commit |
+| A5 | complete | implementation `dc12c17` |
 | A6 | planned | — |
 | A7 | planned | — |
 | B1 | planned | — |
