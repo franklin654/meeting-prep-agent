@@ -375,9 +375,15 @@ def test_app_starts_without_touching_hindsight(
     monkeypatch.setattr(main_module, "settings", _settings())
     monkeypatch.setattr(db_session, "engine", engine)
     plain = TestClient(main_module.app)  # no lifespan
-    assert plain.get("/api/health").json() == {"status": "ok"}
+    assert plain.get("/api/health").json() == {
+        "status": "ok",
+        "demo_today": "2026-09-28",
+    }
     with TestClient(main_module.app) as started:
-        assert started.get("/api/health").json() == {"status": "ok"}
+        assert started.get("/api/health").json() == {
+            "status": "ok",
+            "demo_today": "2026-09-28",
+        }
         assert started.get("/api/meetings").json() == []  # tables created by the lifespan
     assert constructed == []
 
