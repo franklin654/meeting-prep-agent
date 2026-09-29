@@ -1349,3 +1349,53 @@ async def test_m2_case_end_to_end_quote_is_refined_and_p2_sees_roi_one_pager(
     line = next(ln for ln in p2_prompt.splitlines() if ln.startswith(row.id))
     assert "original words:" in line and "ROI one-pager by Aug 5" in line
     assert summary.closed_commitments == 1
+
+
+def _two_line_transcript(*lines: tuple[str, str]) -> str:
+    return "\n".join(
+        f"[2026-07-28T09:{n:02d}:00+05:30] {speaker} (Account Executive, Tracewise): {text}"
+        for n, (speaker, text) in enumerate(lines, start=10)
+    )
+
+
+def test_refine_skips_questions_verifier_case() -> None:
+    transcript = _two_line_transcript(
+        ("Priya Nair", "I will draft the comparison for you."),
+        ("Priya Nair", "Should I send the pricing sheet by Aug 5?"),
+        ("Priya Nair", "I will also send the security report by Aug 5."),
+    )
+    item = _cm("Draft the comparison", "I will draft the comparison for you.", date(2026, 8, 5))
+    (out,), refined = ingest.refine_quotes([item], transcript)
+    assert "?" not in out.source_quote
+    assert out.source_quote == "I will also send the security report by Aug 5." and refined == 1
+
+
+def test_refine_with_only_a_question_keeps_the_original_quote() -> None:
+    transcript = _two_line_transcript(
+        ("Priya Nair", "I will draft the comparison for you."),
+        ("Priya Nair", "Should I send the comparison by Aug 5?"),
+    )
+    item = _cm("Draft the comparison", "I will draft the comparison for you.", date(2026, 8, 5))
+    assert ingest.refine_quotes([item], transcript) == ([item], 0)
+
+
+def test_refine_prefers_shared_content_word_over_deliverable_term_only() -> None:
+    transcript = _two_line_transcript(
+        ("Priya Nair", "I will draft the comparison for you."),
+        ("Priya Nair", "I will send the security report by Aug 5."),  # deliverable term only
+        ("Priya Nair", "The comparison will follow by Aug 5."),  # shares 'comparison'
+    )
+    item = _cm("Draft the comparison", "I will draft the comparison for you.", date(2026, 8, 5))
+    (out,), _ = ingest.refine_quotes([item], transcript)
+    assert out.source_quote == "The comparison will follow by Aug 5."
+
+
+def test_refine_among_equal_candidates_keeps_the_earliest() -> None:
+    transcript = _two_line_transcript(
+        ("Priya Nair", "I will draft the comparison for you."),
+        ("Priya Nair", "The comparison is due Aug 5."),
+        ("Priya Nair", "Again, the comparison lands Aug 5."),
+    )
+    item = _cm("Draft the comparison", "I will draft the comparison for you.", date(2026, 8, 5))
+    (out,), _ = ingest.refine_quotes([item], transcript)
+    assert out.source_quote == "The comparison is due Aug 5."

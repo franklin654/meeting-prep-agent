@@ -454,8 +454,10 @@ def refine_quotes(
     Only for commitments with a `due_date` whose `source_quote` has no date signal (see
     `_carries_date_signal`). Searches the transcript in order for the earliest utterance by the
     same speaker (`owner_person` via `same_speaker(owner_person, speaker)`, or the speaker of
-    the current quote) that (a) states the due date as month-name+day or ISO and (b) names a
-    deliverable (`DELIVERABLE_ALLOW_TERMS`) or shares a content word with the commitment text.
+    the current quote) that (a) states the due date as month-name+day or ISO, (b) is not a
+    question (ends with "?") and (c) names a deliverable (`DELIVERABLE_ALLOW_TERMS`) or shares a
+    content word with the commitment text. Candidates sharing a content word win over ones with
+    only a deliverable term; among equals the earliest wins.
     The replacement is verbatim from the transcript (<= 200 chars). Otherwise the quote is
     kept. Text, owner and due date never change. Returns `(commitments, refined_count)`.
     """
@@ -473,18 +475,26 @@ def refine_quotes(
             (spk for spk, text in utterances if quote_norm in normalize_text(text)), None
         )
         words = _content_words(item.text)
-        replacement: str | None = None
+        shared: str | None = None  # earliest candidate sharing a content word with the text
+        named: str | None = None  # earliest candidate with only a deliverable term
         for speaker, text in utterances:
             speaker_ok = same_speaker(item.owner_person, speaker) or (
                 current_speaker is not None and _names_match(current_speaker, speaker)
             )
-            if not speaker_ok or not _has_explicit_date(text, due):
+            if text.rstrip().endswith("?") or not speaker_ok or not _has_explicit_date(text, due):
+                continue  # a question is not a promise
+            has_shared_word = bool(_content_words(text) & words)
+            if not has_shared_word and not _has_deliverable_term(text):
                 continue
-            if _has_deliverable_term(text) or (_content_words(text) & words):
-                candidate = _utterance_quote(text, due)
-                if is_verbatim(candidate, normalized):
-                    replacement = candidate
-                    break
+            candidate = _utterance_quote(text, due)
+            if not is_verbatim(candidate, normalized):
+                continue
+            if has_shared_word:
+                shared = candidate
+                break
+            if named is None:
+                named = candidate
+        replacement = shared or named
         if replacement is None:
             result.append(item)
         else:
