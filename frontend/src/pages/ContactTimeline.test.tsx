@@ -1,50 +1,32 @@
-import { screen, within } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/routes'
 import { mockFetch } from '@/test/mockFetch'
 import { renderRoutes } from '@/test/renderWithProviders'
 
-describe('ContactTimeline page', () => {
-  it('shows newest memories first with meeting links and source quotes', async () => {
-    const fetchMock = mockFetch({ 'GET /api/contacts/c_anita/timeline': { body: {
-      contact: { id: 'c_anita', name: 'Anita Rao', role: 'CFO' },
-      entries: [
-        { text: 'Anita approved a $75K budget. | When: 2026-09-29 | Involving: Anita Rao | To prepare pricing.', fact_kind: 'deal_fact', learned_on: '2026-09-29', citation: { source_type: 'meeting', meeting_id: 'mtg_m6', meeting_date: '2026-09-29', label: 'M6 · Sep 29', quote: 'We can go up to $75K.', memory_id: 'mem_new' } },
-        { text: 'Anita planned a half marathon. | When: 2026-07-28 | Involving: Anita Rao', fact_kind: 'personal', learned_on: '2026-07-28', citation: { source_type: 'meeting', meeting_id: 'mtg_m2', meeting_date: '2026-07-28', label: 'M2 · Jul 28', quote: 'I am training for a half marathon.', memory_id: 'mem_old' } },
-      ],
-    } } })
+const profile = (name: string) => ({
+  contact: { id: 'c_anita', name, role: 'CFO' },
+  account: { id: 'acc', name: 'FinEdge', industry: 'Finance', stage: 'evaluation' },
+  stats: { meetings: 1, facts: 1, open_follow_ups: 0 },
+  timeline: [{ meeting_id: 'mtg_m6', title: 'Pricing review', meeting_date: '2026-09-29', items: [{ kind: 'deal_fact', text: 'Anita approved a $75K budget.', learned_on: '2026-09-29', citation: { source_type: 'meeting', meeting_id: 'mtg_m6', meeting_date: '2026-09-29', label: 'Pricing review · Sep 29', quote: 'We can go up to $75K.', memory_id: null } }] }],
+  facts: [{ id: 'fact_1', kind: 'deal_fact', text: 'Anita approved a $75K budget.', learned_on: '2026-09-29', citation: { source_type: 'meeting', meeting_id: 'mtg_m6', meeting_date: '2026-09-29', label: 'Pricing review · Sep 29', quote: 'We can go up to $75K.', memory_id: null } }],
+  follow_ups: [], preferences: [], patterns: [], hidden_count: 0,
+})
+
+describe('Contact profile page', () => {
+  it('shows contact context and meeting source links', async () => {
+    const fetchMock = mockFetch({ 'GET /api/contacts/c_anita/profile': { body: profile('Anita Rao') } })
     renderRoutes(routes, { route: '/contacts/c_anita' })
     expect(await screen.findByRole('heading', { name: 'Anita Rao' })).toBeInTheDocument()
-    const cards = screen.getAllByRole('listitem')
-    expect(within(cards[0]).getByText('Anita approved a $75K budget.')).toBeInTheDocument()
-    expect(within(cards[1]).getByText('Anita planned a half marathon.')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'M2 · Jul 28' })[0]).toHaveAttribute('href', '/meetings/mtg_m2')
-    expect(fetchMock.calls.map((call) => call.path).sort()).toEqual([
-      '/api/contacts/c_anita/timeline',
-      '/api/health',
-    ])
+    expect(screen.getByText(/FinEdge/)).toBeInTheDocument()
+    expect(screen.getByText('Anita approved a $75K budget.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Pricing review/ })).toHaveAttribute('href', '/meetings/mtg_m6')
+    expect(fetchMock.calls.some((call) => call.path === '/api/contacts/c_anita/profile')).toBe(true)
   })
 
-  it('shows a clear empty state', async () => {
-    mockFetch({ 'GET /api/contacts/c_empty/timeline': { body: { contact: { id: 'c_empty', name: 'Vikram', role: null }, entries: [] } } })
+  it('shows an empty state for a contact with no history', async () => {
+    mockFetch({ 'GET /api/contacts/c_empty/profile': { body: { ...profile('Vikram'), timeline: [], facts: [], stats: { meetings: 0, facts: 0, open_follow_ups: 0 } } } })
     renderRoutes(routes, { route: '/contacts/c_empty' })
-    expect(await screen.findByText(/no memories for this contact yet/i)).toBeInTheDocument()
-  })
-
-  it('keeps long timelines compact until the user expands them', async () => {
-    mockFetch({ 'GET /api/contacts/c_many/timeline': { body: {
-      contact: { id: 'c_many', name: 'Anita Rao', role: 'CFO' },
-      entries: Array.from({ length: 12 }, (_, index) => ({
-        text: `Fact ${index + 1} | When: 2026-07-28 | Involving: Anita Rao`,
-        fact_kind: 'deal_fact',
-        learned_on: '2026-07-28',
-        citation: { source_type: 'meeting', meeting_id: 'mtg_m2', meeting_date: '2026-07-28', label: 'M2 · Jul 28', quote: null, memory_id: `mem_${index}` },
-      })),
-    } } })
-    renderRoutes(routes, { route: '/contacts/c_many' })
-    expect(await screen.findByText('Fact 1')).toBeInTheDocument()
-    expect(screen.getAllByRole('listitem')).toHaveLength(8)
-    expect(screen.getByRole('button', { name: 'Show all 12 facts' })).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'M2 · Jul 28' })[0]).toHaveAttribute('href', '/meetings/mtg_m2')
+    expect(await screen.findByText('No timeline items yet.')).toBeInTheDocument()
   })
 })

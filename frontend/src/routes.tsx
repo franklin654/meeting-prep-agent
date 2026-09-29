@@ -1,10 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { Brief } from '@/pages/Brief'
-import { ContactTimeline } from '@/pages/ContactTimeline'
 import { ComingSoon } from '@/pages/ComingSoon'
 import { Dashboard } from '@/pages/Dashboard'
 import { Capture } from '@/pages/Capture'
+import { Contacts } from '@/pages/Contacts'
 
 /**
  * Shared shell route table. Existing meeting and contact-detail paths remain
@@ -17,8 +17,8 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'meetings/:id', element: <Brief /> },
-      { path: 'contacts', element: <ComingSoon title="Contacts" /> },
-      { path: 'contacts/:id', element: <ContactTimeline /> },
+      { path: 'contacts', element: <Contacts /> },
+      { path: 'contacts/:id', element: <Contacts /> },
       { path: 'ask', element: <ComingSoon title="Ask" /> },
       { path: 'capture', element: <Capture /> },
       { path: 'memory', element: <ComingSoon title="Memory inspector" /> },

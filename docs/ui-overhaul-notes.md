@@ -17,7 +17,7 @@
 | B2 | complete | `621b7cc` |
 | B3 | complete | `de8dd2f` |
 | B4 | complete | 2026-09-30 |
-| B5 | in progress | — |
+| B5 | complete | 2026-09-30 |
 | C1 | planned | — |
 | C2 | planned | — |
 | C3 | planned | — |
@@ -123,3 +123,9 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Hidden memory IDs are filtered from brief Hindsight evidence and Ask citations; hidden/corrected extracted facts are excluded from profiles, brief-enrichment evidence, and matching Ask sources. The UI text explicitly says the original remains in Hindsight. Hindsight memory deletion is not claimed or attempted.
 - B4 checks: backend 694 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Profile/control/pattern tests use the temporary SQLite fixture, FakeLLM and FakeMemoryService; no live LLM, Hindsight, or real-DB operations.
 - B4 live correction was not attempted: the previously authorized successful Hindsight retain cap is already consumed. Sandbox-W correction would be a third successful retain. This is carried as a checkpoint gate blocker unless separately authorized; do not treat a fake-service test as live confirmation.
+
+### B5 implementation
+
+- Replaced the Contacts placeholder with a searchable, account-filtered contact list and a profile view with Timeline, Facts, Follow-ups, and Preferences tabs. Added cited meeting links, explicit correct/hide controls and Hindsight-retention disclosure, follow-up complete/edit-date/delete actions with confirmation, cached pattern refresh (only when at least three facts exist), and the existing scoped Ask drawer.
+- B5 checks: frontend ESLint and TypeScript passed; Vitest 54 passed. The running Sandbox-W services still answer on API :8001 and Vite :5174; API health reports `ok`, Vite responds HTTP 200.
+- No live Hindsight, LLM, or sandbox DB operations have been performed in B4/B5 yet. Checkpoint 2 live gates remain pending; the corrected-memory Hindsight retain action is quota-blocked as stated above.

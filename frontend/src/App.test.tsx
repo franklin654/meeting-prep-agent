@@ -15,8 +15,8 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { name: 'Meeting brief' })).toBeInTheDocument()
   })
 
-  it('renders the contact timeline route at /contacts/:id', async () => {
-    mockFetch({ 'GET /api/contacts/con-456/timeline': { body: { contact: { id: 'con-456', name: 'Anita Rao', role: 'CFO' }, entries: [] } } })
+  it('renders the contact profile route at /contacts/:id', async () => {
+    mockFetch({ 'GET /api/contacts/con-456/profile': { body: { contact: { id: 'con-456', name: 'Anita Rao', role: 'CFO' }, account: { id: 'acc', name: 'FinEdge', industry: 'Finance', stage: 'evaluation' }, stats: { meetings: 0, facts: 0, open_follow_ups: 0 }, timeline: [], facts: [], follow_ups: [], preferences: [], patterns: [], hidden_count: 0 } } })
     renderRoutes(routes, { route: '/contacts/con-456' })
     expect(await screen.findByRole('heading', { name: 'Anita Rao' })).toBeInTheDocument()
   })
