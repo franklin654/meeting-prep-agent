@@ -5,7 +5,7 @@
 | Ticket | Status | Commit |
 | --- | --- | --- |
 | Stage 0 | complete | pending docs-only commit |
-| A0 | complete | `651e0e5` |
+| A0 | complete | implementation `3f667b1` |
 | A1 | planned | — |
 | A2 | planned | — |
 | A3 | planned | — |
