@@ -52,7 +52,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T17 | Brief page: sections, severities, CitationChip, MemoryToggle side by side, personalization meter | FE | T03, T15 | `pages/Brief.tsx`, components | Acceptance 5, 9, 11 pass in browser | Done |
 | T18 | Contact timeline API and page | FE | T07, T03 | `api/contacts.py`, `pages/ContactTimeline.tsx` | Acceptance 10 passes | Done |
 | T19 | Feedback API, preferences service, style profile, FeedbackControls | BE-brief | T14, T17 | `services/preferences.py`, components | Acceptance 7–8 pass; phase 4 gate met | Done |
-| T20 | Reasoning: R2 contradictions after ingest, account alerts | BE-core | T12 | `services/reasoning.py`, prompt R2 | Acceptance 12 passes | Not started |
+| T20 | Reasoning: R2 contradictions after ingest, account alerts | BE-core | T12 | `services/reasoning.py`, prompt R2 | Acceptance 12 passes | Done: R2 runs after retain/idle; alerts require both cited meetings; fake-backed |
 | T21 | R1 objections and R3 cross-contact gaps in the brief | BE-brief | T14 | `services/brief.py`, prompts R1, R3 | Acceptance 13 passes | Not started |
 | T22 | R4 cross-deal patterns in the brief | BE-brief | T14, T11 | prompt R4 | Acceptance 16 passes | Not started |
 | T23 | Ask backend: R5, pin, Remember this, `ask_answers` | BE-brief | T06, T07 | `services/ask.py`, `api/ask.py` | Acceptance 18 (API parts) passes | Not started |

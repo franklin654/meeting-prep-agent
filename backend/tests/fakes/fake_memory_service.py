@@ -214,6 +214,13 @@ class FakeMemoryService(MemoryService):
     ) -> ReflectResult:
         self.reflect_calls.append((query, list(tags), budget))
         if not self._reflect_queue:
+            if schema.__name__ == "ContradictionReport":
+                return ReflectResult(
+                    text="",
+                    structured={"contradictions": []},
+                    sources=[],
+                    structured_error=None,
+                )
             raise AssertionError(
                 "FakeMemoryService.reflect_structured called with no canned response "
                 "queued. Call queue_reflect_response()/queue_reflect_error() in the test first."
