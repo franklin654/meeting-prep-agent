@@ -723,3 +723,152 @@ async def test_ingested_at_is_wall_clock_later_than_earlier_stamp(
     meeting = repo.get_meeting(seeded, "m4_finedge")
     assert meeting is not None and meeting.ingested_at is not None
     assert meeting.ingested_at > before
+
+
+# ---- T12b: tightened P1 + code-side consolidation ----
+
+
+def _cm(
+    text: str, quote: str, due: date | None = None, who: str = "Priya", owner: Owner = Owner.us
+) -> ExtractedCommitment:
+    return ExtractedCommitment(
+        owner=owner, owner_person=who, text=text, due_date=due, source_quote=quote
+    )
+
+
+def _noisy_m4() -> list[ExtractedCommitment]:
+    """14 noisy P1 commitments; every quote is a real substring of the M4 transcript."""
+    process = [
+        ("Keep the owner list short", "Keep the owner list short, please."),
+        ("Stress that committees are unnecessary", "We don't need a committee for every DAG."),
+        ("Confirm attendees can hear us", "Can you both hear us okay?"),
+        ("Check that Arjun is on the call", "Arjun, you're on too?"),
+        ("Greet the group warmly", "Morning, Rahul. Morning, Karan."),
+        ("Note the production pipeline count", "It's still 55 in production."),
+        ("Help map what would be sent", "I can help map what we'd send"),
+        ("Spell out deployment data flows", "Sneha wants the deployment and data flow spelled out"),
+    ]
+    return [
+        _cm(
+            "Send the revised pricing deck with pilot option",
+            "share the revised pricing deck on the date I mentioned",
+        ),
+        _cm(
+            "Send revised pricing deck with pilot option",
+            "I'll also send a revised pricing deck with the pilot option by Sep 3.",
+            date(2026, 9, 3),
+        ),
+        _cm(
+            "Send sample DAG configs",
+            "I'll send sample DAG configs by Sep 5.",
+            date(2026, 9, 5),
+            who="Karan",
+            owner=Owner.them,
+        ),
+        _cm("Put together the pilot outline", "I'll put those criteria into the pilot outline."),
+        _cm(
+            "Put together the pilot outline with success criteria and commercial assumptions",
+            "put together the pilot outline, include the success criteria and commercial "
+            "assumptions",
+        ),
+        *[_cm(t, q) for t, q in process],
+        _cm(
+            "Send sample DAG configs",
+            "I'll send sample DAG configs by Sep 5.",
+            who="Karan",
+            owner=Owner.them,
+        ),
+    ]
+
+
+def test_consolidate_merges_duplicates_and_caps_dated_first() -> None:
+    noisy = _noisy_m4()
+    assert len(noisy) == 14
+    norm = normalize_text(_transcript("m4_finedge_pilot_scoping.txt"))
+    kept, merged, capped = ingest.consolidate_commitments(noisy, norm)
+
+    assert ingest.MAX_COMMITMENTS_PER_MEETING == 5 and len(kept) == 5
+    assert merged == 3  # deck restatement, pilot outline restatement, DAG repeat
+    assert capped == 6  # 14 - 3 merged = 11 groups, 5 kept
+    assert [c.due_date for c in kept[:2]] == [date(2026, 9, 3), date(2026, 9, 5)]
+    deck = kept[0]
+    assert deck.due_date == date(2026, 9, 3) and "pricing deck" in deck.text
+    assert deck.source_quote.startswith("I'll also send a revised pricing deck")  # earliest
+    assert sum("DAG configs" in c.text for c in kept) == 1
+    assert all(c.due_date is None for c in kept[2:])
+
+
+def test_consolidate_keeps_most_specific_text_on_containment() -> None:
+    kept, merged, _ = ingest.consolidate_commitments(
+        [
+            _cm("Put together the pilot outline", "q1"),
+            _cm("Put together the pilot outline with success criteria", "q2"),
+        ]
+    )
+    assert merged == 1 and kept[0].text.endswith("success criteria")
+
+
+def test_consolidate_dated_survive_even_when_listed_last() -> None:
+    noise = [_cm(f"Do unrelated thing number {n} alpha{n}", f"q{n}") for n in range(7)]
+    dated = _cm("Send SOC 2 report", "q-soc2", date(2026, 8, 20), who="Arjun")
+    kept, merged, capped = ingest.consolidate_commitments([*noise, dated])
+    assert kept[0] is dated and len(kept) == 5 and merged == 0 and capped == 3
+
+
+def test_consolidate_merge_keeps_due_date_from_later_restatement() -> None:
+    a = _cm("Send the ROI one-pager", "q1")
+    b = _cm("Send the ROI one-pager", "q2", date(2026, 7, 30))
+    kept, merged, _ = ingest.consolidate_commitments([a, b])
+    assert merged == 1 and len(kept) == 1
+    assert kept[0].due_date == date(2026, 7, 30) and kept[0].source_quote == "q1"
+
+
+def test_consolidate_jaccard_and_distinct_deliverables() -> None:
+    same = [
+        _cm("Send the revised pricing deck with pilot option today", "q1"),
+        _cm("Send revised pricing deck with the pilot option today", "q2", who="Arjun"),
+    ]
+    assert len(ingest.consolidate_commitments(same)[0]) == 1
+    different = [_cm("Send the case study", "q1"), _cm("Send the ROI one-pager", "q2")]
+    assert len(ingest.consolidate_commitments(different)[0]) == 2
+
+
+async def test_run_ingest_applies_cap_and_keeps_planted_m4_deliverables(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    ext = _extraction("m4_extraction.json").model_copy(update={"commitments": _noisy_m4()})
+    llm.queue_response(ext)
+    summary = await run_ingest(
+        _job(seeded), "m4_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+    rows = _commitments(seeded)
+    assert len(rows) == 5 == summary.new_commitments
+    deck, dag = _by_text(seeded, "pricing deck"), _by_text(seeded, "DAG configs")
+    assert deck.due_date == date(2026, 9, 3) and dag.due_date == date(2026, 9, 5)
+
+
+def test_p1_prompt_contains_exclusion_rules() -> None:
+    text = render_prompt(
+        "extract_meeting",
+        our_company="Tracewise",
+        our_people="Priya",
+        meeting_title="T",
+        meeting_date="2026-08-27",
+        account_name="FinEdge",
+        known_contacts="Karan",
+        transcript="X",
+    )
+    for phrase in (
+        "at most 5 per meeting",
+        "ONLY an explicit promise by a NAMED",
+        "EXCLUDE all of these",
+        "instructions to yourself",
+        "hypotheticals",
+        "vague follow-ups",
+        "restatements of the same promise",
+        "MERGE duplicates",
+        "earliest source_quote",
+        "Bundle sub-items",
+    ):
+        assert phrase in text
