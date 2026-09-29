@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { NudgeDigest } from '@/components/NudgeDigest'
 import { Textarea } from '@/components/ui/textarea'
 
 function NotesDialog({ meetings, onClose }: { meetings: MeetingSummary[]; onClose: () => void }) {
@@ -83,6 +84,7 @@ export function Dashboard() {
         <div><p className="text-sm font-medium text-primary">Your account memory, ready before the next call</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Meetings</h1></div>
         <Button onClick={() => setDialogOpen(true)}>Log notes</Button>
       </div>
+      <NudgeDigest />
       {meetings.isLoading ? <div className="grid gap-3" aria-label="Loading meetings"><Skeleton className="h-28" /><Skeleton className="h-28" /></div> : meetings.isError ? <p role="alert" className="rounded-lg border p-5 text-sm">Meetings could not be loaded. Refresh to try again.</p> : meetings.data?.length ? (
         <div className="grid gap-3">
           {meetings.data.map((meeting) => <article key={meeting.id} className="rounded-xl border bg-card p-5 shadow-card sm:flex sm:items-center sm:justify-between">

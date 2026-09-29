@@ -11,4 +11,5 @@ export const queryKeys = {
   job: (jobId: string) => ['job', jobId] as const,
   contactTimeline: (contactId: string) => ['contact-timeline', contactId] as const,
   style: () => ['style'] as const,
+  nudges: () => ['nudges'] as const,
 }
