@@ -9,6 +9,19 @@ export type MeetingSummary = components['schemas']['MeetingSummary']
 export type JobStatus = components['schemas']['JobStatus']
 export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
+export type Nudge = components['schemas']['Nudge']
+
+export function useNudges() {
+  return useQuery({
+    queryKey: queryKeys.nudges(),
+    queryFn: async (): Promise<Nudge[]> => {
+      const { data, error } = await api.GET('/api/nudges')
+      if (error || !data) throw new Error('Nudges unavailable')
+      return data as Nudge[]
+    },
+    staleTime: 60_000,
+  })
+}
 
 export function useDemoDate() {
   return useQuery({

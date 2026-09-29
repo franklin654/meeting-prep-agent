@@ -8,7 +8,7 @@ from datetime import date
 
 from fastapi import FastAPI
 
-from app.api import ask, briefs, contacts, feedback, jobs, meetings
+from app.api import ask, briefs, contacts, feedback, jobs, meetings, nudges
 from app.api.deps import close_memory_service
 from app.config import settings
 from app.core.errors import register_exception_handlers
@@ -39,6 +39,7 @@ app.include_router(jobs.router, prefix="/api")
 app.include_router(briefs.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
+app.include_router(nudges.router, prefix="/api")
 
 
 @app.get("/api/health")

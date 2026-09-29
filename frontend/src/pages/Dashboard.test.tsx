@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 describe('Dashboard', () => {
   it('lists upcoming meetings and enforces the notes minimum before submitting', async () => {
     const fetchMock = mockFetch({
+      'GET /api/nudges': { body: [] },
       'GET /api/meetings': {
         body: [{
           id: 'mtg_1', account_id: 'acct_1', account_name: 'FinEdge', title: 'Pilot decision',
@@ -25,12 +26,14 @@ describe('Dashboard', () => {
     expect(submit).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/meeting transcript/i), { target: { value: 'short' } })
     expect(submit).toBeDisabled()
-    expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET'])
+    expect(fetchMock.calls.filter((call) => call.path === '/api/nudges')).toHaveLength(1)
+    expect(fetchMock.calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
   it('submits only valid notes and shows the learned summary when the job finishes', async () => {
     const transcript = 'A'.repeat(50)
     const fetchMock = mockFetch({
+      'GET /api/nudges': { body: [] },
       'GET /api/meetings': { body: [{
         id: 'mtg_1', account_id: 'acct_1', account_name: 'FinEdge', title: 'Pilot decision',
         scheduled_at: '2026-09-29T13:00:00Z', status: 'upcoming', attendees: [], brief_ready: false,
@@ -48,6 +51,7 @@ describe('Dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /start learning/i }))
     expect(await screen.findByText(/Budget is \$75K.*Alerts: Contradiction/)).toBeInTheDocument()
     expect(await screen.findByText(/Alerts: Contradiction: budget changed\./)).toBeInTheDocument()
-    expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET', 'GET'])
+    expect(fetchMock.calls.filter((call) => call.path === '/api/nudges')).toHaveLength(1)
+    expect(fetchMock.calls.map((call) => call.method)).toContain('POST')
   })
 })

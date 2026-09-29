@@ -214,6 +214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nudges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Nudges */
+        get: operations["list_nudges_api_nudges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -430,6 +447,18 @@ export interface components {
         NotesRequest: {
             /** Transcript */
             transcript: string;
+        };
+        /** Nudge */
+        Nudge: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "overdue_commitment" | "silent_contact" | "brief_ready";
+            /** Text */
+            text: string;
+            /** Link */
+            link: string;
         };
         /** PinRequest */
         PinRequest: {
@@ -886,6 +915,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_nudges_api_nudges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Nudge"][];
                 };
             };
         };
