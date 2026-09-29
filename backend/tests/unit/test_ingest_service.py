@@ -25,7 +25,7 @@ from app.core.errors import (
     RateLimitedError,
 )
 from app.core.time import utcnow
-from app.db import ingest_repo
+from app.db import facts_repo, ingest_repo
 from app.db import repository as repo
 from app.db.models import Account, Commitment, Contact, Job, Meeting
 from app.llm.prompt_loader import prompt_placeholders, render_prompt
@@ -276,6 +276,45 @@ async def test_m4_commitments_quotes_and_no_commitment_in_facts(
     assert [c.schema for c in llm.calls] == [MeetingExtraction]
     assert llm.calls[0].temperature == 0.0
     assert "Tracewise" in llm.calls[0].prompt and "Karan Shah" in llm.calls[0].prompt
+    stored_facts = facts_repo.list_account_facts(seeded, "acc_finedge")
+    assert [(fact.kind.value, fact.text, fact.source_quote) for fact in stored_facts] == [
+        ("deal_fact", "55 pipelines in production", "It's still 55 in production.")
+    ]
+
+
+async def test_ingest_resolves_fact_about_person_and_drops_unverified_quote(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    extraction = MeetingExtraction(
+        people=[],
+        commitments=[],
+        acknowledgements=[],
+        facts=[
+            ExtractedFact(
+                kind="personal",
+                about_person="Karan",
+                text="Lives in Pune",
+                source_quote="It's still 55 in production.",
+            ),
+            ExtractedFact(
+                kind="objection",
+                about_person="Karan",
+                text="Needs EU residency",
+                source_quote="not present in this transcript",
+            ),
+        ],
+        deal_budget_usd=None,
+    )
+    llm, memory = FakeLLM(), FakeMemoryService()
+    llm.queue_response(extraction)
+
+    await run_ingest(_job(seeded), "m4_finedge", llm=llm, memory=memory, session_factory=factory)
+
+    stored = facts_repo.list_account_facts(seeded, "acc_finedge")
+    assert len(stored) == 1
+    assert stored[0].contact_id == "c_karan"
+    assert stored[0].kind.value == "personal"
+    assert stored[0].source_quote == "It's still 55 in production."
 
 
 async def test_r2_runs_after_retain_and_returns_source_meeting_alerts(
@@ -463,8 +502,7 @@ async def test_p2_renewed_match_must_have_same_owner_and_deliverable(
         else "Priya will send a security report by Oct 1."
     )
     m6.transcript = (
-        f"[2026-09-29T10:00:00+05:30] Priya Nair "
-        f"(Account Executive, Tracewise): {quote}"
+        f"[2026-09-29T10:00:00+05:30] Priya Nair (Account Executive, Tracewise): {quote}"
     )
     seeded.add(m6)
     seeded.commit()

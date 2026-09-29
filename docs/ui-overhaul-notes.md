@@ -4,11 +4,11 @@
 
 | Ticket | Status | Commit |
 | --- | --- | --- |
-| Stage 0 | complete | pending docs-only commit |
+| Stage 0 | complete | `d185960` |
 | A0 | complete | implementation `3f667b1` |
 | A1 | complete | implementation `ecd34d9` |
-| A2 | complete | `9fc8b8a` |
-| A3 | planned | — |
+| A2 | complete | `f5f7585` |
+| A3 | WIP | implementation commit pending |
 | A4 | planned | — |
 | A5 | planned | — |
 | A6 | planned | — |
@@ -33,16 +33,24 @@
 - A0: `MEMORY_READ_ONLY` defaults off. The real and fake memory gateways reject every write (`ensure_bank`, `ensure_mental_models`, meeting/note/preference retains) with `memory_read_only` before issuing an SDK call. Provider adapters now log provider, model, `json`/`text` call type, and provider-reported prompt/completion token counts only.
 - A1: Added only the requested additive tables (`extractedfact`, `capturedraft`, `meetingprepared`, `memoryoverride`) and their repository gateways. No `create_all` call was run against `backend/app.db`.
 - A2: Added account/contact creation and listing, meeting scheduling/cancellation, prepared markers, and enriched meeting summary metrics. Added `ae_name` and `company_name` to health using the seeded company file; Docker API mounts `./data` read-only at `/data` for the same source. Regenerated `frontend/src/api/schema.d.ts` offline from `app.openapi()` (17 paths). No new error codes.
+- A3: Ingestion persists quote-verified P1 facts and replaces a meeting's facts on re-ingest; fact contacts are matched with the existing resolver. Added a sequential resumable P1-only `data/scripts/backfill_facts.py` with `--dry-run` and `--limit`. No prompt files changed.
 
 ## Live-call and token tally
 
 | Operation | Calls | Prompt tokens | Completion tokens | Notes |
 | --- | ---: | ---: | ---: | --- |
-| App LLM | 0 | 0 | 0 | — |
+| App LLM | 1 attempted | unknown | unknown | P1 request returned temperature-unsupported parameter error; fallback request cancelled before response, no usage totals. |
 | Hindsight retain | 0 | — | — | — |
 | Hindsight reflect | 0 | — | — | — |
 | Brief generation | 0 | — | — | — |
 | Pattern refresh | 0 | — | — | — |
+
+## A3 interruption
+
+- The pre-overhaul database backup passed `PRAGMA integrity_check`. In-process FastAPI startup created the four additive tables in the real DB without binding port 8000. The brief unique key had no duplicates. Backfill dry-run found 15 eligible meetings and made zero calls.
+- Backfill attempt: the configured `gpt-6-luna` rejected `temperature`; the existing adapter omitted the parameter and retried. The retry was still awaiting a response when cancelled. This is one logical app LLM attempt; prompt/completion token counts were not returned. No Hindsight calls occurred, and `extractedfact` remains empty. The DB still has 15 done meetings with transcripts.
+- Stop reason: the user-directed stop condition for model/parameter errors. Resume only after direction on retrying the backfill. Do not create sandbox copies until 12 of the 15 meetings have at least two facts.
+- A3 tests/checks before interruption: 127 tests passed; Ruff and mypy passed.
 
 ## B4–C4 plan addendum
 
