@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -59,7 +59,7 @@ from app.schemas.brief import (
     Severity,
     SourceType,
 )
-from app.schemas.enums import FactKind
+from app.schemas.enums import FactKind, Owner
 from app.schemas.memory import MemoryHit
 from app.services.evidence import (
     QUOTE_MAX_CHARS,
@@ -129,6 +129,18 @@ def default_brief_llm() -> LLMClient:
 class Persona:
     user_name: str
     our_company: str
+    competitors: list[str] = field(default_factory=list)
+
+
+def _competitor_names(raw: Any) -> list[str]:
+    """`competitor` in company.json: a string, an object with `name`, or a list of either."""
+    items = raw if isinstance(raw, list) else [raw]
+    names: list[str] = []
+    for entry in items:
+        name = entry.get("name") if isinstance(entry, dict) else entry
+        if isinstance(name, str) and name.strip() and name.strip() not in names:
+            names.append(name.strip())
+    return names
 
 
 _COMPANY_JSON = Path(__file__).resolve().parents[3] / "data" / "seed" / "company.json"
@@ -146,7 +158,11 @@ def load_persona() -> Persona:
             "(ae.name and vendor.name); make sure the repo's data/ directory is available."
         )
     data = json.loads(_COMPANY_JSON.read_text(encoding="utf-8"))
-    return Persona(user_name=data["ae"]["name"], our_company=data["vendor"]["name"])
+    return Persona(
+        user_name=data["ae"]["name"],
+        our_company=data["vendor"]["name"],
+        competitors=_competitor_names(data.get("competitor")),
+    )
 
 
 # ---- transcript line parser --------------------------------------------------------
@@ -187,6 +203,27 @@ COMPETITOR_QUERY = (
 )
 
 
+WATCH_OUT_CANDIDATES = 8
+
+
+def competitor_query(names: Sequence[str]) -> str:
+    """The generic competitor wording, plus ' such as <names>' when the persona lists any."""
+    return f"{COMPETITOR_QUERY} such as {', '.join(names)}" if names else COMPETITOR_QUERY
+
+
+class Timings:
+    """Per-stage durations in ms. Concurrent branches record the slowest branch (`record_max`)."""
+
+    def __init__(self) -> None:
+        self.ms: dict[str, int] = {}
+
+    def record_max(self, name: str, seconds: float) -> None:
+        self.ms[name] = max(self.ms.get(name, 0), int(seconds * 1000))
+
+    def set(self, name: str, seconds: float) -> None:
+        self.ms[name] = int(seconds * 1000)
+
+
 def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
 
@@ -218,20 +255,27 @@ async def _recall_top(
     query: str,
     tags: list[str],
     fact_kind: FactKind,
-    fallback_query: str | None = None,
+    candidates: int = CANDIDATES_PER_QUERY,
+    timings: Timings | None = None,
 ) -> list[MemoryHit]:
     """Labelled recall; if it returns nothing, ONE retry without `fact_kind` (the extraction
     model does not always label facts). Top hits are then resolved to meetings.
     """
+    recall_started = time.monotonic()
     hits = await memory.recall_facts(query=query, tags=tags, fact_kind=fact_kind)
     fell_back = False
     if not hits:
         fell_back = True
-        hits = await memory.recall_facts(query=fallback_query or query, tags=tags)
-    # Top 5 by rank are resolved; the first TOP_HITS_PER_QUERY that resolve to a dated meeting
-    # are kept, so unresolvable hits in the top 3 do not leave the section empty.
-    candidates = top_distinct_hits(hits, CANDIDATES_PER_QUERY)
-    resolved = await memory.resolve_sources(candidates)
+        hits = await memory.recall_facts(query=query, tags=tags)
+    if timings is not None:
+        timings.record_max("recall", time.monotonic() - recall_started)
+    # The top `candidates` by rank are resolved; the first TOP_HITS_PER_QUERY that resolve to a
+    # dated meeting are kept, so unresolvable hits do not leave the section empty.
+    pool = top_distinct_hits(hits, candidates)
+    resolve_started = time.monotonic()
+    resolved = await memory.resolve_sources(pool)
+    if timings is not None:
+        timings.record_max("resolve", time.monotonic() - resolve_started)
     kept = [h for h in resolved if h.meeting_id is not None and h.meeting_date is not None][
         :TOP_HITS_PER_QUERY
     ]
@@ -239,7 +283,7 @@ async def _recall_top(
         "brief.recall section=%s returned=%d candidates=%d kept=%d fallback=%s",
         section,
         len(hits),
-        len(candidates),
+        len(pool),
         len(kept),
         fell_back,
     )
@@ -247,12 +291,20 @@ async def _recall_top(
 
 
 async def _objection_evidence(
-    memory: MemoryService, *, account_id: str, account_name: str, today_: date
+    memory: MemoryService,
+    *,
+    account_id: str,
+    account_name: str,
+    today_: date,
+    timings: Timings | None = None,
 ) -> list[tuple[Objection, MemoryHit]]:
     query = render_prompt("reflect_objections", today=today_.isoformat(), account_name=account_name)
+    reflect_started = time.monotonic()
     result = await memory.reflect_structured(
         query=query, tags=[account_tag(account_id)], schema=ObjectionReport
     )
+    if timings is not None:
+        timings.record_max("reflect", time.monotonic() - reflect_started)
     if result.structured is None:
         logger.warning(
             "brief.section_dropped section=unresolved_objections reason=%s",
@@ -264,25 +316,52 @@ async def _objection_evidence(
     except PydanticValidationError:
         logger.warning("brief.section_dropped section=unresolved_objections reason=invalid_output")
         return []
+    resolve_started = time.monotonic()
     sources = await memory.resolve_sources(result.sources)
+    if timings is not None:
+        timings.record_max("resolve", time.monotonic() - resolve_started)
     return match_objection_sources(report, sources)
 
 
-async def _gather_memory(inputs: BriefInputs, memory: MemoryService, today_: date) -> MemoryContext:
+async def _timed_mental_model(
+    memory: MemoryService, name: str, timings: Timings
+) -> MentalModelText | None:
+    started = time.monotonic()
+    try:
+        return await memory.get_mental_model(name)
+    finally:
+        timings.record_max("mental_model", time.monotonic() - started)
+
+
+async def _gather_memory(
+    inputs: BriefInputs,
+    memory: MemoryService,
+    today_: date,
+    competitors: Sequence[str] = (),
+    timings: Timings | None = None,
+) -> MemoryContext:
     account = inputs.account
     external = [c for c in inputs.attendees if c.account_id is not None]
+    timings = timings or Timings()
 
+    gather_started = time.monotonic()
     results = await asyncio.gather(
-        memory.get_mental_model(_relationship_model_id(account.id)),
+        _timed_mental_model(memory, _relationship_model_id(account.id), timings),
         _objection_evidence(
-            memory, account_id=account.id, account_name=account.name, today_=today_
+            memory,
+            account_id=account.id,
+            account_name=account.name,
+            today_=today_,
+            timings=timings,
         ),
         _recall_top(
             memory,
             section="watch_outs",
-            query=COMPETITOR_QUERY,
+            query=competitor_query(competitors),
             tags=[account_tag(account.id)],
             fact_kind=FactKind.competitor,
+            candidates=WATCH_OUT_CANDIDATES,
+            timings=timings,
         ),
         *(
             _recall_top(
@@ -291,11 +370,13 @@ async def _gather_memory(inputs: BriefInputs, memory: MemoryService, today_: dat
                 query=f"{c.name} {PERSONAL_QUERY}",
                 tags=[contact_tag(c.id)],
                 fact_kind=FactKind.personal,
+                timings=timings,
             )
             for c in external
         ),
         return_exceptions=True,
     )
+    timings.set("gather", time.monotonic() - gather_started)
     labels = ["mental_model", "unresolved_objections", "watch_outs"]
     labels += [f"personal_touchpoints:{c.id}" for c in external]
 
@@ -366,16 +447,74 @@ def _is_citable(citation: Citation) -> bool:
     return bool(citation.meeting_id and citation.meeting_date and citation.quote)
 
 
+# (customer-owned?, due date, commitment id): sorts us-owned first, then most overdue, then id.
+_OverdueRank = tuple[bool, date, str]
+
+MAX_CRITICAL_ITEMS = 2
+
+
+def _rank_of(ref: EvidenceRef) -> _OverdueRank:
+    assert ref.due_date is not None and ref.commitment_id is not None
+    return (ref.owner != Owner.us.value, ref.due_date, ref.commitment_id)
+
+
+def _apply_severity_cap(
+    sections: dict[SectionKey, list[BriefItem]], overdue_of: dict[str, list[_OverdueRank]]
+) -> None:
+    """At most MAX_CRITICAL_ITEMS critical items in the whole brief, all in open_commitments.
+
+    Critical candidates are ONLY open_commitments items citing an overdue ledger row owned by
+    us, ranked most days overdue first, then commitment id; the top ones stay critical. A
+    customer-owned row is never critical. Everything else that would be critical (other overdue
+    rows, customer-owned rows, any agenda/alerts/other-section item citing or restating overdue
+    rows, an LLM `critical` anywhere) becomes `warning`. open_commitments is then ordered by
+    severity, then rank (us-owned overdue first, most overdue first).
+    """
+    commitments = sections.get(SectionKey.open_commitments, [])
+    candidates = sorted(
+        (i for i in commitments if i.id in overdue_of), key=lambda i: min(overdue_of[i.id])
+    )
+    us_candidates = sorted(
+        (i for i in commitments if any(not r[0] for r in overdue_of.get(i.id, []))),
+        key=lambda i: min(r for r in overdue_of[i.id] if not r[0]),
+    )
+    critical_ids = {i.id for i in us_candidates[:MAX_CRITICAL_ITEMS]}
+    for items in sections.values():
+        for idx, item in enumerate(items):
+            if item.id in critical_ids:
+                severity = Severity.critical
+            elif item.id in overdue_of or item.severity == Severity.critical:
+                severity = Severity.warning
+            else:
+                severity = item.severity
+            items[idx] = item.model_copy(update={"severity": severity})
+    if commitments:
+        rank_pos = {i.id: n for n, i in enumerate(candidates)}
+        order = {Severity.critical: 0, Severity.warning: 1, Severity.info: 2}
+        sections[SectionKey.open_commitments] = [
+            item
+            for _, _, item in sorted(
+                ((order[i.severity], rank_pos.get(i.id, len(candidates)), i) for i in commitments),
+                key=lambda t: (t[0], t[1]),
+            )
+        ]
+
+
 def _map_draft(
     draft: BriefDraft,
     table: EvidenceTable,
     *,
     mode: BriefMode,
     known_contact_ids: set[str],
-) -> tuple[dict[SectionKey, list[BriefItem]], set[str]]:
-    """Draft -> items with citations. Returns (items per section, covered commitment ids)."""
+) -> tuple[dict[SectionKey, list[BriefItem]], set[str], dict[str, list[_OverdueRank]]]:
+    """Draft -> items with citations.
+
+    Returns (items per section, covered commitment ids, overdue ledger rows each item cites).
+    Severity is NOT forced here; `_apply_severity_cap` ranks and caps it afterwards.
+    """
     sections: dict[SectionKey, list[BriefItem]] = {}
     covered: set[str] = set()
+    overdue_of: dict[str, list[_OverdueRank]] = {}
     for key in LLM_SECTION_KEYS:
         for n, draft_item in enumerate(draft.sections.get(key, []), start=1):
             refs: list[EvidenceRef] = []
@@ -391,21 +530,24 @@ def _map_draft(
             else:
                 citations = []
             severity = draft_item.severity
-            if any(r.overdue for r in refs):
-                severity = Severity.critical
-            elif key in _WARNING_FLOOR and severity == Severity.info:
+            if key in _WARNING_FLOOR and severity == Severity.info:
                 severity = Severity.warning
-            covered.update(r.commitment_id for r in refs if r.commitment_id)
+            if key == SectionKey.open_commitments:  # only these items 'cover' a commitment
+                covered.update(r.commitment_id for r in refs if r.commitment_id)
+            item_id = f"{key.value}-{n}"
+            ranks = [_rank_of(r) for r in refs if r.overdue and r.due_date and r.commitment_id]
+            if ranks:
+                overdue_of[item_id] = ranks
             sections.setdefault(key, []).append(
                 BriefItem(
-                    id=f"{key.value}-{n}",
+                    id=item_id,
                     text=draft_item.text,
                     severity=severity,
                     contact_ids=[c for c in draft_item.contact_ids if c in known_contact_ids],
                     citations=citations,
                 )
             )
-    return sections, covered
+    return sections, covered, overdue_of
 
 
 def _overdue_item(
@@ -503,16 +645,19 @@ def assemble_brief(
     generated_at: datetime,
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
-    sections, covered = _map_draft(draft, table, mode=mode, known_contact_ids=known)
+    sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
 
     if mode == "memory":
         for commitment in sorted(inputs.open_commitments, key=lambda c: c.due_date or date.max):
             overdue = commitment.due_date is not None and commitment.due_date < today()
             info = meetings.get(commitment.meeting_id)
             if overdue and commitment.id not in covered and info is not None:
-                sections.setdefault(SectionKey.open_commitments, []).append(
-                    _overdue_item(commitment, info, known)
-                )
+                forced = _overdue_item(commitment, info, known)
+                overdue_of[forced.id] = [
+                    (commitment.owner != Owner.us, commitment.due_date or date.max, commitment.id)
+                ]
+                sections.setdefault(SectionKey.open_commitments, []).append(forced)
+    _apply_severity_cap(sections, overdue_of)
 
     attendee_items = _attendee_items(inputs, mode=mode)
     if attendee_items:
@@ -556,6 +701,7 @@ async def generate_brief(
         raise ValidationError(f"Unknown brief mode {mode!r}.")
     started = time.monotonic()
     with_memory = mode == "memory"
+    timings = Timings()
 
     inputs = load_brief_inputs(session_factory, meeting_id, include_ledger=with_memory)
     persona = load_persona()
@@ -563,18 +709,23 @@ async def generate_brief(
         m.id: MeetingInfo(id=m.id, title=m.title, date=_meeting_date(m))
         for m in inputs.account_meetings
     }
+    timings.set("load", time.monotonic() - started)
 
     table = EvidenceTable([])
     if with_memory:
-        context = await _gather_memory(inputs, memory, today())
+        context = await _gather_memory(
+            inputs, memory, today(), competitors=persona.competitors, timings=timings
+        )
         gathered_at = time.monotonic()
-        done = [
-            m for m in inputs.account_meetings if m.status == "done" and m.id != inputs.meeting.id
+        ingested = [
+            m
+            for m in inputs.account_meetings
+            if m.ingested_at is not None and m.id != inputs.meeting.id
         ]
-        latest = max(done, key=lambda m: m.scheduled_at, default=None)
+        latest = max(ingested, key=lambda m: m.scheduled_at, default=None)
         table = build_evidence(
             mental_model=context.mental_model,
-            latest_done_meeting=meetings[latest.id] if latest else None,
+            latest_ingested_meeting=meetings[latest.id] if latest else None,
             recall_sections=context.recall_sections,
             objections=context.objections,
             commitments=inputs.open_commitments,
@@ -591,13 +742,10 @@ async def generate_brief(
     prompt = render_brief_prompt(persona=persona, inputs=inputs, evidence_text=table.render())
     llm_started = time.monotonic()
     draft = await llm.complete_json(prompt, BriefDraft, temperature=BRIEF_TEMPERATURE)
-    logger.info(
-        "brief.llm meeting=%s mode=%s duration_ms=%d",
-        meeting_id,
-        mode,
-        int((time.monotonic() - llm_started) * 1000),
-    )
+    timings.set("p3", time.monotonic() - llm_started)
+    logger.info("brief.llm meeting=%s mode=%s duration_ms=%d", meeting_id, mode, timings.ms["p3"])
 
+    post_started = time.monotonic()
     brief_id, generated_at = new_brief_stamp(session_factory, meeting_id, mode)
     brief = assemble_brief(
         draft,
@@ -608,13 +756,36 @@ async def generate_brief(
         brief_id=brief_id,
         generated_at=generated_at,
     )
-    save_brief(session_factory, brief)
+    if with_memory and not brief.sections:
+        # Never persist (and so never serve from the cache) a brief with nothing in it.
+        logger.warning("brief.empty_not_persisted meeting=%s mode=%s", meeting_id, mode)
+    else:
+        brief = save_brief(session_factory, brief)
+    timings.set("post", time.monotonic() - post_started)
+    total = time.monotonic() - started
+    timings.set("total", total)
     logger.info(
         "brief.done meeting=%s mode=%s items=%d duration_ms=%d",
         meeting_id,
         mode,
         sum(len(s.items) for s in brief.sections),
-        int((time.monotonic() - started) * 1000),
+        timings.ms["total"],
+    )
+    ms = timings.ms
+    logger.info(
+        "brief.timing meeting=%s mode=%s load_ms=%d recall_ms=%d reflect_ms=%d resolve_ms=%d "
+        "mental_model_ms=%d gather_ms=%d p3_ms=%d post_ms=%d total_ms=%d",
+        meeting_id,
+        mode,
+        ms.get("load", 0),
+        ms.get("recall", 0),
+        ms.get("reflect", 0),
+        ms.get("resolve", 0),
+        ms.get("mental_model", 0),
+        ms.get("gather", 0),
+        ms.get("p3", 0),
+        ms.get("post", 0),
+        ms.get("total", 0),
     )
     return brief
 

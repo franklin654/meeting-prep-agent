@@ -17,7 +17,7 @@ from app.memory.tags import account_tag, contact_tag, fact_kind_tag, meeting_tag
 from app.schemas.brief import BriefDraft, SectionKey, SourceType
 from app.schemas.enums import CommitmentStatus, FactKind, Owner
 from app.schemas.memory import MemoryHit
-from app.services.brief import COMPETITOR_QUERY, PERSONAL_QUERY, top_distinct_hits
+from app.services.brief import PERSONAL_QUERY, competitor_query, load_persona, top_distinct_hits
 from tests.unit.brief_world import (
     ACC,
     DECK_QUOTE,
@@ -90,7 +90,13 @@ async def test_watch_outs_fallback_not_used_when_labelled_recall_has_hits(
     await make(world)
 
     account_calls = [c for c in calls if c[1] == (account_tag(ACC),)]
-    assert account_calls == [(COMPETITOR_QUERY, (account_tag(ACC),), FactKind.competitor)]
+    assert account_calls == [
+        (
+            competitor_query(load_persona().competitors),
+            (account_tag(ACC),),
+            FactKind.competitor,
+        )
+    ]
 
 
 async def test_watch_outs_fallback_used_when_labelled_recall_is_empty(
@@ -116,7 +122,7 @@ async def test_watch_outs_fallback_used_when_labelled_recall_is_empty(
 
     account_calls = [c for c in calls if c[1] == (account_tag(ACC),)]
     assert [c[2] for c in account_calls] == [FactKind.competitor, None]
-    assert all(c[0] == COMPETITOR_QUERY for c in account_calls)
+    assert all(c[0] == competitor_query(load_persona().competitors) for c in account_calls)
     (watch,) = section(brief, SectionKey.watch_outs)
     assert [c.meeting_id for c in watch.citations] == ["m3_finedge"]
 
@@ -346,8 +352,10 @@ async def test_many_overdue_rows_do_not_squeeze_out_recall_and_all_overdue_stay_
     forced = section(brief, SectionKey.open_commitments)
     assert len(forced) == 14  # the appender covers every overdue dated commitment
     for it in forced:
-        assert it.severity.value == "critical"
         assert it.citations[0].meeting_id and it.citations[0].quote
+    # Only two stay critical (us-owned, most overdue first); the rest are warnings.
+    assert [i.severity.value for i in forced].count("critical") == 2
+    assert "pricing deck" in forced[0].text
 
 
 async def test_top_five_resolved_keep_first_three_that_resolve(world: World) -> None:

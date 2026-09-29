@@ -12,12 +12,14 @@ the two (a brief pinned to the demo date could never be invalidated by a live in
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.core.errors import NotFoundError
@@ -26,6 +28,8 @@ from app.db import repository
 from app.db.models import Account, BriefRecord, Commitment, Contact, Meeting
 from app.schemas.brief import Brief
 from app.schemas.enums import CommitmentStatus
+
+logger = logging.getLogger(__name__)
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
@@ -107,24 +111,44 @@ def new_brief_stamp(
     return brief_id, utcnow()
 
 
-def save_brief(session_factory: SessionFactory, brief: Brief) -> None:
-    """Upsert the record for `(brief.meeting_id, brief.mode)`; created_at = generated_at."""
+def save_brief(session_factory: SessionFactory, brief: Brief) -> Brief:
+    """Upsert the record for `(brief.meeting_id, brief.mode)`; created_at = generated_at.
+
+    Safe under concurrent calls for the same meeting and mode: the unique index turns the
+    losing insert into an IntegrityError, which is rolled back and turned into an UPDATE of
+    the existing row. Returns the brief carrying the STORED id (stable across regeneration).
+    """
     with session_factory() as session:
         record = _find_record(session, brief.meeting_id, brief.mode)
-        content = brief.model_dump(mode="json")
         if record is None:
-            record = BriefRecord(
-                id=brief.id,
-                meeting_id=brief.meeting_id,
-                mode=brief.mode,
-                content=content,
-                created_at=brief.generated_at,
+            session.add(
+                BriefRecord(
+                    id=brief.id,
+                    meeting_id=brief.meeting_id,
+                    mode=brief.mode,
+                    content=brief.model_dump(mode="json"),
+                    created_at=brief.generated_at,
+                )
             )
-        else:
-            record.content = content
-            record.created_at = brief.generated_at
+            try:
+                session.commit()
+                return brief
+            except IntegrityError:
+                session.rollback()
+                logger.info(
+                    "brief.save_conflict meeting=%s mode=%s: updating existing row",
+                    brief.meeting_id,
+                    brief.mode,
+                )
+                record = _find_record(session, brief.meeting_id, brief.mode)
+                if record is None:  # the conflicting row vanished: not a unique conflict
+                    raise
+        stored = brief.model_copy(update={"id": record.id})
+        record.content = stored.model_dump(mode="json")
+        record.created_at = stored.generated_at
         session.add(record)
         session.commit()
+        return stored
 
 
 def get_fresh_brief(session_factory: SessionFactory, meeting_id: str, mode: str) -> Brief | None:

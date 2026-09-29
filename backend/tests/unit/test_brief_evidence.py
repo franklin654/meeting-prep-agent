@@ -51,7 +51,7 @@ def test_ids_order_and_ledger_overdue_flag() -> None:
         mental_model=MentalModelText(
             id="relationship-a", name="n", content="Summary", last_refreshed_at=None
         ),
-        latest_done_meeting=MEETINGS["m9"],
+        latest_ingested_meeting=MEETINGS["m9"],
         recall_hits=[hit(1, "m1"), hit(2, "m3")],
         objections=[],
         commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", date(2026, 10, 1))],
@@ -73,7 +73,7 @@ def test_ids_order_and_ledger_overdue_flag() -> None:
 def test_mental_model_without_a_done_meeting_is_dropped() -> None:
     table = build_evidence(
         mental_model=MentalModelText(id="r", name="n", content="Summary", last_refreshed_at=None),
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=[],
         objections=[],
         commitments=[],
@@ -87,7 +87,7 @@ def test_mental_model_without_a_done_meeting_is_dropped() -> None:
 def test_hits_without_meeting_are_unusable_and_duplicates_collapse() -> None:
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=[hit(1, None), hit(2, "m1"), hit(2, "m1"), hit(3, "unknown")],
         objections=[],
         commitments=[],
@@ -104,7 +104,7 @@ def test_hit_date_falls_back_to_hit_when_meeting_unknown() -> None:
     )
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=[dated],
         objections=[],
         commitments=[],
@@ -118,7 +118,7 @@ def test_cap_keeps_dated_ledger_and_truncates_recall_in_rank_order() -> None:
     hits = [hit(i, f"m{1 + i % 9}") for i in range(60)]
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=hits,
         objections=[],
         commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", date(2026, 10, 1))],
@@ -139,7 +139,7 @@ def test_ledger_never_sends_undated_rows_and_caps_upcoming_at_five() -> None:
     rows += [commitment("today", TODAY)]
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=[],
         objections=[],
         commitments=rows,
@@ -160,7 +160,7 @@ def test_quote_and_prompt_text_are_bounded() -> None:
     long = "word " * 200
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_hits=[hit(1, "m1", long)],
         objections=[],
         commitments=[],
@@ -225,7 +225,7 @@ def test_recall_floor_and_overdue_cap_hold_together() -> None:
     ]  # fmt: skip
     table = build_evidence(
         mental_model=MentalModelText(id="r", name="n", content="S", last_refreshed_at=None),
-        latest_done_meeting=MEETINGS["m9"],
+        latest_ingested_meeting=MEETINGS["m9"],
         recall_sections=sections,
         objections=objections,
         commitments=rows,
@@ -252,7 +252,7 @@ def test_recall_floor_reserves_a_slot_per_section_even_beyond_min_recall() -> No
     sections = [[hit(10 * si + j, "m1") for j in range(2)] for si in range(10)]
     table = build_evidence(
         mental_model=None,
-        latest_done_meeting=None,
+        latest_ingested_meeting=None,
         recall_sections=sections,
         objections=[],
         commitments=[],

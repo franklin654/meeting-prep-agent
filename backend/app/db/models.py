@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import JSON, Column, Field, SQLModel
 
 from app.schemas.brief import SectionKey
@@ -68,6 +69,9 @@ class Commitment(SQLModel, table=True):
 
 
 class BriefRecord(SQLModel, table=True):
+    # One stored brief per meeting and mode; makes concurrent upserts safe (see brief_repo).
+    __table_args__ = (UniqueConstraint("meeting_id", "mode", name="ux_briefrecord_meeting_mode"),)
+
     id: str = Field(primary_key=True)
     meeting_id: str = Field(foreign_key="meeting.id", index=True)
     mode: str  # memory | no_memory
