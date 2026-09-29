@@ -8,6 +8,7 @@ The real provider SDKs run against an `httpx.MockTransport`, so request shape
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -224,18 +225,22 @@ async def test_logs_usage_without_prompt_or_completion_text(
 ) -> None:
     client, _, _ = maker([ok_json(GOOD)])
 
-    with caplog.at_level("INFO"):
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
         await client.complete_json("secret prompt text", Widget)
 
     messages = [
         record.getMessage() for record in caplog.records if "llm.usage" in record.getMessage()
     ]
     assert len(messages) == 1
+    record = next(r for r in caplog.records if "llm.usage" in r.getMessage())
+    assert record.name == "uvicorn.error"
+    assert record.levelno == logging.INFO
     assert "call_type=json" in messages[0]
     assert "model=test-model" in messages[0]
-    assert "prompt_tokens=" in messages[0]
-    assert "completion_tokens=" in messages[0]
+    assert "prompt_tokens=11" in messages[0] or "prompt_tokens=1" in messages[0]
+    assert "completion_tokens=7" in messages[0] or "completion_tokens=1" in messages[0]
     assert "secret prompt text" not in messages[0]
+    assert "not-a-real-key" not in messages[0]
 
 
 @PROVIDERS

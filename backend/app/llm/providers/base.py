@@ -31,7 +31,10 @@ from pydantic import BaseModel, ValidationError
 from app.core.errors import LLMInvalidOutputError, LLMTimeoutError, RateLimitedError
 from app.llm.client import LLMClient
 
-logger = logging.getLogger(__name__)
+# Uvicorn configures this logger at INFO in normal app runs. Using a module logger
+# here leaves the INFO-level token usage records behind Uvicorn's default WARNING
+# root level, even though higher-level app timing records are visible.
+logger = logging.getLogger("uvicorn.error")
 
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")
