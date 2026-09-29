@@ -9,6 +9,8 @@
 
 # Local UI gate screenshots and artifacts
 artifacts/
+backend/app.sandbox.db
+backend/app.sandbox-r.db
 
 # Python bytecode
 __pycache__/

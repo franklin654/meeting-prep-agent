@@ -8,7 +8,7 @@
 | A0 | complete | implementation `3f667b1` |
 | A1 | complete | implementation `ecd34d9` |
 | A2 | complete | `f5f7585` |
-| A3 | complete | `883c099` |
+| A3 | complete | `4599067` |
 | A4 | planned | — |
 | A5 | planned | — |
 | A6 | planned | — |
@@ -51,6 +51,7 @@
 - Detached sequential real-DB backfill completed: 15 P1 calls, 15 meetings processed, 133 verified facts (`deal_fact:89`, `objection:26`, `personal:15`, `competitor:3`); all 15 meetings have at least two facts. Per-meeting counts are in the ignored log `artifacts/overhaul/a3-facts-backfill.log`. One expected `gpt-6-luna` temperature rejection was retried without temperature and succeeded. No Hindsight calls occurred.
 - Token totals are unavailable: A0 usage logging is INFO-level, but the standalone script had no INFO logging configuration, so the run log captured only the temperature warning and final summary. The script now enables INFO logging for future runs; do not rerun the real backfill solely to recover these counts.
 - A3 checks: 127 tests passed; Ruff and mypy passed. The requested fact-kind per-meeting tally was added to the script output.
+- Created `backend/app.sandbox.db` and `backend/app.sandbox-r.db` using SQLite's online backup command from the completed real DB; both pass `PRAGMA integrity_check`. Both paths are ignored by Git.
 
 ## B4–C4 plan addendum
 
