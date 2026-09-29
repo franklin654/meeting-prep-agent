@@ -449,7 +449,7 @@ def _is_citable(citation: Citation) -> bool:
 # (customer-owned?, due date, commitment id): sorts us-owned first, then most overdue, then id.
 _OverdueRank = tuple[bool, date, str]
 
-MAX_CRITICAL_ITEMS = 2
+MAX_CRITICAL_ITEMS = 1
 
 
 def _rank_of(ref: EvidenceRef) -> _OverdueRank:
@@ -460,7 +460,7 @@ def _rank_of(ref: EvidenceRef) -> _OverdueRank:
 def _apply_severity_cap(
     sections: dict[SectionKey, list[BriefItem]], overdue_of: dict[str, list[_OverdueRank]]
 ) -> None:
-    """At most MAX_CRITICAL_ITEMS critical items in the whole brief, all in open_commitments.
+    """Keep the oldest us-owned overdue commitment red and consolidate the rest.
 
     Critical candidates are ONLY open_commitments items citing an overdue ledger row owned by
     us, ranked most days overdue first, then commitment id; the top ones stay critical. A
@@ -478,10 +478,46 @@ def _apply_severity_cap(
         key=lambda i: min(r for r in overdue_of[i.id] if not r[0]),
     )
     critical_ids = {i.id for i in us_candidates[:MAX_CRITICAL_ITEMS]}
+    grouped = [i for i in us_candidates[MAX_CRITICAL_ITEMS:]]
+    if grouped:
+        group_ids = {i.id for i in grouped}
+        group_ranks = [rank for item in grouped for rank in overdue_of.get(item.id, [])]
+        group_citations = list(
+            {
+                citation.model_dump_json(): citation
+                for item in grouped
+                for citation in item.citations
+            }.values()
+        )
+        group_contacts = list(
+            dict.fromkeys(contact for item in grouped for contact in item.contact_ids)
+        )
+        details = "; ".join(
+            item.text.removeprefix("Overdue: ").rstrip(".") for item in grouped
+        )
+        group_item = BriefItem(
+            id="open_commitments-also-overdue",
+            text=f"Also overdue: {details}.",
+            severity=Severity.warning,
+            contact_ids=group_contacts,
+            citations=group_citations,
+        )
+        commitments = [item for item in commitments if item.id not in group_ids]
+        commitments.append(group_item)
+        sections[SectionKey.open_commitments] = commitments
+        overdue_of[group_item.id] = group_ranks
+
+    sections[SectionKey.alerts] = [
+        item
+        for item in sections.get(SectionKey.alerts, [])
+        if item.id not in overdue_of
+    ]
     for items in sections.values():
         for idx, item in enumerate(items):
             if item.id in critical_ids:
                 severity = Severity.critical
+            elif item.id in overdue_of and all(rank[0] for rank in overdue_of[item.id]):
+                severity = Severity.info
             elif item.id in overdue_of or item.severity == Severity.critical:
                 severity = Severity.warning
             else:
@@ -642,9 +678,47 @@ def assemble_brief(
     meetings: dict[str, MeetingInfo],
     brief_id: str,
     generated_at: datetime,
+    competitor_hits: Sequence[MemoryHit] = (),
+    competitors: Sequence[str] = (),
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
     sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
+
+    if mode == "memory" and competitors:
+        competitor = next(
+            (
+                (name, hit)
+                for name in competitors
+                for hit in competitor_hits
+                if name.casefold() in hit.text.casefold()
+                and hit.meeting_id is not None
+                and hit.meeting_date is not None
+            ),
+            None,
+        )
+        if competitor is not None:
+            name, hit = competitor
+            assert hit.meeting_id is not None and hit.meeting_date is not None
+            # The code-built B4 item replaces model-authored versions of this same fact.
+            sections[SectionKey.watch_outs] = []
+            sections.setdefault(SectionKey.watch_outs, []).append(
+                BriefItem(
+                    id="watch_outs-competitor",
+                    text=f"FinEdge has looked at {name}.",
+                    severity=Severity.warning,
+                    contact_ids=[],
+                    citations=[
+                        Citation(
+                            source_type=SourceType.meeting,
+                            meeting_id=hit.meeting_id,
+                            meeting_date=hit.meeting_date,
+                            label=f"{hit.meeting_id} on {format_date(hit.meeting_date)}",
+                            quote=truncate(hit.text, QUOTE_MAX_CHARS),
+                            memory_id=hit.memory_id,
+                        )
+                    ],
+                )
+            )
 
     if mode == "memory":
         for commitment in sorted(inputs.open_commitments, key=lambda c: c.due_date or date.max):
@@ -711,6 +785,7 @@ async def generate_brief(
     timings.set("load", time.monotonic() - started)
 
     table = EvidenceTable([])
+    competitor_hits: Sequence[MemoryHit] = ()
     if with_memory:
         context = await _gather_memory(
             inputs, memory, today(), competitors=persona.competitors, timings=timings
@@ -731,6 +806,7 @@ async def generate_brief(
             meetings=meetings,
             today=today(),
         )
+        competitor_hits = context.recall_sections[0] if context.recall_sections else []
         logger.info(
             "brief.gathered meeting=%s evidence=%d duration_ms=%d",
             meeting_id,
@@ -758,6 +834,8 @@ async def generate_brief(
         meetings=meetings,
         brief_id=brief_id,
         generated_at=generated_at,
+        competitor_hits=competitor_hits if with_memory else (),
+        competitors=persona.competitors if with_memory else (),
     )
     if with_memory and not brief.sections:
         # Never persist (and so never serve from the cache) a brief with nothing in it.

@@ -350,11 +350,11 @@ async def test_many_overdue_rows_do_not_squeeze_out_recall_and_all_overdue_stay_
     assert section(brief, SectionKey.personal_touchpoints)
     assert section(brief, SectionKey.watch_outs)
     forced = section(brief, SectionKey.open_commitments)
-    assert len(forced) == 14  # the appender covers every overdue dated commitment
+    assert len(forced) == 2  # the red item and grouped warning cover every overdue row
     for it in forced:
         assert it.citations[0].meeting_id and it.citations[0].quote
-    # Only two stay critical (us-owned, most overdue first); the rest are warnings.
-    assert [i.severity.value for i in forced].count("critical") == 2
+    # Only the most overdue us-owned row stays critical.
+    assert [i.severity.value for i in forced].count("critical") == 1
     assert "pricing deck" in forced[0].text
 
 
