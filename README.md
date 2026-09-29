@@ -2,7 +2,7 @@
 
 A meeting prep agent for a B2B sales rep. After each meeting it ingests the
 transcript into [Hindsight](https://github.com/vectorize-io/hindsight) memory;
-before the next meeting it is meant to produce a one-screen brief where every
+before the next meeting it produces a one-screen brief where every
 claim cites a past meeting. Memory is the product: the demo compares the brief
 with and without memory.
 
@@ -17,23 +17,36 @@ with and without memory.
 
 ## Status
 
-Done:
+Built:
 
-- Foundation: project scaffold, schemas, config validation, Docker Compose
-- Data layer: SQLModel tables and repository, synthetic seed data, a transcript
-  generator and validator, and 15 seed transcripts plus the live-demo transcript
-- Memory layer: the `memory_service` gateway around Hindsight, with a live
-  contract test
-- LLM client with OpenAI, Groq and Anthropic adapters
+- Transcript ingest: `POST /api/meetings/{id}/notes` returns a job id and runs in the
+  background; extraction feeds a commitments ledger in which every commitment needs a
+  quote found verbatim in the transcript, and overdue is computed, never stored
+- Hindsight memory: the raw transcript is retained per meeting through the
+  `memory_service` gateway, with a live contract test
+- Cited briefs: every item in a memory brief cites a past meeting, with a
+  With memory / Without / Side by side toggle
+- Contact timeline of what memory holds about a person
+- Rule-based style learning from brief feedback, applied when a brief is read
+- Ask panel: scoped questions answered from memory, with a fixed reply when memory has
+  nothing
+- Snapshot tooling for the local database and cached briefs
+- Switchable LLM providers (OpenAI, Groq, Anthropic), set separately for the app and
+  for Hindsight
 
-Still to come: the ingest service, the brief service and the UI. Nothing in this
-repository yet produces a brief.
+Not built: golden end-to-end tests, the stakeholder map, nudges, and the cross-deal
+pattern item in briefs.
+
+Briefs are pre-generated and cached. Opening a brief is a plain GET and never
+generates one; generating takes about a minute and is a deliberate POST.
 
 ## Quick start
 
 ```bash
 cp .env.example .env         # then fill in the values below
-docker compose up            # hindsight :8888/:9999, api :8000, web :5173
+docker compose up -d hindsight   # Hindsight on :8888 (API) and :9999 (UI)
+cd backend && uv run uvicorn app.main:app --port 8000
+cd frontend && npm install && npm run dev   # http://localhost:5173, proxies /api to :8000
 ```
 
 In `.env`, choose the LLM provider by setting `LLM_PROVIDER` (`openai`, `groq` or
@@ -47,7 +60,7 @@ cd backend && uv run pytest              # unit tests (fakes, no network)
 cd backend && uv run pytest -m live      # Hindsight contract test (needs the container and a key)
 cd backend && uv run pytest -m live_llm  # LLM smoke test per provider (skipped without that key)
 cd backend && uv run ruff check . && uv run mypy app
-cd frontend && npm run lint && npx tsc --noEmit && npm test
+cd frontend && npm run lint && npx tsc --noEmit -p tsconfig.app.json && npm test
 ```
 
 ## Documentation
