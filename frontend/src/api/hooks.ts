@@ -10,6 +10,18 @@ export type JobStatus = components['schemas']['JobStatus']
 export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
 
+export function useDemoDate() {
+  return useQuery({
+    queryKey: ['demo-date'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/health')
+      if (error || !data) throw new Error('Demo date unavailable')
+      return data.demo_today
+    },
+    staleTime: 60 * 60 * 1000,
+  })
+}
+
 export const JOB_POLL_MS = 2500
 /** ~150 s of polling, then stop. */
 const JOB_MAX_POLLS = 60

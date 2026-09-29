@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useBrief, useGenerateBrief, useMeetings, useSubmitFeedback, useStyle, type Brief as BriefData } from '@/api/hooks'
+import { useBrief, useGenerateBrief, useMeetings, useSubmitFeedback, useStyle, useDemoDate, type Brief as BriefData } from '@/api/hooks'
 import type { components } from '@/api/schema'
 import { HeaderControls } from '@/components/Layout'
 import { AskPanel } from '@/components/AskPanel'
@@ -14,6 +14,17 @@ type BriefMode = components['schemas']['Brief']['mode']
 type BriefItem = components['schemas']['BriefItem']
 type BriefSection = components['schemas']['BriefSection']
 type SectionKey = components['schemas']['SectionKey']
+
+function overdueDays(text: string, demoDate?: string) {
+  const match = text.match(/due\s+([A-Za-z]+\s+\d{1,2})/i)
+  if (!match || !demoDate) return null
+  const dueParsed = new Date(`${match[1]}, 2000`)
+  if (Number.isNaN(dueParsed.getTime())) return null
+  const year = Number(demoDate.slice(0, 4))
+  const due = Date.UTC(year, dueParsed.getMonth(), dueParsed.getDate())
+  const today = Date.parse(`${demoDate}T00:00:00Z`)
+  return Math.max(0, Math.floor((today - due) / 86400000))
+}
 
 const SECTION_TITLES: Record<SectionKey, string> = {
   attendees: 'Attendees', where_left_off: 'Where we left off', open_commitments: 'Open commitments',
@@ -96,12 +107,12 @@ function BriefSectionCard({ meetingId, briefId, section, mode }: { meetingId: st
   </section>
 }
 
-function BriefCard({ brief, mode, meetingId, hiddenSections }: { brief: BriefData | null | undefined; mode: BriefMode; meetingId: string; hiddenSections: SectionKey[] }) {
+function BriefCard({ brief, mode, meetingId, hiddenSections, demoDate }: { brief: BriefData | null | undefined; mode: BriefMode; meetingId: string; hiddenSections: SectionKey[]; demoDate?: string }) {
   if (!brief) return <div className="rounded-xl border border-dashed px-6 py-12 text-center"><h2 className="font-semibold">No brief yet</h2><p className="mt-2 text-sm text-muted-foreground">Generate a brief when you’re ready to prepare for this meeting.</p></div>
   if (!brief.sections.some((section) => section.items.length)) return <div className="rounded-xl border border-dashed px-6 py-12 text-center"><h2 className="font-semibold">This brief has no items yet</h2><p className="mt-2 text-sm text-muted-foreground">There is no relevant meeting context to show in {mode === 'memory' ? 'memory' : 'no-memory'} mode.</p></div>
-  const isAttentionAlert = (item: BriefItem) => /contradiction|conflict/i.test(item.text) || (/sneha iyer/i.test(item.text) && /(soc\s*2|data residency)/i.test(item.text) && /anita desai/i.test(item.text))
-  const attention = mode === 'memory' ? brief.sections.flatMap((section) => section.items.filter((item) => item.severity === 'critical' || (section.key === 'alerts' && isAttentionAlert(item)))) : []
-  return <div className="space-y-4">{attention.length > 0 && <section aria-label="Needs attention" className="space-y-3 rounded-xl border border-alert-critical/30 bg-alert-critical-soft/40 p-5"><h2 className="font-semibold text-alert-critical-text">Needs attention</h2>{attention.map((item, index) => { const critical = item.severity === 'critical'; return <article key={`${item.id}-${index}`} className={`rounded-lg border p-3 ${critical ? 'border-alert-critical/20 bg-background/80' : 'border-alert-warning/30 bg-alert-warning-soft/50'}`}><p className={critical ? 'font-semibold text-alert-critical-text' : 'font-medium text-alert-warning-text'}>{item.text}</p>{!!item.citations.length && <div className="mt-2 flex flex-wrap gap-2">{item.citations.map((citation, i) => <CitationChip key={`${citation.label}-${i}`} citation={citation} />)}</div>}</article>})}</section>}{brief.sections.map((section) => {
+  const isAttentionAlert = (item: BriefItem) => /contradiction|conflict|was not on that call|raised a .* concern/i.test(item.text)
+  const attention = mode === 'memory' ? brief.sections.flatMap((section) => section.items.filter((item) => item.severity === 'critical' || isAttentionAlert(item))) : []
+  return <div className="space-y-4">{attention.length > 0 && <section aria-label="Needs attention" className="space-y-3 rounded-xl border bg-card p-5"><h2 className="font-semibold">Needs attention</h2>{attention.map((item, index) => { const critical = item.severity === 'critical'; return <article key={`${item.id}-${index}`} className={`rounded-lg border p-3 ${critical ? 'border-alert-critical/20 bg-background/80' : 'border-alert-warning/30 bg-alert-warning-soft/50'}`}><p className={critical ? 'font-semibold text-alert-critical-text' : 'font-medium text-alert-warning-text'}>{item.text}{critical && overdueDays(item.text, demoDate) !== null && <span className="ml-2 text-xs font-normal">{overdueDays(item.text, demoDate)} days overdue</span>}</p>{!!item.citations.length && <div className="mt-2 flex flex-wrap gap-2">{item.citations.map((citation, i) => <CitationChip key={`${citation.label}-${i}`} citation={citation} />)}</div>}</article>})}</section>}{brief.sections.map((section) => {
     const items = attention.length && mode === 'memory' ? section.items.filter((item) => !attention.some((top) => top.id === item.id)) : section.items
     return <BriefSectionCard key={section.key} meetingId={meetingId} briefId={brief.id} section={{...section, items}} mode={mode} />
   })}
@@ -109,12 +120,12 @@ function BriefCard({ brief, mode, meetingId, hiddenSections }: { brief: BriefDat
   </div>
 }
 
-function ModePanel({ meetingId, mode, onGenerate, disabled, active, hiddenSections, generating }: { meetingId: string; mode: BriefMode; onGenerate: (mode: BriefMode) => void; disabled: boolean; active: boolean; hiddenSections: SectionKey[]; generating: boolean }) {
+function ModePanel({ meetingId, mode, onGenerate, disabled, active, hiddenSections, generating, demoDate }: { meetingId: string; mode: BriefMode; onGenerate: (mode: BriefMode) => void; disabled: boolean; active: boolean; hiddenSections: SectionKey[]; generating: boolean; demoDate?: string }) {
   const brief = useBrief(meetingId, mode, active)
   if (!active) return null
   return <div className="min-w-0 space-y-3">
     <div className="flex items-center justify-between"><h2 className="font-semibold">{mode === 'memory' ? 'With memory' : 'Without memory'}</h2><Badge variant="outline">{mode === 'memory' ? 'Cited context' : 'Meeting only'}</Badge></div>
-    {brief.isLoading || generating ? <div className="space-y-3" aria-label={generating ? `Generating ${mode} brief` : `Loading ${mode} brief`}>{generating && <p className="text-sm text-muted-foreground">This can take about a minute.</p>}<Skeleton className="h-32"/><Skeleton className="h-24"/></div> : brief.isError ? <p role="alert" className="rounded-xl border p-5 text-sm">Brief could not be loaded. Refresh to try again.</p> : <BriefCard brief={brief.data} mode={mode} meetingId={meetingId} hiddenSections={hiddenSections} />}
+    {brief.isLoading || generating ? <div className="space-y-3" aria-label={generating ? `Generating ${mode} brief` : `Loading ${mode} brief`}>{generating && <p className="text-sm text-muted-foreground">This can take about a minute.</p>}<Skeleton className="h-32"/><Skeleton className="h-24"/></div> : brief.isError ? <p role="alert" className="rounded-xl border p-5 text-sm">Brief could not be loaded. Refresh to try again.</p> : <BriefCard brief={brief.data} mode={mode} meetingId={meetingId} hiddenSections={hiddenSections} demoDate={demoDate} />}
     <Button variant="outline" size="sm" disabled={disabled || brief.isLoading || generating} onClick={() => onGenerate(mode)}>{generating ? 'Generating…' : brief.isLoading ? 'Loading brief…' : `${brief.data ? 'Regenerate' : 'Generate'} ${mode === 'memory' ? 'with' : 'without'} memory`}</Button>
   </div>
 }
@@ -124,13 +135,17 @@ export function Brief() {
   const [viewMode, setViewMode] = useState<'memory' | 'no_memory' | 'side_by_side'>('memory')
   const [pendingMode, setPendingMode] = useState<BriefMode>()
   const [confirmMode, setConfirmMode] = useState<BriefMode>()
+  const [askOpen, setAskOpen] = useState(false)
   const generateMemory = useGenerateBrief(id ?? '', 'memory')
   const generateNoMemory = useGenerateBrief(id ?? '', 'no_memory')
   const memory = useBrief(id, 'memory')
+  const noMemory = useBrief(id, 'no_memory')
+  const demoDate = useDemoDate()
   const meetings = useMeetings()
   const meeting = meetings.data?.find((item) => item.id === id)
   const style = useStyle(Boolean(memory.data?.preferences_applied.length))
   const hiddenSections = style.data?.hidden_sections ?? []
+  const shownBrief = viewMode === 'no_memory' ? noMemory.data : memory.data
 
   async function confirmGenerate() {
     if (!confirmMode || !id) return
@@ -146,15 +161,15 @@ export function Brief() {
 
   return <section className="space-y-6">
     <HeaderControls>
-      <div className="flex items-center gap-1.5"><Badge variant="outline">{memory.data?.facts_used ?? 0} facts used</Badge><Badge variant="outline">{memory.data?.preferences_applied.length ?? 0} {memory.data?.preferences_applied.length === 1 ? 'preference' : 'preferences'} applied</Badge></div>
+      <div className="flex items-center gap-1.5"><Badge variant="outline">{shownBrief?.facts_used ?? 0} facts used</Badge><Badge variant="outline">{shownBrief?.preferences_applied.length ?? 0} {shownBrief?.preferences_applied.length === 1 ? 'preference' : 'preferences'} applied</Badge><Button type="button" size="sm" variant="outline" onClick={() => setAskOpen(true)}>Ask</Button></div>
       <div role="group" aria-label="Brief mode" className="flex rounded-lg border bg-background p-0.5 text-xs">{([['memory', 'With memory'], ['no_memory', 'Without'], ['side_by_side', 'Side by side']] as const).map(([mode, label]) => <button key={mode} type="button" aria-pressed={viewMode === mode} onClick={() => setViewMode(mode)} className={`rounded-md px-2 py-1 ${viewMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{label}</button>)}</div>
     </HeaderControls>
     <div><p className="text-sm font-medium text-primary">Preparation brief</p><h1 className="mt-1 text-2xl font-semibold">{meeting ? `${meeting.title} · ${meeting.account_name} · ${new Date(meeting.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : 'Meeting brief'}</h1><p className="mt-1 text-sm text-muted-foreground">Every memory item links back to the meeting where it was learned.</p>{meeting?.attendees.length ? <div className="mt-2 flex flex-wrap gap-2" aria-label="Meeting attendees">{meeting.attendees.map((person) => <div key={person.id} className="flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2.5 pr-1"><span className="text-xs">{person.name}</span><CitationChip citation={{ source_type: 'meeting', meeting_id: meeting.id, meeting_date: meeting.scheduled_at.slice(0, 10), label: `${meeting.title} · ${meeting.account_name}`, quote: person.role ? `${person.name} — ${person.role}` : person.name, memory_id: null }} /></div>)}</div> : null}</div>
     <div id="side-by-side" className={`grid gap-8 ${viewMode === 'side_by_side' ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
-      <div id="with-memory"><ModePanel meetingId={id ?? ''} mode="memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'no_memory'} hiddenSections={hiddenSections} generating={pendingMode === 'memory'} /></div>
-      <div id="without-memory"><ModePanel meetingId={id ?? ''} mode="no_memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'memory'} hiddenSections={[]} generating={pendingMode === 'no_memory'} /></div>
+      <div id="with-memory"><ModePanel meetingId={id ?? ''} mode="memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'no_memory'} hiddenSections={hiddenSections} generating={pendingMode === 'memory'} demoDate={demoDate.data} /></div>
+      <div id="without-memory"><ModePanel meetingId={id ?? ''} mode="no_memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'memory'} hiddenSections={[]} generating={pendingMode === 'no_memory'} demoDate={demoDate.data} /></div>
     </div>
-    {id && <AskPanel scopeType="meeting" scopeId={id} meetingId={id} />}
+    {id && <AskPanel scopeType="meeting" scopeId={id} meetingId={id} open={askOpen} onOpenChange={setAskOpen} />}
     {confirmMode && <div role="alertdialog" aria-labelledby="regenerate-title" className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-lg"><h2 id="regenerate-title" className="font-semibold">Regenerate this brief?</h2><p className="mt-2 text-sm text-muted-foreground">This can take up to a minute. The cached {confirmMode === 'memory' ? 'memory' : 'no-memory'} brief will be replaced.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={!!pendingMode} onClick={() => setConfirmMode(undefined)}>Cancel</Button><Button disabled={!!pendingMode || loading} onClick={() => void confirmGenerate()}>{pendingMode ? 'Generating…' : 'Confirm regenerate'}</Button></div></div></div>}
   </section>
 }

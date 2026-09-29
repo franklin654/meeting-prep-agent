@@ -10,6 +10,7 @@ const KIND_LABELS: Record<string, string> = {
   commitment: 'Commitment', objection: 'Objection', personal: 'Personal', deal_fact: 'Deal fact', competitor: 'Competitor',
 }
 const KIND_ORDER: Record<string, number> = { deal_fact: 0, commitment: 1, personal: 2 }
+const isMeetingLogistics = (text: string) => /will leave the meeting at/i.test(text)
 
 function parseFact(text: string) {
   const match = text.match(/^(.*?)\s*\|\s*When:\s*([^|]*?)\s*\|\s*Involving:\s*([^|]*?)(?:\s*\|\s*(.*))?$/i)
@@ -32,16 +33,23 @@ export function ContactTimeline() {
 
   const { contact, entries } = timeline.data
   const parsed = entries.map((entry) => ({ entry, fact: parseFact(entry.text) }))
-  const relevant = parsed.filter(({ fact }) => fact.involving.some((name) => name.toLowerCase().includes(contact.name.toLowerCase())))
-    .sort((a, b) => (KIND_ORDER[a.entry.fact_kind ?? ''] ?? 3) - (KIND_ORDER[b.entry.fact_kind ?? ''] ?? 3))
+  const relevant = parsed.filter(({ entry, fact }) => !isMeetingLogistics(entry.text) && fact.involving.some((name) => name.toLowerCase().includes(contact.name.toLowerCase())))
+  const ordered = [...(showAll ? parsed : relevant)].sort((a, b) => {
+    const aLogistics = isMeetingLogistics(a.entry.text)
+    const bLogistics = isMeetingLogistics(b.entry.text)
+    if (aLogistics !== bLogistics) return aLogistics ? 1 : -1
+    const byKind = (KIND_ORDER[a.entry.fact_kind ?? ''] ?? 3) - (KIND_ORDER[b.entry.fact_kind ?? ''] ?? 3)
+    if (byKind) return byKind
+    return b.entry.learned_on.localeCompare(a.entry.learned_on)
+  })
   return <section className="space-y-8">
     <header><Link to="/" className="text-sm text-primary hover:underline">← Meetings</Link><p className="mt-5 text-sm font-medium text-primary">Memory inspector</p><h1 className="mt-1 text-2xl font-semibold">{contact.name}</h1><p className="mt-1 text-sm text-muted-foreground">{contact.role ?? 'Contact'} · {entries.length} remembered {entries.length === 1 ? 'fact' : 'facts'}</p></header>
     {entries.length === 0 ? <div className="rounded-xl border border-dashed px-6 py-14 text-center"><h2 className="font-semibold">No memories for this contact yet</h2><p className="mt-2 text-sm text-muted-foreground">Facts learned from future meetings will appear here.</p></div> : <>
       <ol className="relative ml-2 space-y-0 border-l pl-6">
-      {(showAll ? parsed : relevant).slice(0, showAll ? undefined : 8).map(({ entry, fact }, index) => <li key={`${entry.citation.memory_id ?? entry.citation.meeting_id ?? 'entry'}-${index}`} className="relative pb-7 last:pb-0">
+      {ordered.slice(0, showAll ? undefined : 8).map(({ entry, fact }, index) => <li key={`${entry.citation.memory_id ?? entry.citation.meeting_id ?? 'entry'}-${index}`} className="relative pb-7 last:pb-0">
         <span aria-hidden className="absolute -left-[1.9rem] top-1.5 size-3 rounded-full border-2 border-primary bg-background" />
         <article className="rounded-xl border bg-card p-5 shadow-card">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><LearnedDate date={entry.learned_on} />{entry.fact_kind && <Badge variant="outline">{KIND_LABELS[entry.fact_kind]}</Badge>}</div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><LearnedDate date={entry.learned_on} />{isMeetingLogistics(entry.text) ? <Badge variant="outline">Meeting logistics</Badge> : entry.fact_kind && <Badge variant="outline">{KIND_LABELS[entry.fact_kind]}</Badge>}</div>
           <p className="mt-3 text-sm leading-6">{fact.main}</p>
           {(fact.when || fact.involving.length > 0) && <p className="mt-1 text-xs text-muted-foreground">{fact.when}{fact.when && fact.involving.length ? ' · ' : ''}{fact.involving.join(', ')}</p>}
           {fact.why && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium">Why it matters:</span> {fact.why.replace(/^To\s+/i, '')}</p>}
