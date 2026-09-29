@@ -10,6 +10,8 @@ export type JobStatus = components['schemas']['JobStatus']
 export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
 export type Nudge = components['schemas']['Nudge']
+export type Account = components['schemas']['AccountResponse']
+export type ContactSummary = components['schemas']['ContactSummary']
 
 export function useHealth() {
   return useQuery({
@@ -61,6 +63,62 @@ export function useMeetings(status?: MeetingStatus) {
       })
       return data as MeetingSummary[]
     },
+  })
+}
+
+export function useAccounts() {
+  return useQuery({
+    queryKey: queryKeys.accounts(),
+    queryFn: async (): Promise<Account[]> => {
+      const { data } = await api.GET('/api/accounts')
+      return data as Account[]
+    },
+  })
+}
+
+export function useContacts(accountId?: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.contacts(accountId),
+    enabled,
+    queryFn: async (): Promise<ContactSummary[]> => {
+      const { data } = await api.GET('/api/contacts', {
+        params: { query: accountId ? { account_id: accountId } : {} },
+      })
+      return data as ContactSummary[]
+    },
+  })
+}
+
+export function useCreateAccount() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { name: string; industry?: string; stage: Account['stage'] }) => {
+      const { data } = await api.POST('/api/accounts', { body })
+      return data as Account
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.accounts() }),
+  })
+}
+
+export function useCreateContact() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { account_id: string; name: string; role?: string; aliases?: string[] }) => {
+      const { data } = await api.POST('/api/contacts', { body })
+      return data as ContactSummary
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: ['contacts'] }),
+  })
+}
+
+export function useScheduleMeeting() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: components['schemas']['MeetingCreate']) => {
+      const { data } = await api.POST('/api/meetings', { body })
+      return data as MeetingSummary
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.meetingsAll() }),
   })
 }
 

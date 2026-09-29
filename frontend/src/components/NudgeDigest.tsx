@@ -3,9 +3,9 @@ import { useNudges } from '@/api/hooks'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const TONE: Record<string, string> = {
-  overdue_commitment: 'border-red-200 bg-red-50 text-red-900',
-  silent_contact: 'border-amber-200 bg-amber-50 text-amber-950',
-  brief_ready: 'border-indigo-200 bg-indigo-50 text-indigo-950',
+  overdue_commitment: 'border-alert-critical/25 bg-alert-critical-soft text-alert-critical-text',
+  silent_contact: 'border-alert-warning/40 bg-alert-warning-soft text-alert-warning-text',
+  brief_ready: 'border-primary/25 bg-primary-soft text-primary-soft-foreground',
 }
 
 export function NudgeDigest() {
@@ -17,7 +17,8 @@ export function NudgeDigest() {
       <Skeleton className="h-10 w-full" />
     </section>
   }
-  if (nudges.isError || !nudges.data?.length) return null
+  if (nudges.isError) return <section aria-label="Nudge digest" role="alert" className="rounded-[10px] border bg-card p-4 text-sm text-muted-foreground">Needs your attention could not be loaded.</section>
+  if (!nudges.data?.length) return <section aria-label="Nudge digest" className="rounded-[10px] border bg-card p-4 shadow-card"><h2 className="text-sm font-semibold">Needs your attention</h2><p className="mt-2 text-sm text-muted-foreground">You’re all caught up.</p></section>
   return <section aria-label="Nudge digest" className="rounded-xl border bg-card p-4 shadow-card">
     <h2 className="mb-3 text-sm font-semibold">Needs your attention</h2>
     <ul className="space-y-2">{nudges.data.map((nudge, index) => <li key={`${nudge.kind}-${nudge.link}-${index}`}>
