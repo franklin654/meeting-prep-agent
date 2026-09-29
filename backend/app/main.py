@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import date
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -41,10 +42,10 @@ app.include_router(contacts.router, prefix="/api")
 
 
 @app.get("/api/health")
-async def health() -> dict[str, str]:
+async def health() -> dict[str, str | date]:
     """Liveness stub.
 
     Full dependency checks (Hindsight, DB) land with the memory and db gateways
     (T06, T07); for now this only proves the API process is up.
     """
-    return {"status": "ok"}
+    return {"status": "ok", "demo_today": settings.demo_today}

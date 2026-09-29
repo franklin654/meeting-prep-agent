@@ -8,8 +8,10 @@ type Scope = 'meeting' | 'contact' | 'account'
 type Citation = { meeting_id: string | null; label: string; quote: string | null }
 type Turn = { question: string; answer: string; ask_answer_id: string; grounded: boolean; citations: Citation[] }
 
-export function AskPanel({ scopeType, scopeId, meetingId }: { scopeType: Scope; scopeId: string; meetingId?: string }) {
-  const [open, setOpen] = useState(false)
+export function AskPanel({ scopeType, scopeId, meetingId, open: externalOpen, onOpenChange }: { scopeType: Scope; scopeId: string; meetingId?: string; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = externalOpen ?? internalOpen
+  const setOpen = (value: boolean) => { setInternalOpen(value); onOpenChange?.(value) }
   const [question, setQuestion] = useState('')
   const [note, setNote] = useState('')
   const [history, setHistory] = useState<Turn[]>([])
@@ -29,7 +31,7 @@ export function AskPanel({ scopeType, scopeId, meetingId }: { scopeType: Scope; 
   }
 
   return <section className="rounded-xl border bg-card p-4 shadow-card" aria-label="Ask your memory">
-    <div className="flex items-center justify-between"><div><h2 className="font-semibold">Ask your memory</h2><p className="text-xs text-muted-foreground">Answers use cited meeting memories.</p></div><Button variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? 'Close' : 'Open Ask'}</Button></div>
+    <div className="flex items-center justify-between"><div><h2 className="font-semibold">Ask your memory</h2><p className="text-xs text-muted-foreground">Answers use cited meeting memories.</p></div><Button variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Close' : 'Open Ask'}</Button></div>
     {open && <div className="mt-4 space-y-4">
       {meetingId && <div aria-label="Suggested questions" className="flex flex-wrap gap-2">{suggestions.isLoading ? <span className="text-xs text-muted-foreground">Loading suggested questions…</span> : suggestions.data?.map((item) => <Button key={item} type="button" variant="outline" size="sm" onClick={() => void submit(item)}>{item}</Button>)}</div>}
       <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void submit() }}><input aria-label="Question" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm" minLength={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask what you remember…"/><Button type="submit" disabled={ask.isPending || question.trim().length < 3}>{ask.isPending ? 'Thinking…' : 'Ask'}</Button></form>
