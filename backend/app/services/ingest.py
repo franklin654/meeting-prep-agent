@@ -59,6 +59,8 @@ INGEST_LLM_TIMEOUT_SECONDS = 120
 # Our own company; the seed data's vendor (data/seed/company.json). Not configurable yet.
 OUR_COMPANY = "Tracewise"
 MAX_QUOTE_CHARS = 200
+MAX_COMMITMENTS_PER_MEETING = 5
+NEAR_DUPLICATE_JACCARD = 0.8
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
@@ -136,6 +138,66 @@ def _verify_quotes(extraction: MeetingExtraction, transcript: str) -> _Verified:
         + (len(extraction.facts) - len(facts))
     )
     return _Verified(commitments, acks, facts, dropped)
+
+
+def _words(text: str) -> frozenset[str]:
+    return frozenset(_normalize_name(text).split())
+
+
+def _is_near_duplicate(a: ExtractedCommitment, b: ExtractedCommitment) -> bool:
+    """Same normalized text, word-set Jaccard >= 0.8, or same owner_person with containment."""
+    text_a, text_b = _normalize_name(a.text), _normalize_name(b.text)
+    if not text_a or not text_b:
+        return False
+    if text_a == text_b:
+        return True
+    words_a, words_b = _words(a.text), _words(b.text)
+    if (
+        words_a
+        and words_b
+        and len(words_a & words_b) / len(words_a | words_b) >= (NEAR_DUPLICATE_JACCARD)
+    ):
+        return True
+    same_person = _normalize_name(a.owner_person) == _normalize_name(b.owner_person)
+    return same_person and (text_a in text_b or text_b in text_a)
+
+
+def consolidate_commitments(
+    commitments: Sequence[ExtractedCommitment], normalized_transcript: str = ""
+) -> tuple[list[ExtractedCommitment], int, int]:
+    """Merge duplicates, then cap at `MAX_COMMITMENTS_PER_MEETING`.
+
+    Returns `(kept, merged_count, capped_count)`. A merged group keeps the longer (more
+    specific) text, the quote that appears earliest in the transcript (extraction order if
+    positions tie or are unknown) and any due date (the earliest if several). Dated
+    commitments are kept first when capping, then extraction order.
+    """
+
+    def position(item: ExtractedCommitment) -> int:
+        found = normalized_transcript.find(normalize_text(item.source_quote))
+        return found if found >= 0 else len(normalized_transcript)
+
+    groups: list[ExtractedCommitment] = []
+    merged = 0
+    for item in commitments:
+        for idx, kept in enumerate(groups):
+            if _is_near_duplicate(kept, item):
+                first, other = (kept, item) if position(kept) <= position(item) else (item, kept)
+                dues = [d for d in (kept.due_date, item.due_date) if d is not None]
+                groups[idx] = first.model_copy(
+                    update={
+                        "text": max(kept.text, item.text, key=lambda t: len(t.strip())),
+                        "due_date": min(dues) if dues else None,
+                        "owner_person": first.owner_person or other.owner_person,
+                    }
+                )
+                merged += 1
+                break
+        else:
+            groups.append(item)
+    ordered = sorted(groups, key=lambda c: c.due_date is None)  # stable: dated first
+    capped = max(0, len(ordered) - MAX_COMMITMENTS_PER_MEETING)
+    return ordered[:MAX_COMMITMENTS_PER_MEETING], merged, capped
 
 
 # ---- entity resolution ----
@@ -346,6 +408,19 @@ async def _ingest(
     if verified.dropped:
         logger.warning(
             "ingest dropped_unverbatim_items=%d meeting=%s", verified.dropped, meeting_id
+        )
+
+    consolidated, merged, capped = consolidate_commitments(
+        verified.commitments, normalize_text(transcript)
+    )
+    verified.commitments = consolidated
+    if merged or capped:
+        logger.info(
+            "ingest commitments merged=%d capped=%d kept=%d meeting=%s",
+            merged,
+            capped,
+            len(consolidated),
+            meeting_id,
         )
 
     # 4. Entity resolution.
