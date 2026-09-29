@@ -6,9 +6,11 @@ code-side table mapping each id back to what it may cite. The LLM only ever sees
 rendered lines; citations are built from the table, never from model output.
 
 Order: mental model, recall hits, reflect outputs, ledger rows, pinned Ask answers
-(none yet). Newest first within each group, capped at `EVIDENCE_CAP`. Mental model,
-ledger and Ask entries are never cut by the cap (open commitments must always reach
-the prompt); recall and reflect entries share what is left.
+(none yet). Recall and reflect entries keep the order they arrive in (Hindsight's
+relevance rank, section priority first), NOT recency. Capped at `EVIDENCE_CAP`: the mental
+model and the dated ledger rows are never cut; recall and reflect entries fill the rest.
+Ledger evidence is only overdue dated rows plus at most `MAX_UPCOMING_LEDGER_ROWS` dated
+upcoming ones; undated rows never reach the prompt.
 """
 
 from __future__ import annotations
@@ -27,10 +29,11 @@ from app.schemas.memory import MemoryHit
 
 logger = logging.getLogger(__name__)
 
-EVIDENCE_CAP = 40
+EVIDENCE_CAP = 25
+MAX_UPCOMING_LEDGER_ROWS = 5
 QUOTE_MAX_CHARS = 200
-PROMPT_TEXT_MAX_CHARS = 300
-PROMPT_MENTAL_MODEL_MAX_CHARS = 800
+PROMPT_TEXT_MAX_CHARS = 160
+PROMPT_MENTAL_MODEL_MAX_CHARS = 500
 
 
 # ---- R1 output model (prompt: reflect_objections.md) ----
@@ -127,10 +130,6 @@ def match_objection_sources(
     return pairs
 
 
-def _newest_first(refs: Sequence[EvidenceRef]) -> list[EvidenceRef]:
-    return sorted(refs, key=lambda r: r.meeting_date or date.min, reverse=True)
-
-
 def build_evidence(
     *,
     mental_model: MentalModelText | None,
@@ -171,7 +170,8 @@ def build_evidence(
         [hit for _, hit in objections],
         meetings,
         prefix=[
-            f"Unresolved concern ({o.raised_by}): {o.concern}" for o, _ in objections
+            f"Unresolved concern ({o.raised_by}): {truncate(o.concern, PROMPT_TEXT_MAX_CHARS)}"
+            for o, _ in objections
         ],
     )
 
@@ -180,6 +180,16 @@ def build_evidence(
     budget = max(0, cap - len(protected) - len(ledger_refs))
     recall_kept = recall_refs[:budget]
     reflect_kept = reflect_refs[: max(0, budget - len(recall_kept))]
+    logger.debug(
+        "brief.evidence recall_in=%d recall_kept=%d reflect_in=%d reflect_kept=%d "
+        "ledger=%d total=%d",
+        len(recall_hits),
+        len(recall_kept),
+        len(objections),
+        len(reflect_kept),
+        len(ledger_refs),
+        len(protected) + len(recall_kept) + len(reflect_kept) + len(ledger_refs),
+    )
     if len(recall_refs) + len(reflect_refs) > budget:
         logger.info(
             "brief.evidence_capped kept=%d dropped=%d",
@@ -233,14 +243,23 @@ def _memory_refs(
                 label=label,
             )
         )
-    return _newest_first(refs)
+    return refs
 
 
 def _ledger_refs(
     commitments: Sequence[Commitment], meetings: Mapping[str, MeetingInfo], today: date
 ) -> list[EvidenceRef]:
+    dated = [c for c in commitments if c.due_date is not None]
+    overdue_rows = sorted(
+        (c for c in dated if c.due_date is not None and c.due_date < today),
+        key=lambda c: c.due_date or date.max,
+    )
+    upcoming_rows = sorted(
+        (c for c in dated if c.due_date is not None and c.due_date >= today),
+        key=lambda c: c.due_date or date.max,
+    )[:MAX_UPCOMING_LEDGER_ROWS]
     refs: list[EvidenceRef] = []
-    for c in commitments:
+    for c in [*overdue_rows, *upcoming_rows]:
         info = meetings.get(c.meeting_id)
         if info is None:
             continue
@@ -265,4 +284,4 @@ def _ledger_refs(
                 overdue=overdue,
             )
         )
-    return _newest_first(refs)
+    return refs

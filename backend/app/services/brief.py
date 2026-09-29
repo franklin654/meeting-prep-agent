@@ -177,11 +177,67 @@ class MemoryContext:
     objections: list[tuple[Objection, MemoryHit]] = field(default_factory=list)
 
 
-async def _recall_resolved(
-    memory: MemoryService, *, query: str, tags: list[str], fact_kind: FactKind
+TOP_HITS_PER_QUERY = 3
+
+# Generic wording only: no fixture names, so the same queries work for any account.
+PERSONAL_QUERY = "personal life: family, children, hobbies, travel, milestones, non-work interests"
+COMPETITOR_QUERY = (
+    "competitors or alternative vendors the customer has evaluated or is comparing us against"
+)
+
+
+def _normalize(text: str) -> str:
+    return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+
+
+def top_distinct_hits(
+    hits: Sequence[MemoryHit], limit: int = TOP_HITS_PER_QUERY
 ) -> list[MemoryHit]:
+    """First `limit` hits in the order given (Hindsight's relevance rank, never re-sorted by
+    date), skipping duplicates: equal after lowercasing/punctuation removal, or one text
+    contained in another.
+    """
+    kept: list[MemoryHit] = []
+    norms: list[str] = []
+    for hit in hits:
+        norm = _normalize(hit.text)
+        if not norm or any(norm in other or other in norm for other in norms):
+            continue
+        kept.append(hit)
+        norms.append(norm)
+        if len(kept) == limit:
+            break
+    return kept
+
+
+async def _recall_top(
+    memory: MemoryService,
+    *,
+    section: str,
+    query: str,
+    tags: list[str],
+    fact_kind: FactKind,
+    fallback_query: str | None = None,
+) -> list[MemoryHit]:
+    """Labelled recall; if it returns nothing, ONE retry without `fact_kind` (the extraction
+    model does not always label facts). Top hits are then resolved to meetings.
+    """
     hits = await memory.recall_facts(query=query, tags=tags, fact_kind=fact_kind)
-    return await memory.resolve_sources(hits)
+    fell_back = False
+    if not hits:
+        fell_back = True
+        hits = await memory.recall_facts(query=fallback_query or query, tags=tags)
+    kept = top_distinct_hits(hits)
+    resolved = await memory.resolve_sources(kept)
+    logger.debug(
+        "brief.recall section=%s returned=%d kept=%d fallback=%s resolved=%d",
+        section,
+        len(hits),
+        len(kept),
+        fell_back,
+        sum(1 for h in resolved if h.meeting_id is not None),
+    )
+    return resolved
 
 
 async def _objection_evidence(
@@ -215,16 +271,18 @@ async def _gather_memory(inputs: BriefInputs, memory: MemoryService, today_: dat
         _objection_evidence(
             memory, account_id=account.id, account_name=account.name, today_=today_
         ),
-        _recall_resolved(
+        _recall_top(
             memory,
-            query=f"Competitors mentioned by {account.name}",
+            section="watch_outs",
+            query=COMPETITOR_QUERY,
             tags=[account_tag(account.id)],
             fact_kind=FactKind.competitor,
         ),
         *(
-            _recall_resolved(
+            _recall_top(
                 memory,
-                query=f"Personal details {c.name} has shared: family, hobbies, life events",
+                section=f"personal_touchpoints:{c.id}",
+                query=f"{c.name} {PERSONAL_QUERY}",
                 tags=[contact_tag(c.id)],
                 fact_kind=FactKind.personal,
             )

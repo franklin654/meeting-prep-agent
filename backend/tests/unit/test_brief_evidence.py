@@ -10,6 +10,7 @@ from app.schemas.brief import SourceType
 from app.schemas.enums import CommitmentStatus, Owner
 from app.schemas.memory import MemoryHit
 from app.services.evidence import (
+    EVIDENCE_CAP,
     MeetingInfo,
     Objection,
     ObjectionReport,
@@ -59,7 +60,7 @@ def test_ids_order_and_ledger_overdue_flag() -> None:
     assert [r.key for r in table.refs] == ["mm:1", "mem:1", "mem:2", "led:1", "led:2"]
     assert table.refs[0].source_type == SourceType.mental_model
     assert table.refs[0].meeting_id == "m9"
-    assert [r.memory_id for r in table.refs[1:3]] == ["h2", "h1"]  # newest meeting first
+    assert [r.memory_id for r in table.refs[1:3]] == ["h1", "h2"]  # rank order kept, not recency
     led = {r.commitment_id: r for r in table.refs if r.source_type == SourceType.ledger}
     assert led["c1"].overdue and not led["c2"].overdue
     assert "OPEN, OVERDUE: us -> do c1, due 2026-09-03" in led["c1"].text
@@ -111,22 +112,46 @@ def test_hit_date_falls_back_to_hit_when_meeting_unknown() -> None:
     assert table.refs[0].meeting_date == date(2026, 1, 2)
 
 
-def test_cap_keeps_ledger_and_truncates_recall_newest_first() -> None:
+def test_cap_keeps_dated_ledger_and_truncates_recall_in_rank_order() -> None:
     hits = [hit(i, f"m{1 + i % 9}") for i in range(60)]
     table = build_evidence(
         mental_model=None,
         latest_done_meeting=None,
         recall_hits=hits,
         objections=[],
-        commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", None)],
+        commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", date(2026, 10, 1))],
         meetings=MEETINGS,
         today=TODAY,
     )
 
-    assert len(table.refs) == 40
+    assert len(table.refs) == EVIDENCE_CAP == 25
     assert [r.key for r in table.refs if r.key.startswith("led")] == ["led:1", "led:2"]
-    dates = [r.meeting_date for r in table.refs if r.key.startswith("mem")]
-    assert dates == sorted(dates, reverse=True)  # type: ignore[type-var]
+    ids = [r.memory_id for r in table.refs if r.key.startswith("mem")]
+    assert ids == [f"h{i}" for i in range(23)]  # first N by rank
+
+
+def test_ledger_never_sends_undated_rows_and_caps_upcoming_at_five() -> None:
+    rows = [commitment(f"undated{i}", None) for i in range(79)]
+    rows += [commitment("late1", date(2026, 9, 3)), commitment("late2", date(2026, 8, 20))]
+    rows += [commitment(f"soon{i}", date(2026, 10, 1 + i)) for i in range(8)]
+    rows += [commitment("today", TODAY)]
+    table = build_evidence(
+        mental_model=None,
+        latest_done_meeting=None,
+        recall_hits=[],
+        objections=[],
+        commitments=rows,
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+
+    ids = [r.commitment_id for r in table.refs]
+    assert not any(i and i.startswith("undated") for i in ids)
+    assert ids[:2] == ["late2", "late1"]  # overdue first, oldest due date first
+    assert ids[2:] == ["today", "soon0", "soon1", "soon2", "soon3"]  # 5 upcoming, soonest first
+    assert [r.overdue for r in table.refs] == [True, True] + [False] * 5
+    # Far smaller than sending all 91 open rows.
+    assert len(table.render()) < 2000
 
 
 def test_quote_and_prompt_text_are_bounded() -> None:
