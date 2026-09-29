@@ -12,13 +12,16 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 from pydantic import BaseModel
 
 from app.memory.memory_service import (
     MemoryService,
     MentalModelText,
+    meeting_fields,
     require_deletable_bank_id,
+    resolve_hit_from_payload,
 )
 from app.memory.tags import (
     MemoryKind,
@@ -42,6 +45,11 @@ class _RetainedItem:
     document_id: str | None = None
     title: str | None = None
     source: str | None = None
+    # Fidelity for Hindsight's `world` vs `observation` facts (see `seed_fact`).
+    memory_type: str = "world"
+    metadata: dict[str, str] | None = None
+    mentioned_at: date | None = None
+    source_memory_ids: list[str] | None = None
 
 
 class FakeMemoryService(MemoryService):
@@ -58,6 +66,7 @@ class FakeMemoryService(MemoryService):
         self.deleted_banks: list[str] = []
         self.bank_ensured = False
         self._next_id = 0
+        self.get_memory_calls: list[str] = []
 
     # -- test helpers ---------------------------------------------------
 
@@ -70,6 +79,43 @@ class FakeMemoryService(MemoryService):
     def seed_mental_model(self, model_id: str, *, name: str, content: str) -> None:
         self.mental_models[model_id] = MentalModelText(
             id=model_id, name=name, content=content, last_refreshed_at=None
+        )
+
+    def seed_fact(
+        self,
+        memory_id: str,
+        text: str,
+        *,
+        tags: Sequence[str],
+        meeting_id: str | None = None,
+        meeting_date: date | None = None,
+        memory_type: str = "world",
+        mentioned_at: date | None = None,
+        source_memory_ids: Sequence[str] | None = None,
+    ) -> None:
+        """Add one extracted fact the way Hindsight stores it.
+
+        `world` facts carry `meeting_id` / `meeting_date` in metadata and a
+        `meeting-<id>` document id. `observation` facts have EMPTY metadata and no
+        document id (their meeting shows only in `meeting:` tags / `mentioned_at`).
+        """
+        world = memory_type == "world"
+        metadata: dict[str, str] = {}
+        if world and meeting_id:
+            metadata["meeting_id"] = meeting_id
+        if world and meeting_date:
+            metadata["meeting_date"] = meeting_date.isoformat()
+        self.items.append(
+            _RetainedItem(
+                memory_id=memory_id,
+                text=text,
+                tags=list(tags),
+                document_id=f"meeting-{meeting_id}" if world and meeting_id else None,
+                memory_type=memory_type,
+                metadata=metadata,
+                mentioned_at=mentioned_at or meeting_date,
+                source_memory_ids=list(source_memory_ids) if source_memory_ids else None,
+            )
         )
 
     def _new_id(self) -> str:
@@ -182,6 +228,42 @@ class FakeMemoryService(MemoryService):
         hits = [_to_hit(item) for item in matches]
         return sorted(hits, key=lambda h: h.meeting_date or date.min)
 
+    async def resolve_sources(self, hits: Sequence[MemoryHit]) -> list[MemoryHit]:
+        """Same resolution rules as `HindsightMemoryService`, over the fake's own store."""
+        cache: dict[str, dict[str, Any] | None] = {}
+
+        async def fetch(memory_id: str) -> dict[str, Any] | None:
+            if memory_id not in cache:
+                self.get_memory_calls.append(memory_id)
+                cache[memory_id] = self._payload(memory_id)
+            return cache[memory_id]
+
+        resolved: list[MemoryHit] = []
+        for hit in hits:
+            if hit.meeting_id is not None and hit.meeting_date is not None:
+                resolved.append(hit)
+                continue
+            payload = await fetch(hit.memory_id)
+            if payload is None:
+                resolved.append(hit)
+            else:
+                resolved.append(await resolve_hit_from_payload(hit, payload, fetch))
+        return resolved
+
+    def _payload(self, memory_id: str) -> dict[str, Any] | None:
+        for item in self.items:
+            if item.memory_id == memory_id:
+                return {
+                    "id": item.memory_id,
+                    "text": item.text,
+                    "tags": list(item.tags),
+                    "metadata": dict(item.metadata or {}),
+                    "mentioned_at": item.mentioned_at,
+                    "document_id": item.document_id,
+                    "source_memory_ids": item.source_memory_ids or [],
+                }
+        return None
+
     async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
         return True
 
@@ -206,6 +288,18 @@ def _keyword_match(query: str, text: str) -> bool:
 
 
 def _to_hit(item: _RetainedItem) -> MemoryHit:
+    if item.metadata is not None:
+        # Seeded fact: map exactly as the real recall mapping does.
+        meeting_id, meeting_date = meeting_fields(
+            metadata=item.metadata, tags=item.tags, mentioned_at=item.mentioned_at
+        )
+        return MemoryHit(
+            memory_id=item.memory_id,
+            text=item.text,
+            meeting_id=meeting_id,
+            meeting_date=meeting_date,
+            tags=item.tags,
+        )
     return MemoryHit(
         memory_id=item.memory_id,
         text=item.text,

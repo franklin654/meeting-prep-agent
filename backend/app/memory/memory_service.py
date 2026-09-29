@@ -46,6 +46,7 @@ from app.memory.tags import (
     contact_tag,
     fact_kind_tag,
     kind_tag,
+    meeting_id_from_tags,
     meeting_tag,
 )
 from app.schemas.enums import FactKind, ScopeType
@@ -76,6 +77,9 @@ BANK_CONFIG: dict[str, Any] = {
 RECALL_TIMEOUT_S = 5.0
 REFLECT_TIMEOUT_S = 45.0
 RETAIN_TIMEOUT_S = 30.0
+GET_MEMORY_TIMEOUT_S = 5.0
+# Concurrent `get_memory` calls per `resolve_sources` batch.
+RESOLVE_CONCURRENCY = 8
 
 # Reflect 500 retry delay, per "Failure handling": "Retry once after 2s".
 REFLECT_RETRY_DELAY_S = 2.0
@@ -187,6 +191,17 @@ class MemoryService(abc.ABC):
     async def timeline(self, contact_id: str) -> list[MemoryHit]:
         """Recall everything tagged `contact:<id>`, `any_strict`, budget `low`,
         sorted by `meeting_date` (oldest first; `None` dates sort last).
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def resolve_sources(self, hits: Sequence[MemoryHit]) -> list[MemoryHit]:
+        """Fill `meeting_id`, `meeting_date` and `tags` on hits (typically reflect
+        sources, which carry none of them) so they can be cited.
+
+        One `get_memory` per unique memory id, concurrently, cached for the call.
+        A hit that cannot be resolved is returned with `meeting_id=None`; the
+        caller drops it. See `HindsightMemoryService.resolve_sources` for rules.
         """
         raise NotImplementedError
 
@@ -508,6 +523,66 @@ class HindsightMemoryService(MemoryService):
         hits = [_hit_from_recall_result(r) for r in (response.results or [])]
         return sorted(hits, key=lambda h: h.meeting_date or date.min)
 
+    async def resolve_sources(self, hits: Sequence[MemoryHit]) -> list[MemoryHit]:
+        """Resolve each hit's meeting via `client.memory.get_memory` (docs/hindsight-integration.md
+        "Mapping a memory to its meeting"). Hits that already have both `meeting_id` and
+        `meeting_date` are passed through without a call.
+
+        Observations with zero or several `meeting:` tags are resolved one level down through
+        their source memories (see `choose_meeting_from_sources`).
+        """
+        started = time.monotonic()
+        semaphore = asyncio.Semaphore(RESOLVE_CONCURRENCY)
+        cache: dict[str, asyncio.Future[dict[str, Any] | None]] = {}
+        calls = 0
+
+        def fetch(memory_id: str) -> asyncio.Future[dict[str, Any] | None]:
+            nonlocal calls
+            if memory_id not in cache:
+                calls += 1
+                cache[memory_id] = asyncio.ensure_future(self._get_memory(memory_id, semaphore))
+            return cache[memory_id]
+
+        async def resolve(hit: MemoryHit) -> MemoryHit:
+            if hit.meeting_id is not None and hit.meeting_date is not None:
+                return hit
+            payload = await fetch(hit.memory_id)
+            if payload is None:
+                return hit
+            return await resolve_hit_from_payload(hit, payload, fetch)
+
+        try:
+            return list(await asyncio.gather(*(resolve(h) for h in hits)))
+        finally:
+            for future in cache.values():
+                if not future.done():
+                    future.cancel()
+            logger.info(
+                "memory.resolve_sources hits=%d get_memory_calls=%d duration_ms=%d",
+                len(hits),
+                calls,
+                int((time.monotonic() - started) * 1000),
+            )
+
+    async def _get_memory(
+        self, memory_id: str, semaphore: asyncio.Semaphore
+    ) -> dict[str, Any] | None:
+        async with semaphore:
+            try:
+                async with asyncio.timeout(GET_MEMORY_TIMEOUT_S):
+                    raw = await self._client.memory.get_memory(BANK_ID, memory_id)
+            except TimeoutError as exc:
+                raise MemoryUnavailableError(
+                    f"get_memory timed out after {GET_MEMORY_TIMEOUT_S}s."
+                ) from exc
+            except ApiException as exc:
+                if exc.status == 404:
+                    return None
+                raise MemoryUnavailableError(f"get_memory failed: {exc}") from exc
+            except (OpenApiException, OSError) as exc:
+                raise MemoryUnavailableError(f"get_memory failed: {exc}") from exc
+        return _as_dict(raw)
+
     async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
         deadline = asyncio.get_event_loop().time() + timeout_s
         while True:
@@ -550,29 +625,147 @@ def _demo_today_iso() -> str:
     return datetime.combine(settings.demo_today, datetime.min.time()).isoformat()
 
 
+def _as_dict(raw: Any) -> dict[str, Any] | None:
+    """`get_memory` is typed `object` (empty schema); accept a dict or a model."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return raw
+    dump = getattr(raw, "model_dump", None)
+    if callable(dump):
+        dumped = dump()
+        return dumped if isinstance(dumped, dict) else None
+    return dict(vars(raw))
+
+
+def _parse_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def meeting_fields(
+    *, metadata: dict[str, Any] | None, tags: Sequence[str], mentioned_at: Any
+) -> tuple[str | None, date | None]:
+    """(meeting_id, meeting_date) for one memory from its own fields.
+
+    World facts carry both in `metadata`. Observations have EMPTY metadata, so the
+    id comes from a single `meeting:<id>` tag and the date from `mentioned_at`.
+    `occurred_start` / `occurred_end` are never used (they are event dates in the text).
+    """
+    metadata = metadata or {}
+    meeting_id = metadata.get("meeting_id") or meeting_id_from_tags(tags)
+    meeting_date = _parse_date(metadata.get("meeting_date")) or _parse_date(mentioned_at)
+    return meeting_id, meeting_date
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in text.lower().split() if len(w) > 3}
+
+
+def choose_meeting_from_sources(
+    text: str, sources: Sequence[tuple[str, date | None, str]]
+) -> tuple[str, date | None] | None:
+    """Pick the meeting an observation was consolidated from.
+
+    `sources` are `(meeting_id, meeting_date, source_text)` for the resolvable source
+    memories. Choose the source whose text shares the most words with the observation;
+    ties go to the latest meeting date. `None` if there are no resolvable sources.
+    """
+    if not sources:
+        return None
+    target = _words(text)
+    best = max(
+        sources,
+        key=lambda s: (len(target & _words(s[2])), s[1] or date.min),
+    )
+    return best[0], best[1]
+
+
+async def resolve_hit_from_payload(
+    hit: MemoryHit,
+    payload: dict[str, Any],
+    fetch: Any,
+) -> MemoryHit:
+    tags = [str(t) for t in (payload.get("tags") or [])]
+    meeting_id, meeting_date = meeting_fields(
+        metadata=payload.get("metadata"),
+        tags=tags,
+        mentioned_at=payload.get("mentioned_at"),
+    )
+    if meeting_id is None:
+        text = str(payload.get("text") or hit.text)
+        resolved = await _resolve_via_sources(text, payload, fetch)
+        if resolved is not None:
+            meeting_id, meeting_date = resolved[0], resolved[1] or meeting_date
+    return hit.model_copy(
+        update={
+            "meeting_id": meeting_id,
+            "meeting_date": meeting_date,
+            "tags": tags or hit.tags,
+        }
+    )
+
+
+async def _resolve_via_sources(
+    text: str, payload: dict[str, Any], fetch: Any
+) -> tuple[str, date | None] | None:
+    source_ids = [str(i) for i in (payload.get("source_memory_ids") or [])]
+    embedded = {
+        str(m.get("id")): m
+        for m in (payload.get("source_memories") or [])
+        if isinstance(m, dict) and m.get("id")
+    }
+    candidates: list[tuple[str, date | None, str]] = []
+    for source_id in source_ids or list(embedded):
+        source = embedded.get(source_id)
+        if source is None or not (source.get("metadata") or source.get("tags")):
+            source = await fetch(source_id)
+        if source is None:
+            continue
+        s_tags = [str(t) for t in (source.get("tags") or [])]
+        s_id, s_date = meeting_fields(
+            metadata=source.get("metadata"),
+            tags=s_tags,
+            mentioned_at=source.get("mentioned_at"),
+        )
+        if s_id is not None:
+            candidates.append((s_id, s_date, str(source.get("text") or "")))
+    return choose_meeting_from_sources(text, candidates)
+
+
 def _hit_from_recall_result(result: Any) -> MemoryHit:
-    metadata = result.metadata or {}
-    meeting_date_str = metadata.get("meeting_date")
-    meeting_date = date.fromisoformat(meeting_date_str) if meeting_date_str else None
+    tags = list(result.tags or [])
+    meeting_id, meeting_date = meeting_fields(
+        metadata=result.metadata,
+        tags=tags,
+        mentioned_at=getattr(result, "mentioned_at", None),
+    )
     return MemoryHit(
         memory_id=result.id,
         text=result.text,
-        meeting_id=metadata.get("meeting_id"),
+        meeting_id=meeting_id,
         meeting_date=meeting_date,
-        tags=list(result.tags or []),
+        tags=tags,
     )
 
 
 def _hit_from_reflect_fact(fact: Any) -> MemoryHit:
     # `ReflectFact` (from `based_on.memories`) only carries id/text/type/context/
-    # occurred_start/occurred_end -- no tags or metadata, unlike `RecallResult`.
-    # So `meeting_id` and `tags` can't be recovered here; `meeting_date` falls
-    # back to `occurred_start`'s date. Noted as a doc gap in the ticket report.
-    meeting_date = fact.occurred_start.date() if fact.occurred_start else None
+    # occurred_start/occurred_end -- no tags or metadata. `occurred_*` is the date of an
+    # event mentioned in the text, NOT the meeting date, so it is never used; meeting_id
+    # and meeting_date are filled later by `MemoryService.resolve_sources`.
     return MemoryHit(
         memory_id=fact.id,
         text=fact.text,
         meeting_id=None,
-        meeting_date=meeting_date,
+        meeting_date=None,
         tags=[],
     )
