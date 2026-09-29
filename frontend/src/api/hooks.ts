@@ -11,6 +11,18 @@ export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
 export type Nudge = components['schemas']['Nudge']
 
+export function useHealth() {
+  return useQuery({
+    queryKey: ['health'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/health')
+      if (error || !data) throw new Error('Workspace identity unavailable')
+      return data
+    },
+    staleTime: 60 * 60 * 1000,
+  })
+}
+
 export function useNudges() {
   return useQuery({
     queryKey: queryKeys.nudges(),

@@ -19,7 +19,10 @@ describe('ContactTimeline page', () => {
     expect(within(cards[0]).getByText('Anita approved a $75K budget.')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Anita planned a half marathon.')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'M2 · Jul 28' })[0]).toHaveAttribute('href', '/meetings/mtg_m2')
-    expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET'])
+    expect(fetchMock.calls.map((call) => call.path).sort()).toEqual([
+      '/api/contacts/c_anita/timeline',
+      '/api/health',
+    ])
   })
 
   it('shows a clear empty state', async () => {

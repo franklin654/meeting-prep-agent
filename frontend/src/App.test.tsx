@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { routes } from './routes'
 import { renderRoutes } from '@/test/renderWithProviders'
@@ -7,7 +7,7 @@ import { mockFetch } from '@/test/mockFetch'
 describe('routing', () => {
   it('renders the dashboard at /', () => {
     renderRoutes(routes, { route: '/' })
-    expect(screen.getByRole('heading', { name: 'Meetings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('renders the brief route at /meetings/:id', () => {
@@ -23,7 +23,33 @@ describe('routing', () => {
 
   it('renders shared layout nav on every route', () => {
     renderRoutes(routes, { route: '/meetings/mtg-123' })
-    expect(screen.getByRole('link', { name: 'Meeting Prep Agent' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Meetings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Prep Agent' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Contacts' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ask' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Capture' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Memory' })).toBeInTheDocument()
+  })
+
+  it('registers the new shell routes', () => {
+    renderRoutes(routes, { route: '/ask' })
+    expect(screen.getByRole('heading', { name: 'Ask' })).toBeInTheDocument()
+  })
+
+  it('registers the Contacts list route', () => {
+    renderRoutes(routes, { route: '/contacts' })
+    expect(screen.getByRole('heading', { name: 'Contacts' })).toBeInTheDocument()
+  })
+
+  it('shows the signed-in identity and exposes collapsible navigation', async () => {
+    mockFetch({ 'GET /api/health': { body: { status: 'ok', demo_today: '2026-09-30', ae_name: 'Priya Nair', company_name: 'Tracewise' } } })
+    renderRoutes(routes, { route: '/ask' })
+    await waitFor(() => expect(screen.getByText('Signed in as Priya Nair · Tracewise')).toBeInTheDocument())
+    const toggle = screen.getByRole('button', { name: 'Open navigation' })
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const mobileNavigation = document.getElementById('mobile-navigation')
+    expect(mobileNavigation).not.toBeNull()
+    expect(within(mobileNavigation!).getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
   })
 })

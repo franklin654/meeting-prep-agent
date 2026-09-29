@@ -81,7 +81,7 @@ export function Dashboard() {
   return (
     <section className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-medium text-primary">Your account memory, ready before the next call</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Meetings</h1></div>
+        <div><p className="text-sm font-medium text-primary">Your account memory, ready before the next call</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Today</h1></div>
         <Button onClick={() => setDialogOpen(true)}>Log notes</Button>
       </div>
       <NudgeDigest />

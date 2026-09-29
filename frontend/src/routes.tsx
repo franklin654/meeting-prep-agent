@@ -2,13 +2,12 @@ import type { RouteObject } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { Brief } from '@/pages/Brief'
 import { ContactTimeline } from '@/pages/ContactTimeline'
+import { ComingSoon } from '@/pages/ComingSoon'
 import { Dashboard } from '@/pages/Dashboard'
 
 /**
- * The three routes from docs/technical-design.md's Frontend table:
- * Dashboard ("/"), Brief ("/meetings/:id"), Contact timeline ("/contacts/:id").
- * Kept separate from the router instance so tests can mount them with a
- * memory router instead of a browser router.
+ * Shared shell route table. Existing meeting and contact-detail paths remain
+ * available while the new section pages land in their later tickets.
  */
 export const routes: RouteObject[] = [
   {
@@ -17,7 +16,11 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'meetings/:id', element: <Brief /> },
+      { path: 'contacts', element: <ComingSoon title="Contacts" /> },
       { path: 'contacts/:id', element: <ContactTimeline /> },
+      { path: 'ask', element: <ComingSoon title="Ask" /> },
+      { path: 'capture', element: <ComingSoon title="Capture notes" /> },
+      { path: 'memory', element: <ComingSoon title="Memory inspector" /> },
     ],
   },
 ]
