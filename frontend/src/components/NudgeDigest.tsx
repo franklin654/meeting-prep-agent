@@ -4,6 +4,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const TONE: Record<string, string> = {
   overdue_commitment: 'border-alert-critical/25 bg-alert-critical-soft text-alert-critical-text',
+  they_owe_overdue: 'border-alert-warning/40 bg-alert-warning-soft text-alert-warning-text',
+  no_history: 'border-primary/25 bg-primary-soft text-primary-soft-foreground',
   silent_contact: 'border-alert-warning/40 bg-alert-warning-soft text-alert-warning-text',
   brief_ready: 'border-primary/25 bg-primary-soft text-primary-soft-foreground',
 }

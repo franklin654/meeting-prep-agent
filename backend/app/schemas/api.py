@@ -156,7 +156,13 @@ class StyleProfile(BaseModel):
 
 
 class Nudge(BaseModel):  # GET /api/nudges
-    kind: Literal["overdue_commitment", "silent_contact", "brief_ready"]
+    kind: Literal[
+        "overdue_commitment",
+        "they_owe_overdue",
+        "no_history",
+        "silent_contact",
+        "brief_ready",
+    ]
     text: str
     link: str  # frontend route
 

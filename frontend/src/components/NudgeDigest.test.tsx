@@ -6,6 +6,8 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 
 const NUDGES = [
   { kind: 'overdue_commitment', text: 'Pricing deck is 25 days overdue (FinEdge)', link: '/meetings/m6_finedge' },
+  { kind: 'they_owe_overdue', text: 'Waiting on the vendor shortlist (FinEdge)', link: '/meetings/m6_finedge' },
+  { kind: 'no_history', text: 'No history yet: Northstar\'s first meeting is coming up', link: '/meetings/m_first' },
   { kind: 'brief_ready', text: 'Brief ready: Pilot decision - FinEdge, Sep 29', link: '/meetings/m6_finedge' },
   { kind: 'silent_contact', text: "Sneha Iyer hasn't been on a call for 47 days", link: '/meetings/m6_finedge' },
 ]

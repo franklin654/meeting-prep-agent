@@ -14,7 +14,7 @@
 | A6 | complete | implementation `2b59262` |
 | A7 | complete | implementation `5a95eb5` |
 | B1 | complete | `92b545b` |
-| B2 | planned | — |
+| B2 | complete | `621b7cc` |
 | B3 | planned | — |
 | B4 | planned | — |
 | B5 | planned | — |
@@ -95,6 +95,8 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Commitment cards are SQLite-ledger sourced and carry meeting-title/date citations with quote fallback to the commitment text. One oldest us-owned overdue commitment is critical; other overdue obligations are warnings. Enriched obligations replace the duplicate P3 open-commitments section. Fact objections cluster by text overlap, count distinct source meetings, rank by frequency/recency, and include citations; they replace duplicate P3 objections. Hidden fact and memory overrides are excluded from their respective brief sources.
 - Contact cards show account, role, recent meeting citations, follow-up counts, and only show a communication-style line when a personal fact explicitly contains a preference cue; that line cites its source. A first memory brief with no earlier completed account meeting skips Hindsight reads and ledger/fact/override reads while still making the normal single P3 call with an empty evidence table; the UI labels it “No history yet”.
 - B1 checks: backend 683 passed, 1 skipped, 6 deselected; Ruff and mypy passed; frontend lint/typecheck and 53 Vitest tests passed; production build passed (existing >500 kB bundle advisory). New tests cover enrichment, first-meeting no-memory retrieval, hidden-source filtering, contact-style citations, and legacy cached brief payload rendering. No live LLM or Hindsight calls and no real DB reads/writes for B1.
+- B2: added deterministic `they_owe_overdue` and `no_history` nudge kinds with the specified priority order and eight-row cap. Added `POST /api/style/reset` and `DELETE /api/style/rules/{section}`; both delete only SQLite feedback, return the recomputed profile, and make no Hindsight call. Updated the typed nudge UI tones, documented the changed schema/routes, and regenerated the client offline from `app.openapi()` (22 paths).
+- B2 checks: backend 686 passed, 1 skipped, 6 deselected; Ruff and mypy passed; frontend lint/typecheck and 53 Vitest tests passed. Tests cover priority/cap, closed-account exclusion, the two style deletion semantics, and both new nudge kinds as links. No live LLM/Hindsight calls or real DB operations.
 
 ## B4–C4 plan addendum
 

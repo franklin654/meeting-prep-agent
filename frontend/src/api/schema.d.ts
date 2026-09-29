@@ -317,6 +317,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/style/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Style
+         * @description Clear all app feedback rows and return the default style profile.
+         */
+        post: operations["reset_style_api_style_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/style/rules/{section}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Style Rule
+         * @description Remove the feedback history for one section and return the updated style profile.
+         */
+        delete: operations["delete_style_rule_api_style_rules__section__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}/timeline": {
         parameters: {
             query?: never;
@@ -792,7 +832,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "overdue_commitment" | "silent_contact" | "brief_ready";
+            kind: "overdue_commitment" | "they_owe_overdue" | "no_history" | "silent_contact" | "brief_ready";
             /** Text */
             text: string;
             /** Link */
@@ -1589,6 +1629,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StyleProfile"];
+                };
+            };
+        };
+    };
+    reset_style_api_style_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleProfile"];
+                };
+            };
+        };
+    };
+    delete_style_rule_api_style_rules__section__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section: components["schemas"]["SectionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -223,19 +223,19 @@ def test_nudges_order_caps_and_exclusions(client: TestClient, engine: object) ->
         "overdue_commitment",
         "overdue_commitment",
         "overdue_commitment",
+        "they_owe_overdue",
         "brief_ready",
         "brief_ready",
         "brief_ready",
         "brief_ready",
-        "silent_contact",
     ]
     assert rows[0]["text"] == "Task 0 is 58 days overdue (FinEdge Payments)"
     assert rows[0]["link"] == "/meetings/m6_finedge"
     assert rows[1]["text"] == "Task 1 is 25 days overdue (FinEdge Payments)"
-    assert rows[3]["text"] == "Brief ready: Pilot decision - FinEdge Payments, Sep 29"
-    assert rows[7]["text"].endswith("hasn't been on a call for 58 days")
+    assert rows[4]["text"] == "Brief ready: Pilot decision - FinEdge Payments, Sep 29"
     assert "Closed Co" not in str(rows)
-    assert "Customer task" not in str(rows)
+    assert rows[3]["kind"] == "they_owe_overdue"
+    assert "Customer task" in rows[3]["text"]
 
 
 def test_silent_contacts_capped_at_two_and_upcoming_attendee_excluded(
@@ -260,6 +260,52 @@ def test_empty_nudges_returns_empty_list(client: TestClient, engine: object) -> 
         session.add(Account(id="empty", name="Empty", industry="x", size=None, stage="discovery"))
         session.commit()
     assert client.get("/api/nudges").json() == []
+
+
+def test_they_owe_and_no_history_follow_our_overdue_priority(
+    client: TestClient, engine: object
+) -> None:
+    _seed(engine, extras=False)
+    with Session(engine) as session:  # type: ignore[arg-type]
+        for commitment in repository.list_overdue_commitments(session):
+            session.delete(commitment)
+        session.add(
+            Commitment(
+                id="cm_them_overdue",
+                account_id="acc_open",
+                meeting_id="m_done_aug12",
+                owner=Owner.them,
+                text="Customer sends the vendor shortlist",
+                due_date=date(2026, 9, 1),
+                source_quote="We will send the shortlist",
+            )
+        )
+        session.add(
+            Account(
+                id="acc_first",
+                name="First Meeting Co",
+                industry="software",
+                size=5,
+                stage="discovery",
+            )
+        )
+        _add_meeting(
+            session,
+            "m_first",
+            account_id="acc_first",
+            when=date(2026, 10, 4),
+            status="upcoming",
+            title="First conversation",
+        )
+        session.commit()
+
+    rows = client.get("/api/nudges").json()
+
+    assert [row["kind"] for row in rows[:2]] == ["they_owe_overdue", "no_history"]
+    assert rows[0]["link"] == "/meetings/m6_finedge"
+    assert "shortlist" in rows[0]["text"]
+    assert rows[1]["link"] == "/meetings/m_first"
+    assert rows[1]["text"].startswith("No history yet")
 
 
 def test_overdue_nudge_links_to_dashboard_when_account_has_no_upcoming_meeting(

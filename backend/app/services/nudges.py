@@ -80,6 +80,67 @@ def _brief_ready_nudges(upcoming: Sequence[MeetingRow]) -> list[Nudge]:
     ]
 
 
+def _they_owe_nudges(
+    session: Session,
+    accounts: dict[str, Account],
+    upcoming: Sequence[MeetingRow],
+) -> list[Nudge]:
+    earliest_meeting: dict[str, str] = {}
+    for row in upcoming:
+        earliest_meeting.setdefault(row.meeting.account_id, row.meeting.id)
+    rows = [
+        commitment
+        for commitment in repository.list_overdue_commitments(session)
+        if commitment.owner is Owner.them
+        and (account := accounts.get(commitment.account_id)) is not None
+        and account.stage not in {"closed_won", "closed_lost"}
+    ]
+    rows.sort(key=lambda commitment: (commitment.due_date or date.max, commitment.id))
+    return [
+        Nudge(
+            kind="they_owe_overdue",
+            text=f"Waiting on {_commitment_label(commitment.text)} ({account.name})",
+            link=f"/meetings/{earliest_meeting[commitment.account_id]}"
+            if commitment.account_id in earliest_meeting
+            else "/",
+        )
+        for commitment in rows[:3]
+        if (account := accounts.get(commitment.account_id)) is not None
+    ]
+
+
+def _no_history_nudges(
+    done: Sequence[MeetingRow],
+    upcoming: Sequence[MeetingRow],
+    accounts: dict[str, Account],
+) -> list[Nudge]:
+    output: list[Nudge] = []
+    seen_accounts: set[str] = set()
+    for row in upcoming:
+        account_id = row.meeting.account_id
+        account = accounts.get(account_id)
+        if (
+            account is None
+            or account.stage in {"closed_won", "closed_lost"}
+            or any(
+                previous.meeting.account_id == account_id
+                and previous.meeting.scheduled_at < row.meeting.scheduled_at
+                for previous in done
+            )
+            or account_id in seen_accounts
+        ):
+            continue
+        seen_accounts.add(account_id)
+        output.append(
+            Nudge(
+                kind="no_history",
+                text=f"No history yet: {row.account_name}'s first meeting is coming up",
+                link=f"/meetings/{row.meeting.id}",
+            )
+        )
+    return output
+
+
 def _silent_contact_nudges(
     done: Sequence[MeetingRow], upcoming: Sequence[MeetingRow], accounts: dict[str, Account]
 ) -> list[Nudge]:
@@ -133,6 +194,8 @@ def build_nudges(session: Session) -> list[Nudge]:
     done = [row for row in rows if row.meeting.status == "done"]
     accounts = {account.id: account for account in repository.list_accounts(session)}
     nudges = _overdue_nudges(session, accounts, upcoming)
+    nudges.extend(_they_owe_nudges(session, accounts, upcoming))
+    nudges.extend(_no_history_nudges(done, upcoming, accounts))
     nudges.extend(_brief_ready_nudges(upcoming))
     nudges.extend(_silent_contact_nudges(done, upcoming, accounts))
     return nudges[:8]

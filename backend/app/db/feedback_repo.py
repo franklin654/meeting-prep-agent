@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, delete, select
 
 from app.core.errors import NotFoundError
 from app.core.time import utcnow
@@ -47,3 +47,18 @@ def store_feedback(
                 created_at=utcnow(),
             ),
         )
+
+
+def delete_feedback_for_section(session_factory: SessionFactory, section: SectionKey) -> int:
+    with session_factory() as session:
+        statement = delete(Feedback).where(col(Feedback.section) == section)
+        result = session.exec(statement)
+        session.commit()
+        return result.rowcount or 0
+
+
+def delete_all_feedback(session_factory: SessionFactory) -> int:
+    with session_factory() as session:
+        result = session.exec(delete(Feedback))
+        session.commit()
+        return result.rowcount or 0

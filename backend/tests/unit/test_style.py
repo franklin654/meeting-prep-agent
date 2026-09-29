@@ -365,6 +365,34 @@ def test_get_style_reflects_rows(client: TestClient) -> None:
     assert style["notes"] == ["Hides Personal touchpoints.", "Prefers shorter briefs."]
 
 
+def test_delete_style_rule_removes_only_that_sections_feedback(client: TestClient) -> None:
+    brief = _post_brief(client)
+    _feedback(client, brief.id, "agenda", "less")
+    _feedback(client, brief.id, "watch_outs", "up")
+
+    response = client.delete("/api/style/rules/agenda")
+
+    assert response.status_code == 200
+    assert response.json()["length"] == "standard"
+    factory = main_module.app.dependency_overrides[get_session_factory]()
+    assert len(feedback_repo.load_all_feedback(factory)) == 1
+
+
+def test_reset_style_deletes_all_feedback(client: TestClient) -> None:
+    brief = _post_brief(client)
+    _feedback(client, brief.id, "agenda", "less")
+    _feedback(client, brief.id, "watch_outs", "up")
+
+    response = client.post("/api/style/reset")
+
+    assert response.status_code == 200
+    assert response.json()["section_order"] == [key.value for key in SectionKey]
+    assert response.json()["hidden_sections"] == []
+    assert response.json()["length"] == "standard"
+    factory = main_module.app.dependency_overrides[get_session_factory]()
+    assert feedback_repo.load_all_feedback(factory) == []
+
+
 def test_briefs_come_back_styled_and_record_stays_unstyled(
     client: TestClient, world: World
 ) -> None:

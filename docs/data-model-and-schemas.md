@@ -477,6 +477,7 @@ class FeedbackRequest(BaseModel):         # POST /api/briefs/{id}/feedback
     section: SectionKey
     action: Literal["up", "down", "more", "less", "collapsed"]
 
+# GET /api/style; POST /api/style/reset; DELETE /api/style/rules/{section}
 class StyleProfile(BaseModel):
     section_order: list[SectionKey]
     hidden_sections: list[SectionKey]
@@ -484,7 +485,10 @@ class StyleProfile(BaseModel):
     notes: list[str]                      # plain-language rules shown in the UI
 
 class Nudge(BaseModel):                   # GET /api/nudges
-    kind: Literal["overdue_commitment", "silent_contact", "brief_ready"]
+    kind: Literal[
+        "overdue_commitment", "they_owe_overdue", "no_history",
+        "silent_contact", "brief_ready"
+    ]
     text: str
     link: str                             # frontend route
 
