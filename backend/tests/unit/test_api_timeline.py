@@ -310,3 +310,30 @@ def test_brief_ready_agrees_with_get_fresh_brief(engine: Engine) -> None:
     _add_brief(engine, "m2", "memory")
     fresh = brief_repo.get_fresh_brief(lambda: Session(engine), "m2", "memory")
     assert (fresh is not None) == _ready(engine)
+
+
+def test_corrupt_brief_row_does_not_break_meeting_list(
+    client: TestClient, engine: Engine, caplog: pytest.LogCaptureFixture
+) -> None:
+    _add_brief(engine, "m3", "memory")  # valid, fresh
+    with Session(engine) as db:
+        repo.create_brief_record(
+            db,
+            BriefRecord(
+                id="br_bad",
+                meeting_id="m2",
+                mode="memory",
+                content={"secret": "not a brief"},
+                created_at=T0,
+            ),
+        )
+    with caplog.at_level("WARNING"):
+        response = client.get("/api/meetings")
+    assert response.status_code == 200
+    ready = {r["id"]: r["brief_ready"] for r in response.json()}
+    assert ready["m2"] is False
+    assert ready["m3"] is True
+    assert ready["m1"] is False
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("m2" in w and "ValidationError" in w for w in warnings)
+    assert not any("secret" in w for w in warnings)
