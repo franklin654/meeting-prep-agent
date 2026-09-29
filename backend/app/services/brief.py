@@ -74,6 +74,12 @@ from app.services.evidence import (
     match_objection_sources,
     truncate,
 )
+from app.services.preferences import (
+    DEFAULT_SECTION_ORDER,
+    SECTION_TITLES,
+    current_style,
+    prompt_style_string,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +91,8 @@ BriefMode = Literal["memory", "no_memory"]
 BRIEF_LLM_TIMEOUT_SECONDS = 120
 BRIEF_TEMPERATURE = 0.3
 
-# Style profile is the default until Phase 4 adds learning from feedback.
+# P3 style placeholder when nothing has been learned; otherwise `prompt_style_string`.
 DEFAULT_STYLE_PROFILE = "default"
-DEFAULT_SECTION_ORDER: list[SectionKey] = list(SectionKey)
 
 # Sections the LLM writes. `attendees` is built in code; `your_questions` renders pinned
 # Ask answers, which do not exist yet.
@@ -100,18 +105,6 @@ LLM_SECTION_KEYS: list[SectionKey] = [
     SectionKey.watch_outs,
     SectionKey.alerts,
 ]
-
-SECTION_TITLES: dict[SectionKey, str] = {
-    SectionKey.attendees: "Attendees",
-    SectionKey.where_left_off: "Where we left off",
-    SectionKey.open_commitments: "Open commitments",
-    SectionKey.unresolved_objections: "Unresolved objections",
-    SectionKey.personal_touchpoints: "Personal touchpoints",
-    SectionKey.agenda: "Suggested agenda",
-    SectionKey.watch_outs: "Watch-outs",
-    SectionKey.alerts: "Alerts",
-    SectionKey.your_questions: "Your questions",
-}
 
 # Sections whose items are never below `warning` (prompt rule, enforced in code).
 _WARNING_FLOOR = {SectionKey.watch_outs, SectionKey.alerts}
@@ -405,7 +398,13 @@ async def _gather_memory(
 # ---- prompt ------------------------------------------------------------------------
 
 
-def render_brief_prompt(*, persona: Persona, inputs: BriefInputs, evidence_text: str) -> str:
+def render_brief_prompt(
+    *,
+    persona: Persona,
+    inputs: BriefInputs,
+    evidence_text: str,
+    style_profile: str = DEFAULT_STYLE_PROFILE,
+) -> str:
     """Render P3. `no_memory` mode differs from `memory` mode only in `evidence_text`."""
     attendees = "; ".join(
         f"{c.id}: {c.name}" + (f" ({c.role})" if c.role else "") for c in inputs.attendees
@@ -420,7 +419,7 @@ def render_brief_prompt(*, persona: Persona, inputs: BriefInputs, evidence_text:
         account_name=inputs.account.name,
         attendees=attendees or "(none recorded)",
         evidence=evidence_text,
-        style_profile=DEFAULT_STYLE_PROFILE,
+        style_profile=style_profile,
         section_keys=", ".join(k.value for k in LLM_SECTION_KEYS),
     )
 
@@ -739,7 +738,11 @@ async def generate_brief(
             int((gathered_at - started) * 1000),
         )
 
-    prompt = render_brief_prompt(persona=persona, inputs=inputs, evidence_text=table.render())
+    # Only LENGTH and emphasis go to the prompt; order and hiding are read-time (apply_style).
+    style = prompt_style_string(current_style(session_factory))
+    prompt = render_brief_prompt(
+        persona=persona, inputs=inputs, evidence_text=table.render(), style_profile=style
+    )
     llm_started = time.monotonic()
     draft = await llm.complete_json(prompt, BriefDraft, temperature=BRIEF_TEMPERATURE)
     timings.set("p3", time.monotonic() - llm_started)
