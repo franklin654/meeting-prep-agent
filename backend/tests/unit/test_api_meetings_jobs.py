@@ -400,3 +400,27 @@ def test_lifespan_closes_memory_service_if_created(
         assert get_memory_service() is get_memory_service()
     assert closed == [True]
     assert deps._memory is None
+
+
+def test_failed_job_result_message_is_not_exposed_only_the_code(
+    client: TestClient, engine: Engine
+) -> None:
+    from app.db import ingest_repo
+
+    learned = LearnedSummary(facts=[], new_commitments=1, closed_commitments=0, alerts=[])
+    with Session(engine) as db:
+        failed = ingest_repo.create_job_row(db).id
+        ingest_repo.finish_job(
+            db,
+            failed,
+            error="memory_unavailable",
+            result={"error_code": "memory_unavailable", "error_message": "Retain timed out"},
+        )
+        done = ingest_repo.create_job_row(db).id
+        ingest_repo.finish_job(db, done, result=learned.model_dump())
+    job = _job(client, failed)
+    assert job.status == "failed" and job.error == "memory_unavailable" and job.learned is None
+    assert "Retain timed out" not in str(client.get(f"/api/jobs/{failed}").json())
+    ok = _job(client, done)
+    assert ok.status == "done" and ok.error is None and ok.learned is not None
+    assert ok.learned.new_commitments == 1

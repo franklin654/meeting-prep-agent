@@ -56,6 +56,10 @@ from app.schemas.extraction import (
 logger = logging.getLogger(__name__)
 
 INGEST_LLM_TIMEOUT_SECONDS = 120
+# Client-side limit for `memory.retain_meeting` during ingest (the default is 30 s; a real
+# retain took 34.7 s while Hindsight still finished it). Passed on every retain in `_ingest`.
+INGEST_RETAIN_TIMEOUT_S = 120.0
+ERROR_MESSAGE_MAX_CHARS = 300
 # Our own company; the seed data's vendor (data/seed/company.json). Not configurable yet.
 OUR_COMPANY = "Tracewise"
 MAX_QUOTE_CHARS = 200
@@ -148,6 +152,28 @@ _PUNCT_MAP = str.maketrans(
         " ": " ",
     }
 )
+
+
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)bearer\s+\S+"),
+    re.compile(r"\bsk-[A-Za-z0-9_\-]{6,}"),
+    re.compile(r"\bgsk_[A-Za-z0-9_\-]{6,}"),
+    re.compile(r"[A-Za-z0-9+/=_\-]{32,}"),
+)
+
+
+def safe_error_message(exc: BaseException) -> str:
+    """Short, secret-free description of `exc` for the job row (never prompt/transcript text).
+
+    Cuts at the first newline, `{` or the word "body" (HTTP bodies can echo the request),
+    redacts key-like tokens (sk-..., gsk_..., Bearer ..., long base64-ish strings), then
+    truncates to `ERROR_MESSAGE_MAX_CHARS`.
+    """
+    text = re.split(r"\n|\{|\bbody\b", str(exc), maxsplit=1)[0].strip()
+    for pattern in _SECRET_PATTERNS:
+        text = pattern.sub("[redacted]", text)
+    text = text.strip() or type(exc).__name__
+    return text[:ERROR_MESSAGE_MAX_CHARS]
 
 
 def default_ingest_llm() -> LLMClient:
@@ -390,6 +416,13 @@ def _match_commitment_ids(
     return matched
 
 
+def _format_open_commitment(commitment: Commitment) -> str:
+    """`id: text | original words: "quote"`, so P2 can match an acknowledgement that uses
+    different words than the commitment's text (docs: quote truncated to 200 chars)."""
+    quote = " ".join(commitment.source_quote.split())[:MAX_QUOTE_CHARS]
+    return f'{commitment.id}: {commitment.text} | original words: "{quote}"'
+
+
 def _format_ack(index: int, ack: Acknowledgement) -> str:
     return f'{index}: {ack.description} — "{ack.source_quote}"'
 
@@ -420,15 +453,22 @@ async def run_ingest(
             ingest_repo.finish_job(session, job_id, result=summary.model_dump(mode="json"))
     except Exception as exc:
         code = exc.code if isinstance(exc, AppError) else "internal_error"
+        message = safe_error_message(exc)
         logger.error(
-            "ingest failed job=%s meeting=%s code=%s error_type=%s",
+            "ingest failed job=%s meeting=%s code=%s error_type=%s message_len=%d",
             job_id,
             meeting_id,
             code,
             type(exc).__name__,
+            len(message),
         )
         with session_factory() as session:
-            ingest_repo.finish_job(session, job_id, error=code)
+            ingest_repo.finish_job(
+                session,
+                job_id,
+                error=code,
+                result={"error_code": code, "error_message": message},
+            )
         raise
     logger.info(
         "ingest done job=%s meeting=%s duration_ms=%d",
@@ -532,7 +572,7 @@ async def _ingest(
     if verified.acknowledgements and earlier_open:
         p2_prompt = render_prompt(
             "match_acknowledgements",
-            open_commitments="\n".join(f"{c.id}: {c.text}" for c in earlier_open),
+            open_commitments="\n".join(_format_open_commitment(c) for c in earlier_open),
             meeting_date=meeting_date.isoformat(),
             acknowledgements="\n".join(
                 _format_ack(i, a) for i, a in enumerate(verified.acknowledgements)
@@ -584,6 +624,7 @@ async def _ingest(
         meeting_date=meeting_date,
         title=title,
         transcript=transcript,
+        timeout_s=INGEST_RETAIN_TIMEOUT_S,
     )
     logger.info(
         "ingest retain meeting=%s duration_ms=%d", meeting_id, int((time.monotonic() - t0) * 1000)

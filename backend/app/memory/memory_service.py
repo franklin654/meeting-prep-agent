@@ -136,9 +136,13 @@ class MemoryService(abc.ABC):
         title: str,
         transcript: str,
         source: str = "ingest",
+        timeout_s: float | None = None,
     ) -> None:
         """Retain one meeting transcript as a document with a stable id, so
         re-ingesting the same meeting replaces rather than duplicates it.
+
+        `timeout_s` overrides the client-side retain limit (`RETAIN_TIMEOUT_S`, 30 s) for
+        this call only; `None` keeps the default.
         """
         raise NotImplementedError
 
@@ -206,9 +210,17 @@ class MemoryService(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
-        """Poll until the bank has no pending/processing operations, or `timeout_s`
-        elapses. Returns `True` if it went idle, `False` on timeout.
+    async def wait_until_idle(
+        self,
+        timeout_s: float = 60.0,
+        *,
+        consecutive_idle: int = 3,
+        poll_interval_s: float = 5.0,
+    ) -> bool:
+        """Poll until the bank has had no pending/processing operations for
+        `consecutive_idle` polls in a row (`poll_interval_s` apart; a busy poll resets the
+        count, so the gap before a re-queued consolidation task does not end the wait early),
+        or `timeout_s` elapses. Returns `True` if it went idle, `False` on timeout.
         """
         raise NotImplementedError
 
@@ -317,6 +329,7 @@ class HindsightMemoryService(MemoryService):
         title: str,
         transcript: str,
         source: str = "ingest",
+        timeout_s: float | None = None,
     ) -> None:
         tags = [account_tag(account_id)]
         tags.extend(contact_tag(cid) for cid in contact_ids)
@@ -335,6 +348,7 @@ class HindsightMemoryService(MemoryService):
             },
             timestamp=datetime.combine(meeting_date, datetime.min.time()),
             context="sales meeting transcript",
+            timeout_s=timeout_s,
         )
 
     async def retain_note(self, *, text: str, scope_type: ScopeType, scope_id: str) -> None:
@@ -364,9 +378,11 @@ class HindsightMemoryService(MemoryService):
         document_id: str | None = None,
         metadata: dict[str, str] | None = None,
         timestamp: datetime | None = None,
+        timeout_s: float | None = None,
     ) -> None:
+        limit = RETAIN_TIMEOUT_S if timeout_s is None else timeout_s
         try:
-            async with asyncio.timeout(RETAIN_TIMEOUT_S):
+            async with asyncio.timeout(limit):
                 await self._client.aretain(
                     bank_id=BANK_ID,
                     content=content,
@@ -377,9 +393,7 @@ class HindsightMemoryService(MemoryService):
                     timestamp=timestamp,
                 )
         except TimeoutError as exc:
-            raise MemoryUnavailableError(
-                f"Retain timed out after {RETAIN_TIMEOUT_S}s."
-            ) from exc
+            raise MemoryUnavailableError(f"Retain timed out after {limit:g}s.") from exc
         except (ApiException, OpenApiException, OSError) as exc:
             raise MemoryUnavailableError(f"Retain failed: {exc}") from exc
 
@@ -583,8 +597,16 @@ class HindsightMemoryService(MemoryService):
                 raise MemoryUnavailableError(f"get_memory failed: {exc}") from exc
         return _as_dict(raw)
 
-    async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
-        deadline = asyncio.get_event_loop().time() + timeout_s
+    async def wait_until_idle(
+        self,
+        timeout_s: float = 60.0,
+        *,
+        consecutive_idle: int = 3,
+        poll_interval_s: float = 5.0,
+    ) -> bool:
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout_s
+        idle_polls = 0
         while True:
             try:
                 pending = await self._client.operations.list_operations(
@@ -596,12 +618,12 @@ class HindsightMemoryService(MemoryService):
             except (ApiException, OpenApiException, OSError) as exc:
                 raise MemoryUnavailableError(f"Could not poll bank operations: {exc}") from exc
 
-            if pending.total == 0 and processing.total == 0:
+            idle_polls = idle_polls + 1 if pending.total == 0 and processing.total == 0 else 0
+            if idle_polls >= max(1, consecutive_idle):
                 return True
-            if asyncio.get_event_loop().time() >= deadline:
+            if loop.time() >= deadline:
                 return False
-            await asyncio.sleep(1.0)
-
+            await asyncio.sleep(poll_interval_s)
 
     async def delete_bank(self, bank_id: str) -> None:
         require_deletable_bank_id(bank_id)
