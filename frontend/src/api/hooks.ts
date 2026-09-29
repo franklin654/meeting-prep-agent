@@ -82,9 +82,10 @@ export function useGenerateBrief(meetingId: string, mode: BriefMode) {
   })
 }
 
-export function useStyle() {
+export function useStyle(enabled = true) {
   return useQuery({
     queryKey: queryKeys.style(),
+    enabled,
     queryFn: async () => {
       const { data } = await api.GET('/api/style')
       return data as StyleProfile
