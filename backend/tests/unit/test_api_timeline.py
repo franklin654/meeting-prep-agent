@@ -202,6 +202,107 @@ def test_dedupe_rules(
     assert len(_get(client).entries) == (1 if dup else 2)
 
 
+@pytest.mark.parametrize(
+    ("a", "b", "dup"),
+    [
+        # changed date / month / amount: must stay two entries
+        (
+            "Renewal decision due on March 15 by the board of Finedge",
+            "Renewal decision due on March 20 by the board of Finedge",
+            False,
+        ),
+        (
+            "Budget capped at $40K and approval needed from the CFO by June",
+            "Budget capped at $40K and approval needed from the CFO by July",
+            False,
+        ),
+        (
+            "Renewal decision due on Monday by the board of Finedge",
+            "Renewal decision due on Friday by the board of Finedge",
+            False,
+        ),
+        (
+            "Kickoff is planned for the first week of the quarter",
+            "Kickoff is planned for the third week of the quarter",
+            False,
+        ),
+        (
+            "Budget capped at $40K and approval needed from the CFO",
+            "Budget capped at $75K and approval needed from the CFO",
+            False,
+        ),
+        # negation / polarity
+        (
+            "Rahul is worried about the security review timeline",
+            "Rahul is not worried about the security review timeline",
+            False,
+        ),
+        (
+            "Rahul isn't worried about the security review timeline",
+            "Rahul is worried about the security review timeline",
+            False,
+        ),
+        (
+            "The board approved the pilot budget for the platform team",
+            "The board rejected the pilot budget for the platform team",
+            False,
+        ),
+        (
+            "Finedge will increase the pilot seat count for the platform team",
+            "Finedge will decrease the pilot seat count for the platform team",
+            False,
+        ),
+        # restatements that must still merge
+        (
+            "Budget is $40K for the pilot rollout across the platform team",
+            "Budget is $40,000 for the pilot rollout across the platform team",
+            True,
+        ),
+        (
+            "Budget is $40K for the pilot rollout across the platform team.",
+            "budget is 40000 dollars for the pilot rollout across the platform team",
+            True,
+        ),
+        (
+            "Renewal decision due on March 15th by the board of Finedge",
+            "Renewal decision due on March 15 by the board of Finedge!",
+            True,
+        ),
+        (
+            "Rahul isn't worried about the security review timeline",
+            "Rahul is not worried about the security review timeline",
+            True,
+        ),
+        (
+            "Rahul approved the pilot budget for the platform team today",
+            "Rahul accepted the pilot budget for the platform team today",
+            True,
+        ),
+        (
+            "Karan owns the SOC 2 report follow up for the platform team",
+            "Karan owns the SOC 2 report follow-up for the platform team",
+            True,
+        ),
+    ],
+)
+def test_dedupe_keeps_changed_numbers_negation_polarity(
+    client: TestClient, memory: FakeMemoryService, a: str, b: str, dup: bool
+) -> None:
+    _seed(memory, "m1", "a", a)
+    _seed(memory, "m2", "b", b)
+    assert len(_get(client).entries) == (1 if dup else 2)
+
+
+def test_budget_contradiction_across_meetings_keeps_both_newest_first(
+    client: TestClient, memory: FakeMemoryService
+) -> None:
+    _seed(memory, "m2", "old", "Anita said the budget is $40K for the pilot")
+    _seed(memory, "m6", "new", "Anita said the budget is now $75K for the pilot")
+    entries = _get(client).entries
+    assert [e.citation.meeting_id for e in entries] == ["m6", "m2"]
+    assert [e.citation.memory_id for e in entries] == ["new", "old"]
+
+
 def test_dedupe_keeps_earliest_meeting(client: TestClient, memory: FakeMemoryService) -> None:
     # Seeded newest first on purpose: the earliest meeting must still win.
     _seed(memory, "m4", "late", "Anita's budget is 40000 USD for the pilot.")

@@ -11,6 +11,13 @@ module turns them into a short, readable list:
    short fact like "Anita is the CFO" does not swallow a longer one), or word-set Jaccard
    >= `JACCARD_THRESHOLD`. The occurrence from the EARLIEST meeting is kept, because that
    is when the agent first learned the fact; ties keep Hindsight's rank order.
+   Containment and Jaccard NEVER merge two texts whose "signatures" differ (a changed
+   amount, date or contradicting fact must stay visible); see `signature`:
+   a) numeric tokens (any token with a digit, number/ordinal words, month and weekday
+      names) as a set; amounts are canonicalised first, so `$40K` == `$40,000` == `40000`;
+   b) negation tokens (not, no, never, cannot, without, none, neither, nor, nobody,
+      nothing, nowhere; `n't` forms are expanded to `not`) as a multiset;
+   c) polarity labels from a short antonym list (`_POLARITY`) as a set.
 4. Group by meeting: meetings newest first, all entries of a meeting adjacent, Hindsight
    rank order inside a meeting.
 5. Cap at `MAX_ENTRIES`, cutting from the oldest end.
@@ -21,6 +28,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 from sqlmodel import Session
 
@@ -38,7 +46,96 @@ QUOTE_MAX_CHARS = 200
 JACCARD_THRESHOLD = 0.8
 MIN_CONTAINMENT_WORDS = 5
 
-_NON_WORD = re.compile(r"[^a-z0-9\s]")
+_APOSTROPHES = re.compile(r"[’‘`]")
+_NOT_CONTRACTIONS = (
+    (re.compile(r"\bwon't\b"), "will not"),
+    (re.compile(r"\bcan't\b"), "can not"),
+    (re.compile(r"\bcannot\b"), "can not"),
+    (re.compile(r"\bshan't\b"), "shall not"),
+    (re.compile(r"n't\b"), " not"),
+)
+# 40, 40,000, 1.5, with an attached k/m/mm/bn/b or spaced thousand/million/billion suffix,
+# and an optional ordinal suffix (15th). Not matched inside words such as `b2b` or `q3`.
+_AMOUNT = re.compile(
+    r"(?<![a-z0-9])(\d+(?:,\d{3})*(?:\.\d+)?)"
+    r"(?:(k|mm|m|bn|b)(?![a-z0-9])|\s(thousand|million|billion)(?![a-z0-9]))?"
+    r"(?:st|nd|rd|th)?(?![a-z0-9])"
+)
+_MULTIPLIERS = {
+    "k": 10**3,
+    "thousand": 10**3,
+    "m": 10**6,
+    "mm": 10**6,
+    "million": 10**6,
+    "b": 10**9,
+    "bn": 10**9,
+    "billion": 10**9,
+}
+_PUNCT = re.compile(r"[^a-z0-9\s]")
+
+_NUMBER_WORDS = frozenset(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+    "fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy "
+    "eighty ninety hundred thousand million billion first second third fourth fifth sixth "
+    "seventh eighth ninth tenth".split()
+)
+_MONTHS = {
+    m: m
+    for m in (
+        "january february march april june july august september october november december"
+    ).split()
+} | {
+    "may": "may",
+    "jan": "january",
+    "feb": "february",
+    "mar": "march",
+    "apr": "april",
+    "jun": "june",
+    "jul": "july",
+    "aug": "august",
+    "sep": "september",
+    "sept": "september",
+    "oct": "october",
+    "nov": "november",
+    "dec": "december",
+}
+_WEEKDAYS = {d: d for d in "monday tuesday wednesday thursday friday saturday sunday".split()} | {
+    "tue": "tuesday",
+    "tues": "tuesday",
+    "wed": "wednesday",
+    "thu": "thursday",
+    "thur": "thursday",
+    "thurs": "thursday",
+    "fri": "friday",
+}
+# "may" is only a month next to a number or after one of these words.
+_MAY_PRECEDERS = frozenset("in by of until till since from before after during this next".split())
+_NEGATIONS = frozenset("not no never without none neither nor nobody nothing nowhere".split())
+# Short, documented antonym list. Each word maps to one polarity label; two texts whose
+# label sets differ are never merged. Words within a label are treated as paraphrases.
+_POLARITY: dict[str, str] = {
+    **dict.fromkeys(
+        "increase increased increases increasing raise raised raises raising higher grow grew "
+        "grown growing".split(),
+        "up",
+    ),
+    **dict.fromkeys(
+        "decrease decreased decreases decreasing reduce reduced reduces reducing lower lowered "
+        "lowers lowering cut cuts drop dropped shrink shrank".split(),
+        "down",
+    ),
+    **dict.fromkeys("approve approved approves approving accept accepted accepts".split(), "yes"),
+    **dict.fromkeys(
+        "reject rejected rejects deny denied denies decline declined refuse refused".split(), "no"
+    ),
+}
+
+
+@dataclass(frozen=True)
+class _Signature:
+    numbers: frozenset[str]
+    negations: tuple[str, ...]  # sorted multiset
+    polarity: frozenset[str]
 
 
 @dataclass(frozen=True)
@@ -49,16 +146,56 @@ class _Candidate:
     learned_on: date
     norm: str
     words: frozenset[str]
+    sig: _Signature
+
+
+def _canonical_amount(match: re.Match[str]) -> str:
+    value = Decimal(match.group(1).replace(",", ""))
+    suffix = match.group(2) or match.group(3)
+    if suffix:
+        value *= _MULTIPLIERS[suffix]
+    return f" {format(value.normalize(), 'f')} "
 
 
 def normalise(text: str) -> str:
-    """Lowercase, drop punctuation (so `$40,000` becomes `40000`), collapse whitespace."""
-    return " ".join(_NON_WORD.sub("", text.lower()).split())
+    """Lowercase; expand `n't` to `not`; canonicalise amounts (`$40K`, `$40,000` and
+    `40000` all become `40000`, `15th` becomes `15`); drop apostrophes, turn other
+    punctuation into spaces; collapse whitespace.
+    """
+    lowered = _APOSTROPHES.sub("'", text.lower())
+    for pattern, replacement in _NOT_CONTRACTIONS:
+        lowered = pattern.sub(replacement, lowered)
+    lowered = _AMOUNT.sub(_canonical_amount, lowered)
+    return " ".join(_PUNCT.sub(" ", lowered.replace("'", "")).split())
+
+
+def signature(norm: str) -> _Signature:
+    """Numbers, negations and polarity of an already-normalised text."""
+    tokens = norm.split()
+    numbers: set[str] = set()
+    for i, token in enumerate(tokens):
+        if any(ch.isdigit() for ch in token) or token in _NUMBER_WORDS:
+            numbers.add(token)
+        elif token in _WEEKDAYS:
+            numbers.add(_WEEKDAYS[token])
+        elif token in _MONTHS:
+            is_may = token == "may"
+            nxt = tokens[i + 1] if i + 1 < len(tokens) else ""
+            prev = tokens[i - 1] if i > 0 else ""
+            if not is_may or nxt[:1].isdigit() or prev in _MAY_PRECEDERS:
+                numbers.add(_MONTHS[token])
+    return _Signature(
+        numbers=frozenset(numbers),
+        negations=tuple(sorted(t for t in tokens if t in _NEGATIONS)),
+        polarity=frozenset(_POLARITY[t] for t in tokens if t in _POLARITY),
+    )
 
 
 def is_near_duplicate(a: _Candidate, b: _Candidate) -> bool:
     if a.norm == b.norm:
         return True
+    if a.sig != b.sig:  # a changed amount/date, negation or polarity is new information
+        return False
     shorter, longer = (a, b) if len(a.norm) <= len(b.norm) else (b, a)
     if len(shorter.words) >= MIN_CONTAINMENT_WORDS and f" {shorter.norm} " in f" {longer.norm} ":
         return True
@@ -125,6 +262,7 @@ async def build_timeline(
                 learned_on=meeting_dates[hit.meeting_id] or hit.meeting_date,
                 norm=norm,
                 words=frozenset(norm.split()),
+                sig=signature(norm),
             )
         )
 
