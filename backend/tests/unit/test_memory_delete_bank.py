@@ -14,6 +14,7 @@ from app.schemas.enums import ScopeType
 from tests.fakes.fake_memory_service import FakeMemoryService
 
 REFUSED = ["ami-test", "spike-abc", "", "ae-", "AE-x", " ae-x", "ae-x ", "xae-x", "spike-ae-x"]
+REFUSED += ["ae-a b", "ae-x\ny", "ae-x\n", "ae-../x", "ae-x/y", "ae-x\\y", "ae-x.y", "ae- x"]
 ACCEPTED = ["ae-priya", "ae-user-demo-thomas"]
 
 
