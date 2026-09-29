@@ -43,6 +43,9 @@ markers = [
     "golden: end-to-end golden scenarios against real Hindsight and the configured LLM providers",
 ]
 asyncio_mode = "auto"
+# A plain `pytest` never spends credits or needs services: live, live_llm and golden tests are
+# deselected. An explicit `-m live` / `-m live_llm` / `-m golden` comes after addopts and wins.
+addopts = "-m 'not live and not live_llm and not golden'"
 
 [tool.ruff]
 line-length = 100

@@ -71,6 +71,8 @@ class EvidenceRef(BaseModel):
     label: str
     commitment_id: str | None = None
     overdue: bool = False
+    owner: str | None = None  # ledger rows: "us" | "them"
+    due_date: date | None = None  # ledger rows
 
 
 class EvidenceTable:
@@ -135,7 +137,7 @@ def match_objection_sources(
 def build_evidence(
     *,
     mental_model: MentalModelText | None,
-    latest_done_meeting: MeetingInfo | None,
+    latest_ingested_meeting: MeetingInfo | None,
     recall_hits: Sequence[MemoryHit] = (),
     objections: Sequence[tuple[Objection, MemoryHit]],
     commitments: Sequence[Commitment],
@@ -166,18 +168,20 @@ def build_evidence(
     sections = list(recall_sections) if recall_sections is not None else [recall_hits]
     protected: list[EvidenceRef] = []
 
-    if mental_model is not None and mental_model.content.strip() and latest_done_meeting:
+    # The summary has no meeting of its own: it is cited to the account's latest INGESTED
+    # meeting (what the memory has read up to), and dropped when nothing is ingested yet.
+    if mental_model is not None and mental_model.content.strip() and latest_ingested_meeting:
         content = mental_model.content.strip()
         protected.append(
             EvidenceRef(
                 key="",
                 source_type=SourceType.mental_model,
-                meeting_id=latest_done_meeting.id,
-                meeting_date=latest_done_meeting.date,
+                meeting_id=latest_ingested_meeting.id,
+                meeting_date=latest_ingested_meeting.date,
                 quote=truncate(content, QUOTE_MAX_CHARS),
                 memory_id=mental_model.id,
                 text="Relationship summary: " + truncate(content, PROMPT_MENTAL_MODEL_MAX_CHARS),
-                label=f"Relationship summary as of {format_date(latest_done_meeting.date)}",
+                label=f"Relationship summary through {format_date(latest_ingested_meeting.date)}",
             )
         )
 
@@ -326,6 +330,8 @@ def _ledger_refs(
                 label=label,
                 commitment_id=c.id,
                 overdue=overdue,
+                owner=c.owner.value,
+                due_date=c.due_date,
             )
         )
     return refs
