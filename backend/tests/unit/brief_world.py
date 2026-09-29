@@ -196,11 +196,11 @@ def _seed_memory(memory: FakeMemoryService) -> None:
         meeting_id="m3_finedge",
         meeting_date=date(2026, 8, 12),
     )
-    # observation used only as an R1 reflect source
+    # Recalled unresolved objection evidence used directly by P3.
     memory.seed_fact(
         "o_sec",
         "Sneha raised a concern about the SOC 2 report and data residency",
-        tags=[account_tag(ACC), meeting_tag("m3_finedge")],
+        tags=[account_tag(ACC), meeting_tag("m3_finedge"), fact_kind_tag(FactKind.objection)],
         memory_type="observation",
         mentioned_at=date(2026, 8, 12),
     )

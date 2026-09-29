@@ -342,10 +342,10 @@ async def test_mental_model_cites_latest_ingested_meeting_not_merely_done(world:
 
     brief, _ = await make(world)
 
-    (wlo,) = section(brief, SectionKey.where_left_off)
-    (c,) = wlo.citations
+    wlo = section(brief, SectionKey.where_left_off)
+    c = next(c for item in wlo for c in item.citations if c.source_type.value == "mental_model")
     assert (c.meeting_id, c.meeting_date) == ("m4_finedge", date(2026, 8, 27))
-    assert c.label == "Relationship summary through Aug 27, 2026"
+    assert c.label == "Pilot scoping · Aug 27"
     assert c.quote and len(c.quote) <= 200
 
 

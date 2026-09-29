@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 from app.config import settings
 from app.core.errors import LLMTimeoutError, MemoryUnavailableError
 from app.db import repository
-from app.db.models import BriefRecord, Commitment, Meeting
+from app.db.models import BriefRecord, Commitment, Contact, Meeting
 from app.memory.memory_service import MemoryService, MentalModelText
 from app.schemas.brief import Brief, BriefDraft, BriefItem, SectionKey, Severity, SourceType
 from app.schemas.enums import CommitmentStatus, FactKind, Owner
@@ -92,7 +92,7 @@ async def test_b1_overdue_deck_is_critical_and_cited_to_m4(
     assert citation.meeting_id == "m4_finedge"
     assert citation.meeting_date == date(2026, 8, 27)
     assert citation.quote == DECK_QUOTE
-    assert citation.label == "Ledger, Call on Aug 27, 2026"
+    assert citation.label == "Pilot scoping · Aug 27"
 
 
 async def test_overdue_item_appended_when_llm_omits_it(world: World) -> None:
@@ -146,7 +146,7 @@ async def test_b4_competitor_watch_out_cited_to_m3(world: World) -> None:
     brief, _ = await make(world)
 
     (watch,) = section(brief, SectionKey.watch_outs)
-    assert watch.text == "FinEdge has looked at DataHawk."
+    assert watch.text == "FinEdge Payments has looked at DataHawk."
     assert [c.meeting_id for c in watch.citations] == ["m3_finedge"]
     assert watch.citations[0].meeting_date == date(2026, 8, 12)
     assert watch.severity == Severity.warning  # floor for watch_outs
@@ -169,7 +169,7 @@ async def test_repeated_same_meeting_competitor_objection_is_dropped(world: Worl
 
     assert section(brief, SectionKey.unresolved_objections) == []
     (watch_out,) = section(brief, SectionKey.watch_outs)
-    assert watch_out.text == "FinEdge has looked at DataHawk."
+    assert watch_out.text == "FinEdge Payments has looked at DataHawk."
     assert watch_out.citations[0].meeting_id == "m3_finedge"
 
 
@@ -231,22 +231,23 @@ async def test_overdue_alert_restatement_is_removed(world: World) -> None:
     assert section(brief, SectionKey.alerts) == []
 
 
-async def test_unresolved_objection_cited_via_reflect_source(world: World) -> None:
+async def test_unresolved_objection_cited_via_recalled_evidence(world: World) -> None:
     brief, llm = await make(world)
 
     (obj,) = section(brief, SectionKey.unresolved_objections)
     assert [c.meeting_id for c in obj.citations] == ["m3_finedge"]
     assert obj.citations[0].meeting_date == date(2026, 8, 12)
-    # Only the unresolved objection is evidence.
+    # The unresolved objection is recalled directly, without an R1 reflect.
     assert "SOC 2" in llm.calls[0].prompt
+    assert world.memory.reflect_calls == []
     assert "Pipeline limit" not in llm.calls[0].prompt
 
 
 async def test_where_left_off_cites_latest_done_meeting(world: World) -> None:
     brief, _ = await make(world)
 
-    (wlo,) = section(brief, SectionKey.where_left_off)
-    (c,) = wlo.citations
+    wlo = section(brief, SectionKey.where_left_off)
+    c = next(c for item in wlo for c in item.citations if c.source_type == SourceType.mental_model)
     assert c.source_type == SourceType.mental_model
     assert (c.meeting_id, c.meeting_date) == ("m5_finedge", date(2026, 9, 15))
     assert c.quote and c.quote.startswith("Evaluation stage")
@@ -283,7 +284,7 @@ async def test_unresolved_evidence_ids_are_dropped(world: World) -> None:
     brief, _ = await make(world, draft)
 
     (competitor,) = section(brief, SectionKey.watch_outs)
-    assert competitor.text == "FinEdge has looked at DataHawk."
+    assert competitor.text == "FinEdge Payments has looked at DataHawk."
     assert len(competitor.citations) == 1
 
 
@@ -330,7 +331,7 @@ async def test_attendees_section_built_in_code_with_citations(world: World) -> N
     (c,) = rahul.citations
     assert (c.meeting_id, c.meeting_date) == ("m4_finedge", date(2026, 8, 27))
     assert c.quote == RAHUL_M4_LINE
-    assert c.label == "Pilot scoping on Aug 27, 2026"
+    assert c.label == "Pilot scoping · Aug 27"
     anita_c = by_contact["c_anita"].citations[0]
     assert (anita_c.meeting_id, anita_c.quote) == ("m2_finedge", ANITA_M2_LINE)
     for it in by_contact.values():
@@ -489,19 +490,20 @@ async def test_no_memory_uses_the_same_prompt_as_memory(world: World) -> None:
 # ---- degradation --------------------------------------------------------------------------
 
 
-async def test_memory_failure_in_one_section_degrades_only_that_section(
+async def test_objection_reflect_queue_is_not_used_by_the_brief_path(
     world: World,
 ) -> None:
     spy = SpyMemory(world.memory)
     spy.fail = set()
 
-    # Objections reflect fails; everything else works.
+    # The old R1 helper remains available, but P3 now uses recalled evidence.
     world.memory._reflect_queue.clear()
     world.memory.queue_reflect_error(MemoryUnavailableError("reflect down"))
 
     brief, _ = await make(world, memory=spy)
 
-    assert section(brief, SectionKey.unresolved_objections) == []
+    assert section(brief, SectionKey.unresolved_objections)
+    assert world.memory.reflect_calls == []
     assert section(brief, SectionKey.personal_touchpoints)
     assert section(brief, SectionKey.watch_outs)
     assert section(brief, SectionKey.open_commitments)
@@ -514,7 +516,7 @@ async def test_recall_failure_degrades_only_recall_sections(world: World) -> Non
 
     assert section(brief, SectionKey.personal_touchpoints) == []
     assert section(brief, SectionKey.watch_outs) == []
-    assert section(brief, SectionKey.unresolved_objections)
+    assert section(brief, SectionKey.unresolved_objections) == []
     assert section(brief, SectionKey.open_commitments)
 
 
@@ -603,6 +605,232 @@ def test_render_brief_prompt_lists_attendees_with_ids(world: World) -> None:
     assert "Today is 2026-09-28" in prompt
 
 
+async def test_memory_brief_uses_recall_not_r1_r3_or_r4_reflects(world: World) -> None:
+    await make(world)
+    assert world.memory.reflect_calls == []
+
+
+async def test_code_snapshot_has_individually_cited_budget_decision_and_competitor(
+    world: World,
+) -> None:
+    from app.memory.tags import account_tag, fact_kind_tag, meeting_tag
+
+    world.memory.seed_fact(
+        "budget_m2",
+        "FinEdge budget is approximately $40K.",
+        tags=[
+            account_tag("acc_finedge"),
+            fact_kind_tag(FactKind.deal_fact),
+            meeting_tag("m2_finedge"),
+        ],
+        meeting_id="m2_finedge",
+        meeting_date=date(2026, 7, 28),
+    )
+    world.memory.seed_fact(
+        "decision_m2",
+        "Anita needs a decision by October 31, 2026.",
+        tags=[
+            account_tag("acc_finedge"),
+            fact_kind_tag(FactKind.deal_fact),
+            meeting_tag("m2_finedge"),
+        ],
+        meeting_id="m2_finedge",
+        meeting_date=date(2026, 7, 28),
+    )
+    world.memory.seed_fact(
+        "competitor_m3",
+        "FinEdge evaluated DataHawk.",
+        tags=[
+            account_tag("acc_finedge"),
+            fact_kind_tag(FactKind.competitor),
+            meeting_tag("m3_finedge"),
+        ],
+        meeting_id="m3_finedge",
+        meeting_date=date(2026, 8, 12),
+    )
+    brief, _ = await make(world)
+    snapshot = section(brief, SectionKey.where_left_off)[0]
+    assert snapshot.severity == Severity.info
+    assert "about $40K" in snapshot.text
+    assert "Oct 31, 2026" in snapshot.text
+    assert "DataHawk" in snapshot.text
+    assert [citation.label for citation in snapshot.citations] == [
+        "Budget and process · Jul 28",
+        "Budget and process · Jul 28",
+        "Technical deep dive · Aug 12",
+    ]
+
+
+async def test_code_b5_uses_attendance_and_recalled_support_without_reflect(world: World) -> None:
+    from app.db.models import MeetingAttendee
+    from app.memory.tags import account_tag, fact_kind_tag, meeting_tag
+
+    with Session(world.engine) as session:
+        m3 = session.get(Meeting, "m3_finedge")
+        m5 = session.get(Meeting, "m5_finedge")
+        assert m3 is not None and m5 is not None
+        m3.transcript = (
+            "[2026-08-12T10:06:30+05:30] Sneha Iyer (IT Security Manager): "
+            "SOC 2 Type II and India data residency are required."
+        )
+        m5.transcript = (
+            "[2026-09-15T10:05:45+05:30] Karan Shah (Data Platform Lead): "
+            "Anita hasn't been in the security conversations."
+        )
+        session.add_all([m3, m5])
+        session.add(
+            Contact(
+                id="c_sneha",
+                account_id="acc_finedge",
+                name="Sneha Iyer",
+                role="IT Security Manager",
+            )
+        )
+        # This fake world has one extra future attendee; the live M6 fixture does not.
+        session.exec(
+            select(MeetingAttendee).where(
+                MeetingAttendee.meeting_id == M6, MeetingAttendee.contact_id == "c_newbie"
+            )
+        ).first()
+        extra = session.get(MeetingAttendee, (M6, "c_newbie"))
+        if extra is not None:
+            session.delete(extra)
+        session.commit()
+    world.memory.seed_fact(
+        "security_m3",
+        "Sneha Iyer raised SOC 2 Type II and India data residency concerns.",
+        tags=[
+            account_tag("acc_finedge"),
+            fact_kind_tag(FactKind.deal_fact),
+            meeting_tag("m3_finedge"),
+        ],
+        meeting_id="m3_finedge",
+        meeting_date=date(2026, 8, 12),
+    )
+    world.memory.seed_fact(
+        "absent_m5",
+        "Karan said Anita hasn't been in the security conversations.",
+        tags=[
+            account_tag("acc_finedge"),
+            fact_kind_tag(FactKind.deal_fact),
+            meeting_tag("m5_finedge"),
+        ],
+        meeting_id="m5_finedge",
+        meeting_date=date(2026, 9, 15),
+    )
+    brief, _ = await make(world)
+    b5 = [item for item in section(brief, SectionKey.alerts) if "SOC 2" in item.text]
+    assert len(b5) == 1
+    assert "Sneha Iyer" in b5[0].text and "Anita Desai" in b5[0].text
+    assert "Vikram Rao" not in b5[0].text and "Priya Nair" not in b5[0].text
+    assert {c.meeting_id for c in b5[0].citations} == {"m3_finedge", "m5_finedge"}
+    assert world.memory.reflect_calls == []
+
+
+async def test_b6_recalls_each_current_objection_under_each_other_account_tag() -> None:
+    from app.db.models import Account
+    from app.memory.tags import account_tag, fact_kind_tag, meeting_tag
+    from app.services.brief import Timings, _cross_deal_recall
+    from tests.fakes.fake_memory_service import FakeMemoryService
+
+    memory = FakeMemoryService()
+    objection = MemoryHit(
+        memory_id="veda_objection",
+        text="Farah says SOC 2 Type II is a must-have for Veda.",
+        meeting_id="v2_veda",
+        meeting_date=date(2026, 4, 7),
+        tags=[account_tag("acc_veda"), meeting_tag("v2_veda"), fact_kind_tag(FactKind.objection)],
+    )
+    memory.seed_fact(
+        "nimbus_resolution",
+        "Deepak confirmed the trust portal and pen-test summary resolved SOC 2 concerns.",
+        tags=[account_tag("acc_nimbus"), meeting_tag("n3_nimbus")],
+        meeting_id="n3_nimbus",
+        meeting_date=date(2026, 4, 14),
+    )
+    other = Account(
+        id="acc_nimbus", name="Nimbus Logistics", industry="SaaS", size=500, stage="evaluation"
+    )
+    hits = await _cross_deal_recall(
+        memory,
+        current_account_id="acc_veda",
+        other_accounts=[other],
+        objections=[objection],
+        timings=Timings(),
+    )
+    assert [hit.memory_id for hit in hits] == ["nimbus_resolution"]
+    assert memory.recall_calls[-1][1] == [account_tag("acc_nimbus")]
+    assert "SOC 2 Type II" in memory.recall_calls[-1][0]
+    assert "trust portal pen-test" in memory.recall_calls[-1][0]
+
+
+def test_cross_deal_postprocessing_requires_named_account_and_only_its_evidence() -> None:
+    from app.services.brief import _filter_cross_deal_draft
+    from app.services.evidence import EvidenceRef, EvidenceTable
+
+    nimbus = EvidenceRef(
+        key="cross_deal:1",
+        source_type=SourceType.meeting,
+        meeting_id="n3_nimbus",
+        meeting_date=date(2026, 4, 14),
+        quote="Trust portal and pen-test resolved it.",
+        memory_id="nimbus_mem",
+        text="cross_deal evidence",
+        label="Nimbus N3 · Apr 14",
+        kind="cross_deal",
+        account_id="acc_nimbus",
+    )
+    mixed = EvidenceRef(
+        key="mem:1",
+        source_type=SourceType.meeting,
+        meeting_id="m4_finedge",
+        meeting_date=date(2026, 8, 27),
+        quote="FinEdge also used a trust portal.",
+        memory_id="finedge_mem",
+        text="FinEdge evidence",
+        label="Pilot scoping · Aug 27",
+        account_id="acc_finedge",
+    )
+    valid = BriefDraft(
+        sections={
+            SectionKey.watch_outs: [
+                item(
+                    "At Nimbus Logistics, the trust portal and pen-test summary "
+                    "resolved SOC 2 concerns.",
+                    ["cross_deal:1"],
+                )
+            ]
+        }
+    )
+    filtered = _filter_cross_deal_draft(
+        valid,
+        EvidenceTable([nimbus]),
+        current_account_id="acc_veda",
+        account_names={"acc_veda": "Veda Health", "acc_nimbus": "Nimbus Logistics"},
+        meeting_account_ids={"n3_nimbus": "acc_nimbus"},
+    )
+    assert len(filtered.sections[SectionKey.watch_outs]) == 1
+
+    invalid = BriefDraft(
+        sections={
+            SectionKey.watch_outs: [
+                item(
+                    "At Nimbus Logistics, the trust portal resolved SOC 2.",
+                    ["cross_deal:1", "mem:1"],
+                )
+            ]
+        }
+    )
+    filtered = _filter_cross_deal_draft(
+        invalid,
+        EvidenceTable([nimbus, mixed]),
+        current_account_id="acc_veda",
+        account_names={"acc_veda": "Veda Health", "acc_nimbus": "Nimbus Logistics"},
+        meeting_account_ids={"n3_nimbus": "acc_nimbus", "m4_finedge": "acc_finedge"},
+    )
+    assert filtered.sections[SectionKey.watch_outs] == []
+
+
 async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
     world: World,
 ) -> None:
@@ -629,17 +857,20 @@ async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
         )
         session.add_all([m3, m5])
         session.commit()
+    world.memory._reflect_queue.clear()
     world.memory.queue_reflect_response(
         ReflectResult(
             text="security gap",
             structured={
-                "gaps": [{
-                    "concern": "SOC 2 and India data-residency",
-                    "raised_by": "Sneha Iyer",
-                    "answered_on": "2026-09-29",
-                    "not_heard_by": ["Anita Desai"],
-                    "extra": "tolerated",
-                }]
+                "gaps": [
+                    {
+                        "concern": "SOC 2 and India data-residency",
+                        "raised_by": "Sneha Iyer",
+                        "answered_on": "2026-09-29",
+                        "not_heard_by": ["Anita Desai"],
+                        "extra": "tolerated",
+                    }
+                ]
             },
             sources=[
                 MemoryHit(
@@ -663,22 +894,24 @@ async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
         )
     )
 
-    brief, _ = await make(world)
+    from app.db.brief_repo import load_brief_inputs
+    from app.services.brief import _cross_contact_alerts
 
-    assert len(world.memory.reflect_calls) == 3
-    assert set(world.memory.get_memory_calls) >= {"o_sec", "o_security_gap_m5"}
-    alerts = section(brief, SectionKey.alerts)
+    inputs = load_brief_inputs(world.session_factory, M6)
+    alerts = await _cross_contact_alerts(
+        world.memory,
+        account_id="acc_finedge",
+        account_name="FinEdge Payments",
+        attendees=inputs.attendees,
+        meetings=inputs.account_meetings,
+    )
+    assert len(world.memory.reflect_calls) == 1
     assert alerts, (world.memory.reflect_calls, world.memory.get_memory_calls)
     alert = next(i for i in alerts if "SOC 2 and India" in i.text)
     assert alert.severity == Severity.warning
     assert alert.contact_ids == ["c_anita"]
     assert {citation.meeting_id for citation in alert.citations} == {"m3_finedge", "m5_finedge"}
     assert any("Anita hasn't been" in citation.quote for citation in alert.citations)
-    r3_query, r3_tags, _ = next(
-        call for call in world.memory.reflect_calls if "attendees from" in call[0]
-    )
-    assert "Anita Desai" in r3_query and "Rahul Mehta" in r3_query
-    assert r3_tags == [account_tag("acc_finedge")]
 
 
 async def test_r4_uses_resolved_other_account_sources_only(world: World) -> None:
@@ -730,13 +963,15 @@ async def test_r4_uses_resolved_other_account_sources_only(world: World) -> None
         ReflectResult(
             text="resolved pattern",
             structured={
-                "patterns": [{
-                    "objection": "SOC 2 Type II requirement",
-                    "other_account": "Nimbus Logistics",
-                    "what_worked": "trust portal access and pen-test summary",
-                    "resolved_on": "April 14, 2026",
-                    "extra": "ignored",
-                }]
+                "patterns": [
+                    {
+                        "objection": "SOC 2 Type II requirement",
+                        "other_account": "Nimbus Logistics",
+                        "what_worked": "trust portal access and pen-test summary",
+                        "resolved_on": "April 14, 2026",
+                        "extra": "ignored",
+                    }
+                ]
             },
             sources=[
                 MemoryHit(

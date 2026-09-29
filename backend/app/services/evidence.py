@@ -77,6 +77,8 @@ class EvidenceRef(BaseModel):
     overdue: bool = False
     owner: str | None = None  # ledger rows: "us" | "them"
     due_date: date | None = None  # ledger rows
+    kind: str | None = None
+    account_id: str | None = None
 
 
 class EvidenceTable:
@@ -149,6 +151,8 @@ def build_evidence(
     today: date,
     cap: int = EVIDENCE_CAP,
     recall_sections: Sequence[Sequence[MemoryHit]] | None = None,
+    objection_hits: Sequence[MemoryHit] = (),
+    cross_deal_hits: Sequence[MemoryHit] = (),
 ) -> EvidenceTable:
     """Assemble the capped, numbered evidence table.
 
@@ -185,7 +189,10 @@ def build_evidence(
                 quote=truncate(content, QUOTE_MAX_CHARS),
                 memory_id=mental_model.id,
                 text="Relationship summary: " + truncate(content, PROMPT_MENTAL_MODEL_MAX_CHARS),
-                label=f"Relationship summary through {format_date(latest_ingested_meeting.date)}",
+                label=(
+                    f"{latest_ingested_meeting.title} · "
+                    f"{latest_ingested_meeting.date:%b} {latest_ingested_meeting.date.day}"
+                ),
             )
         )
 
@@ -195,6 +202,23 @@ def build_evidence(
         refs = [r for r in _memory_refs(hits, meetings, prefix=None) if r.memory_id not in seen_ids]
         seen_ids.update(r.memory_id for r in refs if r.memory_id)
         section_refs.append(refs)
+    recalled_objections = _memory_refs(
+        objection_hits,
+        meetings,
+        prefix=[
+            f"Unresolved objection: {truncate(hit.text, PROMPT_TEXT_MAX_CHARS)}"
+            for hit in objection_hits
+        ],
+    )
+    if recalled_objections:
+        section_refs.append(recalled_objections)
+    cross_refs = [
+        ref
+        for ref in _memory_refs(cross_deal_hits, meetings, prefix=None, kind="cross_deal")
+        if ref.memory_id not in seen_ids
+    ]
+    if cross_refs:
+        section_refs.append(cross_refs)
     reflect_refs = _memory_refs(
         [hit for _, hit in objections],
         meetings,
@@ -213,7 +237,7 @@ def build_evidence(
     logger.debug(
         "brief.evidence recall_in=%d recall_kept=%d reflect_in=%d reflect_kept=%d "
         "ledger=%d total=%d",
-        sum(len(h) for h in sections),
+        sum(len(h) for h in sections) + len(objection_hits) + len(cross_deal_hits),
         len(recall_kept),
         len(objections),
         len(reflect_kept),
@@ -229,7 +253,7 @@ def build_evidence(
         )
 
     ordered = [*protected, *recall_kept, *reflect_kept, *ledger_refs]
-    counters = {"mm": 0, "mem": 0, "led": 0, "ask": 0}
+    counters = {"mm": 0, "mem": 0, "cross_deal": 0, "led": 0, "ask": 0}
     prefix_of = {
         SourceType.mental_model: "mm",
         SourceType.meeting: "mem",
@@ -238,7 +262,7 @@ def build_evidence(
     }
     numbered: list[EvidenceRef] = []
     for ref in ordered:
-        p = prefix_of[ref.source_type]
+        p = "cross_deal" if ref.kind == "cross_deal" else prefix_of[ref.source_type]
         counters[p] += 1
         numbered.append(ref.model_copy(update={"key": f"{p}:{counters[p]}"}))
     return EvidenceTable(numbered)
@@ -266,6 +290,7 @@ def _memory_refs(
     meetings: Mapping[str, MeetingInfo],
     *,
     prefix: Sequence[str] | None,
+    kind: str | None = None,
 ) -> list[EvidenceRef]:
     seen: set[str] = set()
     refs: list[EvidenceRef] = []
@@ -277,8 +302,18 @@ def _memory_refs(
         if meeting_date is None:
             continue
         seen.add(hit.memory_id)
-        label = call_label(meeting_date)
+        label = (
+            f"{info.title} · {meeting_date:%b} {meeting_date.day}"
+            if info
+            else call_label(meeting_date)
+        )
         body = prefix[i] if prefix is not None else truncate(hit.text, PROMPT_TEXT_MAX_CHARS)
+        source_account = next(
+            (tag.removeprefix("account:") for tag in hit.tags if tag.startswith("account:")),
+            None,
+        )
+        if kind == "cross_deal":
+            body = f"cross_deal evidence ({label}): {body}"
         refs.append(
             EvidenceRef(
                 key="",
@@ -289,6 +324,8 @@ def _memory_refs(
                 memory_id=hit.memory_id,
                 text=f"({label}) {body}",
                 label=label,
+                kind=kind,
+                account_id=source_account,
             )
         )
     return refs
@@ -318,7 +355,7 @@ def _ledger_refs(
         overdue = c.due_date is not None and c.due_date < today
         status = "OPEN, OVERDUE" if overdue else "OPEN"
         due = f", due {c.due_date.isoformat()}" if c.due_date else ""
-        label = f"Ledger, {call_label(info.date)}"
+        label = f"{info.title} · {info.date:%b} {info.date.day}"
         refs.append(
             EvidenceRef(
                 key="",

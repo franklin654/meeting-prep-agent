@@ -14,6 +14,10 @@ Rules:
 - Do not invent names, numbers, dates or promises. Use evidence wording for numbers.
 - open_commitments: one item per OPEN ledger entry; OVERDUE ones get severity "critical".
 - watch_outs and alerts: severity "warning".
+- Cross-account evidence is explicitly labeled `cross_deal`. At most one Watch-outs item
+  may use it. That item must begin "At <account>,", be one clean sentence of at most
+  40 words, and cite only `cross_deal` evidence. Describe a resolution from the named
+  other account; do not paste evidence fragments together.
 - personal_touchpoints: phrase as a question to ask ("Ask Rahul how ...").
 - agenda: 3-5 short talking points that address open items and objections.
 - Keep each item under 30 words. Follow the style profile for length and emphasis.
