@@ -152,6 +152,27 @@ async def test_b4_competitor_watch_out_cited_to_m3(world: World) -> None:
     assert watch.severity == Severity.warning  # floor for watch_outs
 
 
+async def test_repeated_same_meeting_competitor_objection_is_dropped(world: World) -> None:
+    def draft(prompt: str) -> BriefDraft:
+        return BriefDraft(
+            sections={
+                SectionKey.unresolved_objections: [
+                    item(
+                        "Karan still has concerns about DataHawk.",
+                        evidence_ids(prompt, "DataHawk"),
+                    )
+                ]
+            }
+        )
+
+    brief, _ = await make(world, draft)
+
+    assert section(brief, SectionKey.unresolved_objections) == []
+    (watch_out,) = section(brief, SectionKey.watch_outs)
+    assert watch_out.text == "FinEdge has looked at DataHawk."
+    assert watch_out.citations[0].meeting_id == "m3_finedge"
+
+
 async def test_overdue_commitments_keep_one_red_group_us_and_mark_customer_info(
     world: World,
 ) -> None:

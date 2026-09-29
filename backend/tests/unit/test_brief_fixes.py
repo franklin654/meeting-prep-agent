@@ -313,6 +313,9 @@ async def test_timing_line_emitted_once_with_all_keys_and_no_content(
 
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("brief.timing ")]
     assert len(lines) == 1
+    record = next(r for r in caplog.records if r.getMessage().startswith("brief.timing "))
+    assert record.name == "uvicorn.error"
+    assert record.levelno == logging.INFO
     line = lines[0]
     for key in ("load_ms", "recall_ms", "reflect_ms", "resolve_ms", "mental_model_ms",
                 "gather_ms", "p3_ms", "post_ms", "total_ms"):  # fmt: skip
