@@ -31,6 +31,23 @@ describe('Brief page', () => {
     expect(f.calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
+  it('shows the empty-brief state when a cached brief has no sections', async () => {
+    mockFetch({ 'GET /api/meetings/mtg_1/brief': { body: {
+      id: 'brf_empty', meeting_id: 'mtg_1', mode: 'memory', generated_at: '2026-09-29T10:00:00Z',
+      sections: [], facts_used: 0, preferences_applied: [],
+    } } })
+    renderRoutes(routes, { route: '/meetings/mtg_1' })
+    expect(await screen.findByText(/this brief has no items yet/i)).toBeInTheDocument()
+  })
+
+  it('shows skeletons and disables generation while the cached brief is loading', async () => {
+    const f = mockFetch({ 'GET /api/meetings/mtg_1/brief': { delayMs: 500, status: 404, body: { error: { code: 'not_found', message: 'No brief' } } } })
+    renderRoutes(routes, { route: '/meetings/mtg_1' })
+    expect(screen.getByLabelText('Loading memory brief')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /loading brief/i })).toBeDisabled()
+    expect(f.calls.every((call) => call.method === 'GET')).toBe(true)
+  })
+
   it('sends section feedback and refreshes the read-time brief', async () => {
     const f = mockFetch({
       'GET /api/meetings/mtg_1/brief': { body: {

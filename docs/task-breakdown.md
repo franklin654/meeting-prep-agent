@@ -48,10 +48,10 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T13 | Meetings, notes and jobs API | BE-core | T12 | `api/meetings.py`, `api/jobs.py` | Endpoints match OpenAPI in schemas doc | Done. Phase 3 gate passed with known deviations: brief p50 about 36-54 s (reflect step about 40 s), B3 cited to M4/M3, B4 not surfaced by P3 |
 | T14 | Brief service: evidence assembly, recall plan, mental model, P3, citation mapping, `no_memory` mode, cache | BE-brief | T06, T07, T08 | `services/brief.py`, prompt P3 | Acceptance 4–6 and 9 pass with fakes; phase 3 gate via API | Done. Phase 3 gate passed with known deviations: brief p50 about 36-54 s (reflect step about 40 s), B3 cited to M4/M3, B4 not surfaced by P3 |
 | T15 | Brief API (generate, get) | BE-brief | T14 | `api/briefs.py` | Endpoints match schemas doc | Done. Phase 3 gate passed with known deviations: brief p50 about 36-54 s (reflect step about 40 s), B3 cited to M4/M3, B4 not surfaced by P3 |
-| T16 | Dashboard, LogNotesDialog, job polling, learned toast | FE | T03, T13 | `pages/Dashboard.tsx` | Acceptance 1 passes in browser | Implemented; Phase 4 gate pending |
-| T17 | Brief page: sections, severities, CitationChip, MemoryToggle side by side, personalization meter | FE | T03, T15 | `pages/Brief.tsx`, components | Acceptance 5, 9, 11 pass in browser | Implemented; Phase 4 gate pending |
-| T18 | Contact timeline API and page | FE | T07, T03 | `api/contacts.py`, `pages/ContactTimeline.tsx` | Acceptance 10 passes | Implemented; Phase 4 gate pending |
-| T19 | Feedback API, preferences service, style profile, FeedbackControls | BE-brief | T14, T17 | `services/preferences.py`, components | Acceptance 7–8 pass; phase 4 gate met | Implemented; Phase 4 gate pending |
+| T16 | Dashboard, LogNotesDialog, job polling, learned toast | FE | T03, T13 | `pages/Dashboard.tsx` | Acceptance 1 passes in browser | Done |
+| T17 | Brief page: sections, severities, CitationChip, MemoryToggle side by side, personalization meter | FE | T03, T15 | `pages/Brief.tsx`, components | Acceptance 5, 9, 11 pass in browser | Done |
+| T18 | Contact timeline API and page | FE | T07, T03 | `api/contacts.py`, `pages/ContactTimeline.tsx` | Acceptance 10 passes | Done |
+| T19 | Feedback API, preferences service, style profile, FeedbackControls | BE-brief | T14, T17 | `services/preferences.py`, components | Acceptance 7–8 pass; phase 4 gate met | Done |
 | T20 | Reasoning: R2 contradictions after ingest, account alerts | BE-core | T12 | `services/reasoning.py`, prompt R2 | Acceptance 12 passes | Not started |
 | T21 | R1 objections and R3 cross-contact gaps in the brief | BE-brief | T14 | `services/brief.py`, prompts R1, R3 | Acceptance 13 passes | Not started |
 | T22 | R4 cross-deal patterns in the brief | BE-brief | T14, T11 | prompt R4 | Acceptance 16 passes | Not started |
