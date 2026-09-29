@@ -1002,6 +1002,34 @@ def test_safe_error_message_redacts_secrets_and_truncates() -> None:
     assert len(long) == ingest.ERROR_MESSAGE_MAX_CHARS
 
 
+@pytest.mark.parametrize(
+    ("raw", "secret"),
+    [
+        ("call to https://api.x.com/v1?api_key=abcd1234efgh&x=1 failed", "abcd1234efgh"),
+        ("bad org org-abc123def456 here", "abc123def456"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("key=abcdef0123456789abcd rejected", "abcdef0123456789abcd"),
+        ("x-api-key: shortkey123", "shortkey123"),
+        ("Authorization: abcdef", "abcdef"),
+        ("bad key sk_live_abcdefghijklmnop", "abcdefghijklmnop"),
+        ("bad key gsk-abc", "gsk-abc"),
+        ("password=hunter2 nope", "hunter2"),
+        ("https://h/x?access_token=zzz999&y=2", "zzz999"),
+        ("Token abc.def.ghi expired", "abc.def.ghi"),
+        ("Bad request. HTTP RESPONSE BODY: sk-verysecretvalue123", "verysecret"),
+    ],
+)
+def test_safe_error_message_redacts_secret_shapes(raw: str, secret: str) -> None:
+    assert secret not in ingest.safe_error_message(RuntimeError(raw))
+
+
+@pytest.mark.parametrize(
+    "benign", ["Retain timed out after 120s.", "LLM call exceeded the 120.0s timeout."]
+)
+def test_safe_error_message_leaves_benign_messages_unchanged(benign: str) -> None:
+    assert ingest.safe_error_message(RuntimeError(benign)) == benign
+
+
 def test_safe_error_message_cuts_response_bodies_and_never_empty() -> None:
     exc = RuntimeError('HTTP 400 Reason: Bad. HTTP response body: {"prompt": "TRANSCRIPT TEXT"}')
     msg = ingest.safe_error_message(exc)

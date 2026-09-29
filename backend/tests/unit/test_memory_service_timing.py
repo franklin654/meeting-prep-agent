@@ -114,6 +114,22 @@ async def test_timeout_returns_false_and_deadline_is_enforced() -> None:
     assert await flapping.wait_until_idle(0.05, poll_interval_s=0.01) is False
 
 
+async def test_final_sleep_is_clamped_to_the_remaining_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleeps: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def recording_sleep(delay: float, *args: Any) -> None:
+        sleeps.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(ms.asyncio, "sleep", recording_sleep)
+    service, _ = _idle_service([False])
+    assert await service.wait_until_idle(0.2, poll_interval_s=60.0) is False
+    assert sleeps and max(sleeps) <= 0.2  # never a full 60 s poll interval
+
+
 async def test_consecutive_idle_is_configurable() -> None:
     service, ops = _idle_service([True])
     assert await service.wait_until_idle(5.0, consecutive_idle=1, poll_interval_s=0.0) is True

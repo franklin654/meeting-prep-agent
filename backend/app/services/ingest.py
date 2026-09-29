@@ -154,10 +154,14 @@ _PUNCT_MAP = str.maketrans(
 )
 
 
+_LABELLED_SECRET = re.compile(
+    r"(?i)\b(api[_-]?key|access[_-]?token|token|secret|authorization|password|passwd|key)"
+    r"\s*[=:]\s*(?:(?:Basic|Bearer|Token)\s+)?\S+"
+)
+_SECRET_QUERY_PARAM = re.compile(r"(?i)[?&][^=\s&]*(?:key|token|secret|password)[^=\s&]*=[^&\s]*")
 _SECRET_PATTERNS = (
-    re.compile(r"(?i)bearer\s+\S+"),
-    re.compile(r"\bsk-[A-Za-z0-9_\-]{6,}"),
-    re.compile(r"\bgsk_[A-Za-z0-9_\-]{6,}"),
+    re.compile(r"(?i)\b(?:Basic|Bearer|Token)\s+\S+"),
+    re.compile(r"(?i)\b(?:sk|gsk|org|pk|rk)[-_][A-Za-z0-9_\-]{3,}"),
     re.compile(r"[A-Za-z0-9+/=_\-]{32,}"),
 )
 
@@ -165,11 +169,16 @@ _SECRET_PATTERNS = (
 def safe_error_message(exc: BaseException) -> str:
     """Short, secret-free description of `exc` for the job row (never prompt/transcript text).
 
-    Cuts at the first newline, `{` or the word "body" (HTTP bodies can echo the request),
-    redacts key-like tokens (sk-..., gsk_..., Bearer ..., long base64-ish strings), then
-    truncates to `ERROR_MESSAGE_MAX_CHARS`.
+    Cuts at the first newline, `{` or the word "body" (case-insensitive; HTTP bodies can echo
+    the request). Then redacts, before truncating to `ERROR_MESSAGE_MAX_CHARS`:
+    `label=value` / `label: value` pairs for api key, token, secret, authorization and
+    password labels (the whole pair becomes `label=<redacted>`); URL query parameters whose
+    name contains key/token/secret/password; `Basic|Bearer|Token <value>`; key prefixes
+    (sk-, gsk_, org-, pk-, rk-, sk_live_ ...); and any 32+ character base64-ish run.
     """
-    text = re.split(r"\n|\{|\bbody\b", str(exc), maxsplit=1)[0].strip()
+    text = re.split(r"(?i)\n|\{|\bbody\b", str(exc), maxsplit=1)[0].strip()
+    text = _LABELLED_SECRET.sub(lambda m: f"{m.group(1)}=<redacted>", text)
+    text = _SECRET_QUERY_PARAM.sub("?<redacted>", text)
     for pattern in _SECRET_PATTERNS:
         text = pattern.sub("[redacted]", text)
     text = text.strip() or type(exc).__name__

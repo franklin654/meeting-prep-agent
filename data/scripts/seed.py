@@ -256,6 +256,7 @@ async def seed(
 
         log(f"{tag} {meeting['date']} {meeting_id} start {_clock()}")
         started = time.monotonic()
+        job_id: str | None = None  # per meeting: never a stale id from the previous one
         try:
             job_id = _prepare_job(session_factory, meeting_id, texts[meeting_id])
             summary = await ingest_fn(

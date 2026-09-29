@@ -621,9 +621,11 @@ class HindsightMemoryService(MemoryService):
             idle_polls = idle_polls + 1 if pending.total == 0 and processing.total == 0 else 0
             if idle_polls >= max(1, consecutive_idle):
                 return True
-            if loop.time() >= deadline:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
                 return False
-            await asyncio.sleep(poll_interval_s)
+            # Never sleep past the deadline: the total stays within `timeout_s`.
+            await asyncio.sleep(min(poll_interval_s, remaining))
 
     async def delete_bank(self, bank_id: str) -> None:
         require_deletable_bank_id(bank_id)
