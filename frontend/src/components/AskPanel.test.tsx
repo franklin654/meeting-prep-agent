@@ -5,6 +5,19 @@ import { mockFetch } from '@/test/mockFetch'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 describe('AskPanel', () => {
+  it('shows the ungrounded response without citation chips using mocked Ask data', async () => {
+    const f = mockFetch({
+      'GET /api/meetings/mtg_1/suggested-questions': { body: { questions: [] } },
+      'POST /api/ask': { body: { ask_answer_id: 'ask_empty', answer: 'Nothing in memory covers that yet.', grounded: false, citations: [] } },
+    })
+    renderWithProviders(<AskPanel scopeType="meeting" scopeId="mtg_1" meetingId="mtg_1" />, { route: '/meetings/mtg_1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Open Ask' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Question' }), { target: { value: 'Any recent forecast?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(await screen.findByText('Nothing in memory covers that yet.')).toBeInTheDocument()
+    expect(f.calls.every((call) => call.path !== '/api/meetings/mtg_1/notes')).toBe(true)
+  })
+
   it('loads P4 suggestions, asks with citations, and can remember a note using mocked responses', async () => {
     const f = mockFetch({
       'GET /api/meetings/mtg_1/suggested-questions': { body: { questions: ['What changed about budget?'] } },

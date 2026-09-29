@@ -12,7 +12,7 @@ describe('routing', () => {
 
   it('renders the brief route at /meetings/:id', () => {
     renderRoutes(routes, { route: '/meetings/mtg-123' })
-    expect(screen.getByRole('heading', { name: 'Meeting mtg-123' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Meeting brief' })).toBeInTheDocument()
   })
 
   it('renders the contact timeline route at /contacts/:id', async () => {

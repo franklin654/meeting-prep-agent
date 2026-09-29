@@ -37,7 +37,7 @@ describe('Dashboard', () => {
       }] },
       'POST /api/meetings/mtg_1/notes': { status: 202, body: { job_id: 'job_1' } },
       'GET /api/jobs/job_1': {
-        body: { id: 'job_1', kind: 'ingest', status: 'done', learned: { facts: ['Budget is $75K'], new_commitments: 1, closed_commitments: 0, alerts: [] } },
+        body: { id: 'job_1', kind: 'ingest', status: 'done', learned: { facts: ['Budget is $75K'], new_commitments: 1, closed_commitments: 0, alerts: ['Contradiction: budget changed.'] } },
       },
     })
     renderWithProviders(<Dashboard />)
@@ -46,7 +46,8 @@ describe('Dashboard', () => {
     fireEvent.change(screen.getByLabelText(/meeting transcript/i), { target: { value: transcript } })
     fireEvent.change(screen.getByLabelText(/choose meeting/i), { target: { value: 'mtg_1' } })
     fireEvent.click(screen.getByRole('button', { name: /start learning/i }))
-    expect(await screen.findByText('Budget is $75K')).toBeInTheDocument()
+    expect(await screen.findByText(/Budget is \$75K.*Alerts: Contradiction/)).toBeInTheDocument()
+    expect(await screen.findByText(/Alerts: Contradiction: budget changed\./)).toBeInTheDocument()
     expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET', 'GET'])
   })
 })
