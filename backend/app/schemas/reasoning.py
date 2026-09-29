@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Contradiction(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     topic: str
     earlier_value: str
@@ -19,6 +19,6 @@ class Contradiction(BaseModel):
 
 
 class ContradictionReport(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     contradictions: list[Contradiction]

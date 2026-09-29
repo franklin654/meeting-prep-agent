@@ -51,10 +51,11 @@ def test_ask_request_enforces_field_constraints() -> None:
         )
 
 
-def test_reflect_answer_round_trips_and_forbids_extra() -> None:
+def test_reflect_answer_round_trips_and_ignores_extra() -> None:
     round_trip(ReflectAnswer(answer="Budget is $75K", confident=True))
-    with pytest.raises(ValidationError):
-        ReflectAnswer(answer="a", confident=False, extra_field="x")  # type: ignore[call-arg]
+    assert ReflectAnswer.model_validate(
+        {"answer": "Budget is $75K", "confident": True, "extra_field": "x"}
+    ) == ReflectAnswer(answer="Budget is $75K", confident=True)
 
 
 def test_ask_response_round_trips() -> None:
