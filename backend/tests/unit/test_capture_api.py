@@ -18,7 +18,8 @@ from app.api.deps import (
     get_session,
     get_session_factory,
 )
-from app.db.models import Account, Commitment, Contact, ExtractedFact, Meeting
+from app.core.errors import MemoryUnavailableError
+from app.db.models import Account, CaptureDraft, Commitment, Contact, ExtractedFact, Meeting
 from app.schemas.ack import AckMatches, RenewedMatch
 from app.schemas.enums import CommitmentStatus, FactKind, Owner
 from app.schemas.extraction import ExtractedCommitment, MeetingExtraction
@@ -138,6 +139,56 @@ def test_preview_is_side_effect_free_and_save_applies_only_selected_items(
         f"/api/capture/{draft['draft_id']}/save", json={"unchecked_item_ids": []}
     )
     assert repeated.json()["job_id"] == save_job_id
+
+
+def test_failed_save_leaves_draft_open_and_retry_replaces_ledger_rows(
+    capture_client: tuple[TestClient, Any, FakeLLM, FakeMemoryService],
+) -> None:
+    client, engine, llm, memory = capture_client
+    llm.queue_response(extraction())
+    preview = client.post("/api/meetings/m_new/capture/preview", json={"transcript": TRANSCRIPT})
+    draft_id = client.get(f"/api/jobs/{preview.json()['job_id']}").json()["draft"]["draft_id"]
+    memory.queue_retain_error(MemoryUnavailableError("Hindsight is temporarily unavailable."))
+
+    first = client.post(f"/api/capture/{draft_id}/save", json={"unchecked_item_ids": []})
+    first_job_id = first.json()["job_id"]
+    failed = client.get(f"/api/jobs/{first_job_id}").json()
+    assert failed["status"] == "failed"
+    assert failed["error"] == "memory_unavailable"
+    with Session(engine) as session:
+        draft = session.get(CaptureDraft, draft_id)
+        assert draft is not None and draft.status == "open"
+        original_commitments = session.exec(
+            select(Commitment).where(Commitment.meeting_id == "m_new")
+        ).all()
+        original_facts = session.exec(
+            select(ExtractedFact).where(ExtractedFact.meeting_id == "m_new")
+        ).all()
+        assert len(original_commitments) == 1
+        assert len(original_facts) == 2
+        original_commitment_ids = {row.id for row in original_commitments}
+        original_fact_ids = {row.id for row in original_facts}
+
+    retry = client.post(f"/api/capture/{draft_id}/save", json={"unchecked_item_ids": []})
+    retry_job_id = retry.json()["job_id"]
+    assert retry_job_id != first_job_id
+    assert client.get(f"/api/jobs/{retry_job_id}").json()["status"] == "done"
+    assert len(llm.calls) == 1  # retry reuses the reviewed draft; no new P1/P2
+    assert len(memory.items) == 1
+
+    with Session(engine) as session:
+        draft = session.get(CaptureDraft, draft_id)
+        assert draft is not None and draft.status == "saved"
+        commitments = session.exec(
+            select(Commitment).where(Commitment.meeting_id == "m_new")
+        ).all()
+        facts = session.exec(
+            select(ExtractedFact).where(ExtractedFact.meeting_id == "m_new")
+        ).all()
+        assert len(commitments) == 1
+        assert len(facts) == 2
+        assert {row.id for row in commitments}.isdisjoint(original_commitment_ids)
+        assert {row.id for row in facts}.isdisjoint(original_fact_ids)
 
 
 def test_discard_does_not_write_ledger_or_memory(

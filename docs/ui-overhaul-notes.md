@@ -40,7 +40,7 @@
 | Operation | Calls | Prompt tokens | Completion tokens | Notes |
 | --- | ---: | ---: | ---: | --- |
 | App LLM | 20 logical P1 calls (19 completed + 1 earlier interrupted), 1 P2 | partial: 3,442 | partial: 1,485 | The 15-call A3 backfill and two original Sandbox-W previews have no recoverable usage records. Logging fix was demonstrated with a Sandbox-W Uvicorn P1+P2 and one isolated one-meeting backfill-script P1; their provider totals are 3,442 prompt / 1,485 completion tokens. Four temperature fallbacks succeeded (A3, first Sandbox-W preview, Uvicorn probe, script probe); one earlier interrupted call had its retry interrupted. |
-| Hindsight retain | 2 attempts (1 reached service and completed; 1 connection-refused before a write) | unavailable | unavailable | Only the successful retain wrote to `ae-overhaul-test`; within the two-retain cap. |
+| Hindsight retain | 3 attempts (2 reached service and completed; 1 connection-refused before a write) | unavailable | unavailable | The two accepted writes are both in `ae-overhaul-test`, at the original cap; the refused attempt never reached Hindsight. |
 | Hindsight reflect | 0 | — | — | — |
 | Brief generation | 0 | — | — | — |
 | Pattern refresh | 0 | — | — | — |
@@ -86,6 +86,7 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Playwright/browser automation is unavailable in this session. Manual UI checklist: open `http://127.0.0.1:5174`; on Today, search for “AE Overhaul Checkpoint 1” and confirm the still-upcoming “Checkpoint 1 Capture Review” appears; in Contacts, search Morgan Riley; in Capture, select “Checkpoint 1 Capture Review Retry” from recent meetings and confirm the Saved summary and brief/contact actions. The API/ledger checks above confirm the corresponding data. No screenshots were fabricated.
 - Live calls through Checkpoint 1: A3's 15 completed backfill P1 calls plus the earlier interrupted logical call; 2 Sandbox-W P1 previews (both completed); 2 retain attempts (one connection failure before service acceptance, one successful retain). No brief generation, pattern refresh, or Hindsight reflect has run. Token totals remain unavailable from provider responses/logs; app logs did not expose provider-reported usage. The earlier expected `gpt-6-luna` temperature rejection retried successfully in the first Sandbox-W preview.
 - A0 logging fix: root cause was `BaseProvider` logging `llm.usage` on `app.llm.providers.base`; normal Uvicorn INFO handling is explicitly configured on `uvicorn.error` (the same logger used by brief timing). Changed the usage logger and strengthened adapter tests to assert logger name/level, provider token values, and no prompt/key leakage. Verification lines: Uvicorn `INFO:     llm.usage provider=openai model=gpt-6-luna call_type=json prompt_tokens=1476 completion_tokens=643`; P2 in the same probe reported 542/83. Standalone `backfill_facts.py` on a one-meeting temporary SQLite DB emitted `llm.usage provider=openai model=gpt-6-luna call_type=json prompt_tokens=1424 completion_tokens=759`. A3's historical token totals remain unknown; its original log has no usage lines, so no real-DB rerun was made.
+- Failed-save recovery checks: full backend pytest 679 passed, 1 skipped, 6 deselected; frontend Vitest 53 passed; Ruff, mypy, lint, and TypeScript check passed.
 
 ## B4–C4 plan addendum
 

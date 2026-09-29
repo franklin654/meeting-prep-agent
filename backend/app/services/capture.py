@@ -238,6 +238,7 @@ async def run_capture_save(
     draft_id: str,
     unchecked_item_ids: set[str],
     *,
+    retrying_failed_save: bool,
     memory: MemoryService,
     session_factory: SessionFactory,
 ) -> None:
@@ -252,6 +253,12 @@ async def run_capture_save(
             account = repository.get_account(session, meeting.account_id)
             if account is None:
                 raise NotFoundError(f"Account {meeting.account_id!r} not found.")
+            if retrying_failed_save:
+                # A previous save may have committed ledger rows before Hindsight failed.
+                # The draft is the source of truth for the selected rows, so replace its
+                # meeting-scoped ledger state before replaying it rather than duplicating it.
+                ingest_repo.reopen_commitments_closed_by(session, meeting.id)
+                ingest_repo.delete_commitments_for_meeting(session, meeting.id)
             extraction = MeetingExtraction.model_validate(draft.extraction["p1"])
             selected = [
                 CaptureItem.model_validate(row)

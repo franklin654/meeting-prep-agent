@@ -68,6 +68,7 @@ class FakeMemoryService(MemoryService):
         self.bank_ensured = False
         self._next_id = 0
         self.retain_timeouts: list[float | None] = []
+        self._retain_errors: list[Exception] = []
         self.idle_polls: list[bool] | None = None  # scripted busy(False)/idle(True) polls
         self.get_memory_calls: list[str] = []
         self.recall_calls: list[tuple[str, list[str], FactKind | None]] = []
@@ -87,6 +88,9 @@ class FakeMemoryService(MemoryService):
 
     def queue_reflect_error(self, error: Exception) -> None:
         self._reflect_queue.append(error)
+
+    def queue_retain_error(self, error: Exception) -> None:
+        self._retain_errors.append(error)
 
     def seed_mental_model(self, model_id: str, *, name: str, content: str) -> None:
         self.mental_models[model_id] = MentalModelText(
@@ -170,6 +174,8 @@ class FakeMemoryService(MemoryService):
     ) -> None:
         self._require_writable("retain_meeting")
         self.retain_timeouts.append(timeout_s)
+        if self._retain_errors:
+            raise self._retain_errors.pop(0)
         tags = [account_tag(account_id)]
         tags.extend(contact_tag(cid) for cid in contact_ids)
         tags.append(meeting_tag(meeting_id))

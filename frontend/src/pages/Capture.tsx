@@ -33,7 +33,7 @@ const BADGE_LABEL: Record<string, string> = {
 const JOB_ERROR: Record<string, string> = {
   not_found: 'The meeting or capture draft could not be found.',
   validation_error: 'The transcript or selected items are invalid. Review them and try again.',
-  memory_unavailable: 'Memory is unavailable right now. Try again in a moment.',
+  memory_unavailable: 'Memory temporarily unavailable.',
   llm_timeout: 'The model took too long to respond. Try again.',
   llm_invalid_output: 'The model returned an unusable result. Try again.',
   rate_limited: 'The model is busy. Wait a few seconds and try again.',
@@ -134,6 +134,8 @@ export function Capture() {
   const discard = useDiscardCapture(draft?.draft_id ?? '')
   const saveJob = useJob(saveJobId)
   const saved = Boolean(saveJobId && saveJob.data?.status === 'done' && saveJob.data.learned)
+  const saveFailed = saveJob.data?.status === 'failed'
+  const memoryUnavailable = saveFailed && saveJob.data?.error === 'memory_unavailable'
   const reviewing = Boolean(draft && !saved)
   const activeStep: 1 | 2 | 3 = saved ? 3 : reviewing ? 2 : 1
   const previewPending = Boolean(previewJobId && !draft && previewJob.data?.status !== 'failed')
@@ -282,7 +284,8 @@ export function Capture() {
         </p>
         {formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}
         {savePending && <div role="status" className="rounded-md border p-4 text-sm text-muted-foreground">Saving the selected items and remembering the transcript… <Skeleton className="mt-3 h-2 w-full" /></div>}
-        {saveJob.data?.status === 'failed' ? <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">{jobError(saveJob.data.error)}</p> : null}
+        {saveFailed && memoryUnavailable ? <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-alert-warning/40 bg-alert-warning-soft p-3 text-sm text-alert-warning-text"><p>Memory temporarily unavailable. Your review is safe; retrying will not re-extract it.</p><Button variant="outline" disabled={save.isPending} onClick={() => void handleSave()}>Retry</Button></div> : null}
+        {saveFailed && !memoryUnavailable ? <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">{jobError(saveJob.data?.error)}</p> : null}
         {saveJob.isError ? <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">{describeError(saveJob.error)}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" disabled={discard.isPending || savePending} onClick={() => void handleDiscard()}>{discard.isPending ? 'Discarding…' : 'Discard'}</Button>

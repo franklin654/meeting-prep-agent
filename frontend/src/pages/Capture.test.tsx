@@ -69,6 +69,36 @@ describe('Capture page', () => {
     expect(saveCall?.body).toEqual({ unchecked_item_ids: [] })
   })
 
+  it('retries a memory-unavailable save with the same draft and no new preview', async () => {
+    const fetchMock = mockFetch({
+      'GET /api/meetings': { body: MEETINGS },
+      'POST /api/meetings/m_up/capture/preview': { status: 202, body: { job_id: 'job_preview' } },
+      'GET /api/jobs/job_preview': { body: { id: 'job_preview', kind: 'capture_preview', status: 'done', draft: DRAFT } },
+      'POST /api/capture/draft_1/save': [
+        { status: 202, body: { job_id: 'job_save_failed' } },
+        { status: 202, body: { job_id: 'job_save_retry' } },
+      ],
+      'GET /api/jobs/job_save_failed': { body: { id: 'job_save_failed', kind: 'capture_save', status: 'failed', error: 'memory_unavailable' } },
+      'GET /api/jobs/job_save_retry': { body: { id: 'job_save_retry', kind: 'capture_save', status: 'done', learned: { facts: ['Needs EU hosting'], new_commitments: 1, closed_commitments: 0, alerts: [] } } },
+    })
+    renderWithProviders(<Capture />)
+    const meetingSelect = await screen.findByRole('combobox', { name: 'Choose meeting' })
+    await screen.findByRole('option', { name: /Pilot decision/ })
+    fireEvent.change(meetingSelect, { target: { value: 'm_up' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Meeting transcript or notes' }), { target: { value: 'A sufficiently long test transcript with an exact quote from Anita about a revised proposal and EU hosting.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Extract memories' }))
+    await screen.findByRole('heading', { name: 'Review what the agent found' })
+    fireEvent.click(screen.getByRole('button', { name: 'Save to memory' }))
+
+    expect(await screen.findByText('Memory temporarily unavailable. Your review is safe; retrying will not re-extract it.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('heading', { name: 'Memory updated' })).toBeInTheDocument()
+    expect(fetchMock.callsTo('POST /api/meetings/m_up/capture/preview')).toHaveLength(1)
+    const saves = fetchMock.callsTo('POST /api/capture/draft_1/save')
+    expect(saves).toHaveLength(2)
+    expect(saves[0].body).toEqual(saves[1].body)
+  })
+
   it('rejects non-text uploads and oversized files', async () => {
     mockFetch({ 'GET /api/meetings': { body: MEETINGS } })
     renderWithProviders(<Capture />)

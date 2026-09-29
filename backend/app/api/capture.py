@@ -72,8 +72,12 @@ def save_capture(
     if draft is None:
         raise NotFoundError(f"Capture draft {draft_id!r} not found.")
     existing_job_id = draft.extraction.get("save_job_id")
+    retrying_failed_save = False
     if existing_job_id:
-        return JobAccepted(job_id=str(existing_job_id))
+        existing_job = repository.get_job(session, str(existing_job_id))
+        if existing_job is not None and existing_job.status != "failed":
+            return JobAccepted(job_id=existing_job.id)
+        retrying_failed_save = existing_job is not None and existing_job.status == "failed"
     if draft.status != "open":
         raise ValidationError("Only an open capture draft can be saved.")
     known = {item.get("id") for item in draft.items}
@@ -89,6 +93,7 @@ def save_capture(
         job.id,
         draft_id,
         set(body.unchecked_item_ids),
+        retrying_failed_save=retrying_failed_save,
         memory=memory,
         session_factory=session_factory,
     )
