@@ -512,7 +512,14 @@ def _b5_alerts(
             and (raiser := _fact_subject(hit.text, inputs.account_contacts)) is not None
         ):
             candidates.append((hit.meeting_date, hit.memory_id, hit, raiser))
-    for meeting_date, _, source_hit, raiser in sorted(candidates, key=lambda c: c[:2]):
+    specific = [word for word in keywords if word.casefold() != "security"]
+
+    def specificity(hit: MemoryHit) -> int:
+        return sum(1 for word in specific if _security_hit(hit.text, [word]))
+
+    # Earliest meeting first; within it the hit naming the most specific topics, then memory_id.
+    ranked = sorted(candidates, key=lambda c: (c[0], c[2].meeting_id, -specificity(c[2]), c[1]))
+    for meeting_date, _, source_hit, raiser in ranked:
         meeting_id = source_hit.meeting_id
         assert meeting_id is not None
         call_attendees = inputs.attendee_ids_by_meeting[meeting_id]

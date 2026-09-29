@@ -103,6 +103,17 @@ def test_exact_item_with_raiser_who_is_not_an_upcoming_attendee() -> None:
     assert alert.contact_ids == ["c_anita"]
 
 
+def test_best_matching_hit_in_meeting_sets_topic_and_quote() -> None:
+    generic = "Sneha Iyer requests confirmation of the approved channel and redaction for security."
+    hits = [hit("m3", generic, D2, "a_first"), hit("m3", SNEHA_FACT, D2, "z_last")]
+    (alert,) = _b5_alerts(inputs(), hits, [], KEYWORDS)
+    assert alert.text == (
+        "Sneha Iyer raised a SOC 2 and data residency concern on Aug 12; "
+        "Anita Desai was not on that call."
+    )
+    assert alert.citations[0].quote == SNEHA_FACT
+
+
 def test_several_raisers_and_meetings_yield_one_earliest_item() -> None:
     hits = [
         hit("m4", "Karan Shah raised an RBI concern on 2026-08-27.", D3),
