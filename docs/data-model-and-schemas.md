@@ -402,6 +402,7 @@ class ErrorResponse(BaseModel):
 | `not_found` | 404 | Unknown meeting, contact, brief or job |
 | `validation_error` | 422 | Request body fails its model |
 | `memory_unavailable` | 503 | Hindsight unreachable or timing out |
+| `memory_read_only` | 409 | A Hindsight write was requested while `MEMORY_READ_ONLY` is enabled |
 | `llm_timeout` | 504 | LLM call exceeded 30 s |
 | `llm_invalid_output` | 502 | LLM output failed validation after one retry |
 | `rate_limited` | 429 | LLM provider (app or Hindsight) returned 429 after retries |

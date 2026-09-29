@@ -24,7 +24,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -146,6 +146,24 @@ class BaseProvider(LLMClient):
         self, prompt: str, schema: type[BaseModel], temperature: float, system: str | None
     ) -> Callable[[], Awaitable[str]]:
         return lambda: self._request_json(prompt, schema, temperature, system)
+
+    def _log_usage(self, response: Any, *, call_type: str) -> None:
+        """Log provider-reported token counts without ever logging request/response text."""
+        usage = getattr(response, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", None)
+        if prompt_tokens is None:
+            prompt_tokens = getattr(usage, "input_tokens", None)
+        completion_tokens = getattr(usage, "completion_tokens", None)
+        if completion_tokens is None:
+            completion_tokens = getattr(usage, "output_tokens", None)
+        logger.info(
+            "llm.usage provider=%s model=%s call_type=%s prompt_tokens=%s completion_tokens=%s",
+            self.provider_name,
+            self._model,
+            call_type,
+            prompt_tokens if prompt_tokens is not None else "unknown",
+            completion_tokens if completion_tokens is not None else "unknown",
+        )
 
     async def _with_backoff(self, call: Callable[[], Awaitable[R]]) -> R:
         """Run one provider request, mapping timeouts and retrying 429s with backoff."""

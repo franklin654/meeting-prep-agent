@@ -5,7 +5,7 @@
 | Ticket | Status | Commit |
 | --- | --- | --- |
 | Stage 0 | complete | pending docs-only commit |
-| A0 | planned | — |
+| A0 | complete | `651e0e5` |
 | A1 | planned | — |
 | A2 | planned | — |
 | A3 | planned | — |
@@ -30,6 +30,7 @@
 - Leave `deliverables/` untracked. Never read, edit, or commit `.env`; never use the real-DB API on port 8000.
 - The current server was unavailable during Stage 0. The checked-in generated OpenAPI client is the baseline contract until offline generation is run.
 - Per the user's explicit resolution of the conflict with AGENTS.md rule 9, commits that change a schema, table, endpoint, or error code may update only the matching portions of `docs/data-model-and-schemas.md`; all other conflicts belong in this file.
+- A0: `MEMORY_READ_ONLY` defaults off. The real and fake memory gateways reject every write (`ensure_bank`, `ensure_mental_models`, meeting/note/preference retains) with `memory_read_only` before issuing an SDK call. Provider adapters now log provider, model, `json`/`text` call type, and provider-reported prompt/completion token counts only.
 
 ## Live-call and token tally
 
@@ -57,4 +58,3 @@
 - Sandbox-W: one first-meeting P3 brief, one pattern refresh, fact hide/correct, follow-up edit/delete, prepared state.
 - Sandbox-R: at most two M6 memory brief generations, record latency/recall timeouts/critical count and verify read-only Hindsight behavior.
 - Read cached M6 on the real-memory data path before generation to prove zero-call enrichment.
-

@@ -37,7 +37,7 @@ from hindsight_client_api.exceptions import ApiException, OpenApiException
 from pydantic import BaseModel
 
 from app.config import settings
-from app.core.errors import MemoryUnavailableError, ValidationError
+from app.core.errors import MemoryReadOnlyError, MemoryUnavailableError, ValidationError
 from app.memory.tags import (
     MemoryKind,
     account_tag,
@@ -270,6 +270,13 @@ class HindsightMemoryService(MemoryService):
     def __init__(self, client: Hindsight | None = None) -> None:
         self._client = client or Hindsight(base_url=settings.hindsight_url)
 
+    @staticmethod
+    def _require_writable(operation: str) -> None:
+        if settings.memory_read_only:
+            raise MemoryReadOnlyError(
+                f"MEMORY_READ_ONLY is enabled; Hindsight write {operation!r} is not allowed."
+            )
+
     async def aclose(self) -> None:
         # `hindsight_client.Hindsight.aclose` ships with no type annotations
         # at all (confirmed via `inspect.signature`) -- a gap in the SDK's own
@@ -280,6 +287,7 @@ class HindsightMemoryService(MemoryService):
         # `acreate_bank` is create-or-update (SDK method name: `create_or_update_bank`
         # on the underlying `banks` namespace) so this is safe to call on every
         # startup, per docs/hindsight-integration.md Bootstrap step 1.
+        self._require_writable("ensure_bank")
         try:
             await self._client.acreate_bank(bank_id=BANK_ID)
             await self._client.aupdate_bank_config(
@@ -289,6 +297,7 @@ class HindsightMemoryService(MemoryService):
             raise MemoryUnavailableError(f"Could not ensure bank {BANK_ID!r}: {exc}") from exc
 
     async def ensure_mental_models(self, accounts: Sequence[tuple[str, str]]) -> None:
+        self._require_writable("ensure_mental_models")
         try:
             existing = await self._client.alist_mental_models(bank_id=BANK_ID, detail="metadata")
             existing_ids = {item.id for item in (existing.items or [])}
@@ -335,6 +344,7 @@ class HindsightMemoryService(MemoryService):
         source: str = "ingest",
         timeout_s: float | None = None,
     ) -> None:
+        self._require_writable("retain_meeting")
         tags = [account_tag(account_id)]
         tags.extend(contact_tag(cid) for cid in contact_ids)
         tags.append(meeting_tag(meeting_id))
@@ -356,6 +366,7 @@ class HindsightMemoryService(MemoryService):
         )
 
     async def retain_note(self, *, text: str, scope_type: ScopeType, scope_id: str) -> None:
+        self._require_writable("retain_note")
         tags = [kind_tag(MemoryKind.note)]
         if scope_type == ScopeType.account:
             tags.append(account_tag(scope_id))
@@ -367,6 +378,7 @@ class HindsightMemoryService(MemoryService):
         await self._retain(content=text, tags=tags, context="user note")
 
     async def retain_preference(self, sentence: str) -> None:
+        self._require_writable("retain_preference")
         await self._retain(
             content=sentence,
             tags=[kind_tag(MemoryKind.preference)],

@@ -22,6 +22,14 @@ def test_demo_today_has_a_default(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.demo_today == date(2026, 9, 28)
 
 
+def test_memory_read_only_defaults_off_and_reads_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MEMORY_READ_ONLY", raising=False)
+    assert Settings(_env_file=None).memory_read_only is False  # type: ignore[call-arg]
+
+    monkeypatch.setenv("MEMORY_READ_ONLY", "true")
+    assert Settings(_env_file=None).memory_read_only is True  # type: ignore[call-arg]
+
+
 def test_settings_ignore_unknown_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOME_FUTURE_TICKETS_VAR", "whatever")
 

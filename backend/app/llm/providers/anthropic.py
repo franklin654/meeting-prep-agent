@@ -74,6 +74,7 @@ class AnthropicProvider(BaseProvider):
         if system:
             kwargs["system"] = system
         response = await self._client.messages.create(**kwargs)
+        self._log_usage(response, call_type="json")
         for block in response.content:
             if block.type == "tool_use":
                 return json.dumps(block.input)
@@ -89,6 +90,7 @@ class AnthropicProvider(BaseProvider):
         if system:
             kwargs["system"] = system
         response = await self._client.messages.create(**kwargs)
+        self._log_usage(response, call_type="text")
         return "".join(block.text for block in response.content if block.type == "text")
 
     def _classify_error(self, exc: Exception) -> ErrorKind | None:
