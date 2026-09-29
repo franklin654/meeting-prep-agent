@@ -820,7 +820,7 @@ def test_consolidate_merge_keeps_due_date_from_later_restatement() -> None:
     b = _cm("Send the ROI one-pager", "q2", date(2026, 7, 30))
     kept, merged, _ = ingest.consolidate_commitments([a, b])
     assert merged == 1 and len(kept) == 1
-    assert kept[0].due_date == date(2026, 7, 30) and kept[0].source_quote == "q1"
+    assert kept[0].due_date == date(2026, 7, 30) and kept[0].source_quote == "q2"
 
 
 def test_consolidate_jaccard_and_distinct_deliverables() -> None:
@@ -1141,3 +1141,211 @@ async def test_non_receipt_complaint_cannot_close_via_unknown_id(
     )
     assert summary.closed_commitments == 0
     assert all(c.status == CommitmentStatus.open for c in _commitments(seeded))
+
+
+# ---- T12f: merged/bundled commitment keeps the quote that carries the date or deliverable ----
+
+COMPARISON = (
+    "Understood. I'll make it a decision-oriented comparison: current approach, proposed "
+    "scope, costs, and what we can or can't credibly quantify."
+)
+ROI = (
+    "I'll send an ROI one-pager by Aug 5. I'll keep it provisional until we have the "
+    "incident and maintenance inputs from Karan's team."
+)
+M2_TRANSCRIPT = "\n".join(
+    [
+        "[2026-07-28T09:15:26+05:30] Priya Nair (Account Executive, Tracewise): " + COMPARISON,
+        "[2026-07-28T09:16:02+05:30] Karan Shah (Data Platform Lead, FinEdge Payments): "
+        "I can get the incident data over by Aug 5 as well, the scope is clear.",
+        "[2026-07-28T09:40:12+05:30] Priya Nair (Account Executive, Tracewise): " + ROI,
+    ]
+)
+M3_TRANSCRIPT = (
+    "[2026-08-12T10:05:00+05:30] Rahul Mehta (VP Engineering, FinEdge Payments): "
+    "Yes, I received the ROI one-pager. Thanks."
+)
+BUNDLED_TEXT = (
+    "Prepare a decision-oriented comparison of the current approach and proposed scope, "
+    "including costs and what can be credibly quantified."
+)
+
+
+def _bundled(quote: str = COMPARISON, due: date | None = date(2026, 8, 5)) -> ExtractedCommitment:
+    return _cm(BUNDLED_TEXT, quote, due)
+
+
+def test_refine_replaces_quote_with_same_speaker_sentence_carrying_the_date() -> None:
+    (out,), refined = ingest.refine_quotes([_bundled()], M2_TRANSCRIPT)
+    assert refined == 1 and out.source_quote == ROI
+    assert (out.text, out.due_date, out.owner, out.owner_person) == (
+        BUNDLED_TEXT,
+        date(2026, 8, 5),
+        Owner.us,
+        "Priya",
+    )
+    assert is_verbatim(out.source_quote, normalize_text(M2_TRANSCRIPT))
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "I'll send it by Aug 5 for sure",
+        "due August 5th",
+        "by 2026-08-05",
+        "by the 5th",
+        "I'll send it by Friday",
+        "let's do it next week",
+    ],
+)
+def test_refine_leaves_quotes_that_already_carry_a_date_signal(quote: str) -> None:
+    item = _bundled(quote)
+    assert ingest.refine_quotes([item], M2_TRANSCRIPT) == ([item], 0)
+
+
+def test_refine_never_touches_undated_commitments() -> None:
+    item = _bundled(due=None)
+    assert ingest.refine_quotes([item], M2_TRANSCRIPT) == ([item], 0)
+
+
+def test_refine_keeps_quote_when_no_same_speaker_sentence_qualifies() -> None:
+    transcript = M2_TRANSCRIPT.replace("by Aug 5. I'll keep", "soon. I'll keep")
+    item = _bundled()
+    # Karan's "by Aug 5" sentence is a different speaker, so it must not be used.
+    assert ingest.refine_quotes([item], transcript) == ([item], 0)
+
+
+def test_refine_requires_deliverable_term_or_shared_content_word() -> None:
+    transcript = (
+        "[2026-07-28T09:15:26+05:30] Priya Nair (Account Executive, Tracewise): "
+        + COMPARISON
+        + "\n[2026-07-28T09:40:12+05:30] Priya Nair (Account Executive, Tracewise): "
+        "Lunch is booked for Aug 5 at noon."
+    )
+    item = _bundled()
+    assert ingest.refine_quotes([item], transcript) == ([item], 0)
+
+
+def test_refine_does_not_use_a_different_speakers_sentence() -> None:
+    karan_only = "\n".join(
+        [
+            "[2026-07-28T09:15:26+05:30] Priya Nair (Account Executive, Tracewise): " + COMPARISON,
+            "[2026-07-28T09:40:12+05:30] Karan Shah (Data Platform Lead, FinEdge): " + ROI,
+        ]
+    )
+    item = _bundled()
+    assert ingest.refine_quotes([item], karan_only) == ([item], 0)
+
+
+def test_refine_clips_long_utterance_to_the_dated_sentence() -> None:
+    filler = "We will keep the comparison provisional and detailed. " * 6
+    text = filler + "I'll send an ROI one-pager by Aug 5. " + filler
+    transcript = (
+        "[2026-07-28T09:15:26+05:30] Priya Nair (Account Executive, Tracewise): "
+        + COMPARISON
+        + "\n[2026-07-28T09:40:12+05:30] Priya Nair (Account Executive, Tracewise): "
+        + text
+    )
+    (out,), refined = ingest.refine_quotes([_bundled()], transcript)
+    assert refined == 1 and out.source_quote == "I'll send an ROI one-pager by Aug 5."
+    assert len(out.source_quote) <= ingest.MAX_QUOTE_CHARS
+
+
+def test_merge_keeps_the_quote_of_the_member_carrying_the_due_date() -> None:
+    norm = normalize_text(M2_TRANSCRIPT)
+    comparison = _cm("Prepare a decision-oriented comparison of scope and costs", COMPARISON)
+    dated = _cm(
+        "Prepare a decision-oriented comparison of scope and costs and the ROI one-pager",
+        ROI,
+        date(2026, 8, 5),
+    )
+    for order in ([comparison, dated], [dated, comparison]):
+        (out,), merged, _ = ingest.consolidate_commitments(order, norm)
+        assert merged == 1 and out.source_quote == ROI and out.due_date == date(2026, 8, 5)
+        assert out.text.endswith("the ROI one-pager")  # most specific (longer) text kept
+
+
+def test_merge_without_dates_prefers_the_quote_naming_the_deliverable() -> None:
+    norm = normalize_text(M2_TRANSCRIPT)
+    vague = _cm("Send the ROI one-pager", "Understood.")
+    named = _cm("Send the ROI one-pager", ROI)
+    (out,), merged, _ = ingest.consolidate_commitments([vague, named], norm)
+    assert merged == 1 and out.source_quote == ROI
+
+
+async def _add_meeting(
+    db: Session, meeting_id: str, when: datetime, title: str, transcript: str, who: list[str]
+) -> None:
+    repo.create_meeting(
+        db,
+        Meeting(
+            id=meeting_id,
+            account_id="acc_finedge",
+            title=title,
+            scheduled_at=when,
+            status="upcoming",
+            transcript=transcript,
+        ),
+    )
+    for cid in who:
+        repo.add_attendee(db, meeting_id, cid)
+
+
+async def test_m2_case_end_to_end_quote_is_refined_and_p2_sees_roi_one_pager(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    await _add_meeting(
+        seeded,
+        "m2_finedge",
+        datetime(2026, 7, 28, 9, tzinfo=UTC),
+        "Budget",
+        M2_TRANSCRIPT,
+        ["c_priya", "c_karan"],
+    )
+    await _add_meeting(
+        seeded,
+        "m3_finedge",
+        datetime(2026, 8, 12, 10, tzinfo=UTC),
+        "Deep dive",
+        M3_TRANSCRIPT,
+        ["c_priya", "c_rahul"],
+    )
+    llm, memory = FakeLLM(), FakeMemoryService()
+    llm.queue_response(
+        MeetingExtraction(
+            people=[],
+            acknowledgements=[],
+            facts=[],
+            deal_budget_usd=None,
+            commitments=[_bundled()],
+        )
+    )
+    await run_ingest(_job(seeded), "m2_finedge", llm=llm, memory=memory, session_factory=factory)
+    (row,) = [c for c in _commitments(seeded) if c.meeting_id == "m2_finedge"]
+    assert row.source_quote == ROI
+    assert (row.text, row.due_date, row.owner) == (BUNDLED_TEXT, date(2026, 8, 5), Owner.us)
+
+    llm.queue_response(
+        MeetingExtraction(
+            people=[],
+            commitments=[],
+            facts=[],
+            deal_budget_usd=None,
+            acknowledgements=[
+                Acknowledgement(
+                    description="ROI one-pager received",
+                    source_quote="Yes, I received the ROI one-pager.",
+                )
+            ],
+        )
+    )
+    llm.queue_response(
+        AckMatches(closed=[ClosedMatch(commitment_id=row.id, acknowledgement_index=0)])
+    )
+    summary = await run_ingest(
+        _job(seeded), "m3_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+    p2_prompt = llm.calls[-1].prompt
+    line = next(ln for ln in p2_prompt.splitlines() if ln.startswith(row.id))
+    assert "original words:" in line and "ROI one-pager by Aug 5" in line
+    assert summary.closed_commitments == 1
