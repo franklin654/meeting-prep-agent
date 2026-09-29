@@ -7,6 +7,8 @@ import type { components } from './schema'
 export type Brief = components['schemas']['Brief']
 export type MeetingSummary = components['schemas']['MeetingSummary']
 export type JobStatus = components['schemas']['JobStatus']
+export type ContactTimelineData = components['schemas']['ContactTimeline']
+export type StyleProfile = components['schemas']['StyleProfile']
 
 export const JOB_POLL_MS = 2500
 /** ~150 s of polling, then stop. */
@@ -25,15 +27,28 @@ export function useMeetings(status?: MeetingStatus) {
   })
 }
 
+export function useContactTimeline(contactId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.contactTimeline(contactId ?? ''),
+    enabled: !!contactId,
+    queryFn: async () => {
+      const { data } = await api.GET('/api/contacts/{contact_id}/timeline', {
+        params: { path: { contact_id: contactId! } },
+      })
+      return data as ContactTimelineData
+    },
+  })
+}
+
 /**
  * The stored brief for a meeting and mode. A 404 means "no cached brief" and
  * resolves to `null`. This hook only ever GETs; generation is an explicit
  * mutation (useGenerateBrief).
  */
-export function useBrief(meetingId: string | undefined, mode: BriefMode) {
+export function useBrief(meetingId: string | undefined, mode: BriefMode, enabled = true) {
   return useQuery({
     queryKey: queryKeys.brief(meetingId ?? '', mode),
-    enabled: !!meetingId,
+    enabled: !!meetingId && enabled,
     staleTime: BRIEF_STALE_MS,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Brief | null> => {
@@ -63,6 +78,32 @@ export function useGenerateBrief(meetingId: string, mode: BriefMode) {
     onSuccess: (brief) => {
       queryClient.setQueryData(queryKeys.brief(meetingId, mode), brief)
       void queryClient.invalidateQueries({ queryKey: queryKeys.meetingsAll() })
+    },
+  })
+}
+
+export function useStyle() {
+  return useQuery({
+    queryKey: queryKeys.style(),
+    queryFn: async () => {
+      const { data } = await api.GET('/api/style')
+      return data as StyleProfile
+    },
+  })
+}
+
+export function useSubmitFeedback(meetingId: string, briefId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (feedback: components['schemas']['FeedbackRequest']) => {
+      const { data } = await api.POST('/api/briefs/{brief_id}/feedback', {
+        params: { path: { brief_id: briefId } }, body: feedback,
+      })
+      return data as StyleProfile
+    },
+    onSuccess: (profile) => {
+      queryClient.setQueryData(queryKeys.style(), profile)
+      void queryClient.invalidateQueries({ queryKey: ['brief', meetingId] })
     },
   })
 }

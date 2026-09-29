@@ -86,6 +86,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/briefs/{brief_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Feedback
+         * @description Store the feedback row, retain one preference sentence, return the new profile.
+         */
+        post: operations["post_feedback_api_briefs__brief_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/style": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Style
+         * @description The style profile derived from every feedback row.
+         */
+        get: operations["get_style_api_style_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contacts/{contact_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contact Timeline
+         * @description Everything memory knows about a contact, newest meeting first, deduplicated, max 30.
+         */
+        get: operations["contact_timeline_api_contacts__contact_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -184,6 +244,26 @@ export interface components {
             /** Role */
             role: string | null;
         };
+        /** ContactTimeline */
+        ContactTimeline: {
+            contact: components["schemas"]["ContactRef"];
+            /** Entries */
+            entries: components["schemas"]["TimelineEntry"][];
+        };
+        /**
+         * FactKind
+         * @enum {string}
+         */
+        FactKind: "commitment" | "objection" | "personal" | "deal_fact" | "competitor";
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            section: components["schemas"]["SectionKey"];
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "up" | "down" | "more" | "less" | "collapsed";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -262,6 +342,32 @@ export interface components {
          * @enum {string}
          */
         SourceType: "meeting" | "ledger" | "mental_model" | "ask";
+        /** StyleProfile */
+        StyleProfile: {
+            /** Section Order */
+            section_order: components["schemas"]["SectionKey"][];
+            /** Hidden Sections */
+            hidden_sections: components["schemas"]["SectionKey"][];
+            /**
+             * Length
+             * @enum {string}
+             */
+            length: "short" | "standard" | "detailed";
+            /** Notes */
+            notes: string[];
+        };
+        /** TimelineEntry */
+        TimelineEntry: {
+            /** Text */
+            text: string;
+            fact_kind: components["schemas"]["FactKind"] | null;
+            /**
+             * Learned On
+             * Format: date
+             */
+            learned_on: string;
+            citation: components["schemas"]["Citation"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -434,6 +540,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_feedback_api_briefs__brief_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brief_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_style_api_style_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleProfile"];
+                };
+            };
+        };
+    };
+    contact_timeline_api_contacts__contact_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactTimeline"];
                 };
             };
             /** @description Validation Error */

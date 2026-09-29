@@ -9,4 +9,6 @@ export const queryKeys = {
   meetingsAll: () => ['meetings'] as const,
   brief: (meetingId: string, mode: BriefMode) => ['brief', meetingId, mode] as const,
   job: (jobId: string) => ['job', jobId] as const,
+  contactTimeline: (contactId: string) => ['contact-timeline', contactId] as const,
+  style: () => ['style'] as const,
 }
