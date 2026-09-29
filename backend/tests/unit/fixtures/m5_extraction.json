@@ -1,0 +1,19 @@
+{
+  "people": [
+    {"name_as_said": "Priya Nair", "role_if_stated": "Account Executive", "organisation": "Tracewise"},
+    {"name_as_said": "Karan Shah", "role_if_stated": "Data Platform Lead", "organisation": "FinEdge Payments"}
+  ],
+  "commitments": [],
+  "acknowledgements": [
+    {
+      "description": "DAG configs received",
+      "source_quote": "thanks for sending the DAG configs"
+    },
+    {
+      "description": "Rahul is waiting on something from our side",
+      "source_quote": "Rahul said he's still waiting on something from your side."
+    }
+  ],
+  "facts": [],
+  "deal_budget_usd": 40000
+}

@@ -1,0 +1,33 @@
+{
+  "people": [
+    {"name_as_said": "Priya Nair", "role_if_stated": "Account Executive", "organisation": "Tracewise"},
+    {"name_as_said": "Karan Shah", "role_if_stated": "Data Platform Lead", "organisation": "FinEdge Payments"},
+    {"name_as_said": "Rahul Mehta", "role_if_stated": "VP Engineering", "organisation": "FinEdge Payments"}
+  ],
+  "commitments": [
+    {
+      "owner": "us",
+      "owner_person": "Priya",
+      "text": "Send revised pricing deck with pilot option",
+      "due_date": "2026-09-03",
+      "source_quote": "I'll also send a revised pricing deck with the pilot option by Sep 3."
+    },
+    {
+      "owner": "them",
+      "owner_person": "KS",
+      "text": "Send sample DAG configs",
+      "due_date": "2026-09-05",
+      "source_quote": "I'll send sample DAG configs by Sep 5."
+    }
+  ],
+  "acknowledgements": [],
+  "facts": [
+    {
+      "kind": "deal_fact",
+      "about_person": null,
+      "text": "55 pipelines in production",
+      "source_quote": "It's still 55 in production."
+    }
+  ],
+  "deal_budget_usd": null
+}
