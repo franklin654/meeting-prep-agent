@@ -62,7 +62,7 @@ from app.schemas.brief import (
 )
 from app.schemas.enums import FactKind, Owner
 from app.schemas.memory import MemoryHit
-from app.schemas.reasoning import GapReport
+from app.schemas.reasoning import GapReport, PatternReport
 from app.schemas.reflect import parse_reflect_result
 from app.services.evidence import (
     QUOTE_MAX_CHARS,
@@ -189,6 +189,7 @@ class MemoryContext:
     recall_sections: list[list[MemoryHit]] = field(default_factory=list)  # rank order each
     objections: list[tuple[Objection, MemoryHit]] = field(default_factory=list)
     cross_contact_alerts: list[BriefItem] = field(default_factory=list)
+    cross_deal_patterns: list[BriefItem] = field(default_factory=list)
 
 
 TOP_HITS_PER_QUERY = 3
@@ -473,6 +474,120 @@ async def _cross_contact_alerts(
     ]
 
 
+def _overlap_count(left: str, right: str) -> int:
+    left_tokens = set(re.findall(r"[a-z0-9]{3,}", left.casefold()))
+    right_tokens = set(re.findall(r"[a-z0-9]{3,}", right.casefold()))
+    return len(left_tokens & right_tokens)
+
+
+def _pattern_item(
+    pattern: Any,
+    current_account_id: str,
+    sources: Sequence[MemoryHit],
+) -> BriefItem | None:
+    current_tag = account_tag(current_account_id)
+    named_account_tokens = set(re.findall(r"[a-z0-9]{3,}", pattern.other_account.casefold()))
+    other_sources: list[tuple[str, MemoryHit]] = []
+    for source in sources:
+        source_accounts = [tag for tag in source.tags if tag.startswith("account:")]
+        if (
+            source.meeting_id is not None
+            and source.meeting_date is not None
+            and len(source_accounts) == 1
+            and source_accounts[0] != current_tag
+            and bool(
+                named_account_tokens
+                & set(re.findall(r"[a-z0-9]{3,}", source_accounts[0].casefold()))
+            )
+        ):
+            other_sources.append((source_accounts[0], source))
+
+    objection_source = next(
+        (
+            (account, source)
+            for account, source in other_sources
+            if _overlap_count(pattern.objection, source.text) >= 1
+        ),
+        None,
+    )
+    if objection_source is None:
+        return None
+    account_id, objection_hit = objection_source
+    resolved_hit = next(
+        (
+            source
+            for source_account, source in other_sources
+            if source_account == account_id
+            and source.meeting_id != objection_hit.meeting_id
+            and _overlap_count(pattern.what_worked, source.text) >= 2
+        ),
+        None,
+    )
+    if resolved_hit is None:
+        return None
+
+    citations = [
+        Citation(
+            source_type=SourceType.meeting,
+            meeting_id=source.meeting_id,
+            meeting_date=source.meeting_date,
+            label=f"{source.meeting_id} on {format_date(source.meeting_date)}",
+            quote=truncate(source.text, QUOTE_MAX_CHARS),
+            memory_id=source.memory_id,
+        )
+        for source in (objection_hit, resolved_hit)
+        if source.meeting_id is not None and source.meeting_date is not None
+    ]
+    return BriefItem(
+        id=f"cross_deal-{objection_hit.memory_id}-{resolved_hit.memory_id}",
+        text=(
+            f"{pattern.objection} was resolved at {pattern.other_account} with "
+            f"{pattern.what_worked}."
+        ),
+        severity=Severity.warning,
+        contact_ids=[],
+        citations=citations,
+    )
+
+
+async def _cross_deal_patterns(
+    memory: MemoryService,
+    *,
+    account_id: str,
+    deal_stage: str,
+    timings: Timings | None = None,
+) -> list[BriefItem]:
+    recall_started = time.monotonic()
+    current_hits = await memory.recall_facts(
+        query="Current objections, security blockers and must-have requirements",
+        tags=[account_tag(account_id)],
+    )
+    if timings is not None:
+        timings.record_max("recall", time.monotonic() - recall_started)
+    current_objections = "\n".join(hit.text for hit in current_hits[:8]) or "(none recalled)"
+    query = render_prompt(
+        "reflect_patterns", deal_stage=deal_stage, current_objections=current_objections
+    )
+    reflect_started = time.monotonic()
+    result = await memory.reflect_structured(
+        query=query, tags=[], schema=PatternReport, budget="high"
+    )
+    if timings is not None:
+        timings.record_max("reflect", time.monotonic() - reflect_started)
+    report = parse_reflect_result("R4", result, PatternReport)
+    if not isinstance(report, PatternReport) or not report.patterns:
+        return []
+    resolve_started = time.monotonic()
+    sources = await memory.resolve_sources(result.sources)
+    if timings is not None:
+        timings.record_max("resolve", time.monotonic() - resolve_started)
+    return [
+        item
+        for pattern in report.patterns
+        if (item := _pattern_item(pattern, account_id, sources)) is not None
+    ]
+
+
 async def _timed_mental_model(
     memory: MemoryService, name: str, timings: Timings
 ) -> MentalModelText | None:
@@ -512,6 +627,12 @@ async def _gather_memory(
             meetings=inputs.account_meetings,
             timings=timings,
         ),
+        _cross_deal_patterns(
+            memory,
+            account_id=account.id,
+            deal_stage=account.stage,
+            timings=timings,
+        ),
         _recall_top(
             memory,
             section="watch_outs",
@@ -535,7 +656,13 @@ async def _gather_memory(
         return_exceptions=True,
     )
     timings.set("gather", time.monotonic() - gather_started)
-    labels = ["mental_model", "unresolved_objections", "cross_contact_gaps", "watch_outs"]
+    labels = [
+        "mental_model",
+        "unresolved_objections",
+        "cross_contact_gaps",
+        "cross_deal_patterns",
+        "watch_outs",
+    ]
     labels += [f"personal_touchpoints:{c.id}" for c in external]
 
     failed = 0
@@ -546,7 +673,7 @@ async def _gather_memory(
         elif isinstance(result, BaseException):
             raise result  # a bug or a non-memory error must not be swallowed
 
-    mental_model, objections, cross_contact, *recalls = results
+    mental_model, objections, cross_contact, cross_deal, *recalls = results
     context = MemoryContext()
     if isinstance(mental_model, MentalModelText):
         context.mental_model = mental_model
@@ -555,6 +682,10 @@ async def _gather_memory(
     if isinstance(cross_contact, list):
         context.cross_contact_alerts = [
             item for item in cross_contact if isinstance(item, BriefItem)
+        ]
+    if isinstance(cross_deal, list):
+        context.cross_deal_patterns = [
+            item for item in cross_deal if isinstance(item, BriefItem)
         ]
     for recall in recalls:
         if isinstance(recall, list):
@@ -889,6 +1020,7 @@ def assemble_brief(
     competitor_hits: Sequence[MemoryHit] = (),
     competitors: Sequence[str] = (),
     cross_contact_alerts: Sequence[BriefItem] = (),
+    cross_deal_patterns: Sequence[BriefItem] = (),
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
     sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
@@ -934,6 +1066,13 @@ def assemble_brief(
         sections.setdefault(SectionKey.alerts, []).extend(
             item
             for item in cross_contact_alerts
+            if item.citations and all(_is_citable(c) for c in item.citations)
+        )
+
+    if mode == "memory" and cross_deal_patterns:
+        sections.setdefault(SectionKey.watch_outs, []).extend(
+            item
+            for item in cross_deal_patterns
             if item.citations and all(_is_citable(c) for c in item.citations)
         )
 
@@ -1068,6 +1207,7 @@ async def generate_brief(
     table = EvidenceTable([])
     competitor_hits: Sequence[MemoryHit] = ()
     cross_contact_alerts: Sequence[BriefItem] = ()
+    cross_deal_patterns: Sequence[BriefItem] = ()
     if with_memory:
         context = await _gather_memory(
             inputs, memory, today(), competitors=persona.competitors, timings=timings
@@ -1090,6 +1230,7 @@ async def generate_brief(
         )
         competitor_hits = context.recall_sections[0] if context.recall_sections else []
         cross_contact_alerts = context.cross_contact_alerts
+        cross_deal_patterns = context.cross_deal_patterns
         logger.info(
             "brief.gathered meeting=%s evidence=%d duration_ms=%d",
             meeting_id,
@@ -1120,6 +1261,7 @@ async def generate_brief(
         competitor_hits=competitor_hits if with_memory else (),
         competitors=persona.competitors if with_memory else (),
         cross_contact_alerts=cross_contact_alerts if with_memory else (),
+        cross_deal_patterns=cross_deal_patterns if with_memory else (),
     )
     if with_memory and not brief.sections:
         # Never persist (and so never serve from the cache) a brief with nothing in it.

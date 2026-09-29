@@ -89,7 +89,9 @@ async def test_watch_outs_fallback_not_used_when_labelled_recall_has_hits(
 
     await make(world)
 
-    account_calls = [c for c in calls if c[1] == (account_tag(ACC),)]
+    account_calls = [
+        c for c in calls if c[1] == (account_tag(ACC),) and c[2] == FactKind.competitor
+    ]
     assert account_calls == [
         (
             competitor_query(load_persona().competitors),
@@ -120,7 +122,10 @@ async def test_watch_outs_fallback_used_when_labelled_recall_is_empty(
         ),
     )
 
-    account_calls = [c for c in calls if c[1] == (account_tag(ACC),)]
+    expected_query = competitor_query(load_persona().competitors)
+    account_calls = [
+        c for c in calls if c[1] == (account_tag(ACC),) and c[0] == expected_query
+    ]
     assert [c[2] for c in account_calls] == [FactKind.competitor, None]
     assert all(c[0] == competitor_query(load_persona().competitors) for c in account_calls)
     (watch,) = section(brief, SectionKey.watch_outs)

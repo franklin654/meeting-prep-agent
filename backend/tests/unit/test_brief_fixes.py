@@ -260,7 +260,8 @@ async def test_watch_out_queries_carry_configured_competitor_names(
     await make(world, lambda p: BriefDraft(sections={}))
 
     expected = f"{COMPETITOR_QUERY} such as Zorblax"
-    assert calls == [(expected, FactKind.competitor), (expected, None)]  # fallback has it too
+    competitor_calls = [call for call in calls if call[0].startswith(COMPETITOR_QUERY)]
+    assert competitor_calls == [(expected, FactKind.competitor), (expected, None)]
 
 
 async def test_no_competitor_in_persona_keeps_the_generic_query(
@@ -271,7 +272,9 @@ async def test_no_competitor_in_persona_keeps_the_generic_query(
 
     await make(world, lambda p: BriefDraft(sections={}))
 
-    assert calls == [(COMPETITOR_QUERY, FactKind.competitor)]
+    assert [call for call in calls if call[0].startswith(COMPETITOR_QUERY)] == [
+        (COMPETITOR_QUERY, FactKind.competitor)
+    ]
 
 
 async def test_watch_outs_pool_of_eight_keep_first_three_resolved(
