@@ -62,6 +62,58 @@ MAX_QUOTE_CHARS = 200
 MAX_COMMITMENTS_PER_MEETING = 5
 NEAR_DUPLICATE_JACCARD = 0.8
 
+# Deterministic backstop for meeting logistics/prep that P1 sometimes still returns. Both lists
+# are matched as whole words/phrases on the commitment TEXT after `_normalize_name`
+# (lowercase, punctuation to spaces: "one-pager" -> "one pager", "SOC 2" -> "soc 2").
+# An item is dropped when its text contains a logistics term or starts with a logistics verb,
+# UNLESS it also names a substantive deliverable from the allow list (allow list always wins,
+# so the planted deliverables can never be filtered out).
+LOGISTICS_TERMS: tuple[str, ...] = (
+    "recap",
+    "agenda",
+    "minutes",
+    "attendee",
+    "attendees",
+    "invite",
+    "invitation",
+    "calendar",
+    "scheduling",
+    "questionnaire",
+    "checklist",
+    "session outline",
+    "information needed",
+)
+LOGISTICS_LEADING_VERBS: tuple[str, ...] = (
+    "bring",
+    "prepare",
+    "identify",
+    "ask",
+    "confirm",
+    "schedule",
+    "book",
+)
+DELIVERABLE_ALLOW_TERMS: tuple[str, ...] = (
+    "deck",
+    "pricing",
+    "proposal",
+    "quote",
+    "comparison",
+    "case study",
+    "one pager",
+    "report",
+    "configs",
+    "config",
+    "access",
+    "credentials",
+    "portal",
+    "sandbox",
+    "pen test",
+    "shortlist",
+    "soc 2",
+    "security package",
+    "data flow",
+)
+
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
 _GENERIC_FIRST_WORDS = frozenset(
@@ -146,6 +198,8 @@ def _words(text: str) -> frozenset[str]:
 
 def _is_near_duplicate(a: ExtractedCommitment, b: ExtractedCommitment) -> bool:
     """Same normalized text, word-set Jaccard >= 0.8, or same owner_person with containment."""
+    if normalize_text(a.source_quote) == normalize_text(b.source_quote):
+        return True  # same sentence, same promise
     text_a, text_b = _normalize_name(a.text), _normalize_name(b.text)
     if not text_a or not text_b:
         return False
@@ -162,10 +216,35 @@ def _is_near_duplicate(a: ExtractedCommitment, b: ExtractedCommitment) -> bool:
     return same_person and (text_a in text_b or text_b in text_a)
 
 
+def _has_term(padded_text: str, terms: Sequence[str]) -> bool:
+    return any(f" {term} " in padded_text for term in terms)
+
+
+def is_logistics(text: str) -> bool:
+    """True for meeting logistics/prep wording with no substantive deliverable noun."""
+    normalized = _normalize_name(text)
+    padded = f" {normalized} "
+    if _has_term(padded, DELIVERABLE_ALLOW_TERMS):
+        return False
+    first = normalized.split(" ", 1)[0] if normalized else ""
+    return first in LOGISTICS_LEADING_VERBS or _has_term(padded, LOGISTICS_TERMS)
+
+
+def filter_logistics(
+    commitments: Sequence[ExtractedCommitment],
+) -> tuple[list[ExtractedCommitment], int]:
+    """Drop logistics/prep items (see `LOGISTICS_TERMS`); returns `(kept, dropped_count)`."""
+    kept = [c for c in commitments if not is_logistics(c.text)]
+    return kept, len(commitments) - len(kept)
+
+
 def consolidate_commitments(
     commitments: Sequence[ExtractedCommitment], normalized_transcript: str = ""
 ) -> tuple[list[ExtractedCommitment], int, int]:
-    """Merge duplicates, then cap at `MAX_COMMITMENTS_PER_MEETING`.
+    """Drop logistics items, merge duplicates, then hard-cap at `MAX_COMMITMENTS_PER_MEETING`.
+
+    Logistics items are dropped first so a dated recap can never outrank an undated real
+    deliverable. Items citing the same normalized `source_quote` are one promise.
 
     Returns `(kept, merged_count, capped_count)`. A merged group keeps the longer (more
     specific) text, the quote that appears earliest in the transcript (extraction order if
@@ -179,7 +258,7 @@ def consolidate_commitments(
 
     groups: list[ExtractedCommitment] = []
     merged = 0
-    for item in commitments:
+    for item in filter_logistics(commitments)[0]:
         for idx, kept in enumerate(groups):
             if _is_near_duplicate(kept, item):
                 first, other = (kept, item) if position(kept) <= position(item) else (item, kept)
@@ -413,10 +492,12 @@ async def _ingest(
     consolidated, merged, capped = consolidate_commitments(
         verified.commitments, normalize_text(transcript)
     )
+    logistics_dropped = filter_logistics(verified.commitments)[1]
     verified.commitments = consolidated
-    if merged or capped:
+    if merged or capped or logistics_dropped:
         logger.info(
-            "ingest commitments merged=%d capped=%d kept=%d meeting=%s",
+            "ingest commitments logistics_dropped=%d merged=%d capped=%d kept=%d meeting=%s",
+            logistics_dropped,
             merged,
             capped,
             len(consolidated),

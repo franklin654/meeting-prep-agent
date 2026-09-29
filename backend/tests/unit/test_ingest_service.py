@@ -789,7 +789,7 @@ def test_consolidate_merges_duplicates_and_caps_dated_first() -> None:
 
     assert ingest.MAX_COMMITMENTS_PER_MEETING == 5 and len(kept) == 5
     assert merged == 3  # deck restatement, pilot outline restatement, DAG repeat
-    assert capped == 6  # 14 - 3 merged = 11 groups, 5 kept
+    assert capped == 5  # 14 - 1 logistics ('Confirm attendees...') - 3 merged = 10, 5 kept
     assert [c.due_date for c in kept[:2]] == [date(2026, 9, 3), date(2026, 9, 5)]
     deck = kept[0]
     assert deck.due_date == date(2026, 9, 3) and "pricing deck" in deck.text
@@ -860,7 +860,14 @@ def test_p1_prompt_contains_exclusion_rules() -> None:
         transcript="X",
     )
     for phrase in (
-        "at most 5 per meeting",
+        "usually 1 to 3, at most 4",
+        "Never pad",
+        "Returning zero is correct",
+        "recaps",
+        "agendas",
+        "attendee",
+        "ONE commitment: bundle",
+        "never use a quote that is only a question",
         "ONLY an explicit promise by a NAMED",
         "EXCLUDE all of these",
         "instructions to yourself",
@@ -869,6 +876,97 @@ def test_p1_prompt_contains_exclusion_rules() -> None:
         "restatements of the same promise",
         "MERGE duplicates",
         "earliest source_quote",
-        "Bundle sub-items",
     ):
         assert phrase in text
+
+
+# ---- T12c: logistics filter and same-quote merge ----
+
+PLANTED = [
+    "Send the case study",  # M1
+    "Send the ROI one-pager",  # M2
+    "Send the SOC 2 report",  # M3
+    "Send revised pricing deck with pilot option",  # M4
+    "Send sample DAG configs",  # M4
+    "Send the trust portal link and the pen-test summary",  # N2
+    "Send the pen-test summary of the last engagement",  # N2
+    "Send a value comparison against the current tool",  # O2
+    "Share sandbox access for the trial",  # V2
+    "Send a shortlist of candidate pipelines",  # M5
+    "Send the security package and data-flow detail",
+    "Send a recap deck with the pricing options",  # allow list wins over 'recap'
+]
+
+LOGISTICS = [
+    "Send a recap with the agenda, needed inputs, commercial questions, and decision timing",
+    "Send a short technical-session outline explaining what the session will cover",
+    "Send a short agenda with the integration questions",
+    "Bring the architecture details for the technical review",
+    "Send a concise recap with owners and open questions",
+    "Send a recap with the proposed agenda",
+    "Bring a network diagram and explain the connection direction",
+    "Send the attendee list",
+    "Send a brief kickoff questionnaire",
+    "Send a recap with the owners and dates",
+    "Send a short note listing the information needed and the sections to be included",
+    "Identify the Airflow and warehouse contacts for the technical session",
+    "Send a calendar invite for the follow-up",
+    "Share the meeting minutes",
+]
+
+
+@pytest.mark.parametrize("text", PLANTED)
+def test_logistics_filter_keeps_planted_deliverables(text: str) -> None:
+    assert not ingest.is_logistics(text)
+
+
+@pytest.mark.parametrize("text", LOGISTICS)
+def test_logistics_filter_drops_logistics(text: str) -> None:
+    assert ingest.is_logistics(text)
+    kept, dropped = ingest.filter_logistics([_cm(text, "q")])
+    assert kept == [] and dropped == 1
+
+
+def test_planted_deliverables_survive_consolidation_with_logistics_noise() -> None:
+    planted = [_cm(t, f"planted quote {n}") for n, t in enumerate(PLANTED[:5])]
+    noise = [_cm(t, f"noise quote {n}", date(2026, 8, 20)) for n, t in enumerate(LOGISTICS)]
+    kept, _, _ = ingest.consolidate_commitments([*noise, *planted])
+    assert [c.text for c in kept] == [c.text for c in planted]
+
+
+def test_dated_logistics_does_not_outrank_undated_deliverable() -> None:
+    recap = _cm("Send a recap with the agenda and decision timing", "q1", date(2026, 9, 1))
+    deck = _cm("Send the revised pricing deck", "q2")
+    kept, _, _ = ingest.consolidate_commitments([recap, deck])
+    assert kept == [deck]
+
+
+def test_same_quote_split_items_merge_into_one_bundled_commitment() -> None:
+    quote = "I'll send the data-flow detail, access requirements, rollout outline, and the costs."
+    split = [
+        _cm("Send the data-flow detail", quote),
+        _cm("Send the access requirements", quote, date(2026, 9, 5)),
+        _cm("Send the data-flow detail, access requirements and rollout outline", quote),
+    ]
+    kept, merged, _ = ingest.consolidate_commitments(split)
+    assert len(kept) == 1 and merged == 2
+    assert kept[0].text == "Send the data-flow detail, access requirements and rollout outline"
+    assert kept[0].due_date == date(2026, 9, 5)
+
+
+async def test_run_ingest_drops_logistics_commitments(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    recap = _cm(
+        "Send a recap with the proposed agenda",
+        "I'll also send a revised pricing deck with the pilot option by Sep 3.",
+        date(2026, 9, 3),
+    )
+    base = _extraction("m4_extraction.json")
+    llm.queue_response(base.model_copy(update={"commitments": [recap, *base.commitments]}))
+    summary = await run_ingest(
+        _job(seeded), "m4_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+    assert summary.new_commitments == 2
+    assert all("recap" not in c.text for c in _commitments(seeded))
