@@ -13,10 +13,12 @@ from app.db import session as db_session
 from app.db.session import get_session
 from app.llm.client import LLMClient
 from app.memory.memory_service import HindsightMemoryService, MemoryService
+from app.services.brief import default_brief_llm
 from app.services.ingest import SessionFactory, default_ingest_llm
 
 __all__ = [
     "close_memory_service",
+    "get_brief_llm",
     "get_llm_client_for_ingest",
     "get_memory_service",
     "get_session",
@@ -25,6 +27,7 @@ __all__ = [
 
 _memory: HindsightMemoryService | None = None
 _ingest_llm: LLMClient | None = None
+_brief_llm: LLMClient | None = None
 
 
 def get_memory_service() -> MemoryService:
@@ -49,6 +52,14 @@ def get_llm_client_for_ingest() -> LLMClient:
     if _ingest_llm is None:
         _ingest_llm = default_ingest_llm()
     return _ingest_llm
+
+
+def get_brief_llm() -> LLMClient:
+    """The app LLM with the 120 s brief timeout, built on first use."""
+    global _brief_llm
+    if _brief_llm is None:
+        _brief_llm = default_brief_llm()
+    return _brief_llm
 
 
 def get_session_factory() -> SessionFactory:
