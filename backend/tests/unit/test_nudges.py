@@ -40,8 +40,8 @@ def client(engine: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
             yield session
 
     app.dependency_overrides[get_session] = session_dependency
-    with TestClient(app) as test_client:
-        yield test_client
+    # Construct without entering the lifespan: tests must stay on the in-memory DB.
+    yield TestClient(app)
     app.dependency_overrides.clear()
 
 
