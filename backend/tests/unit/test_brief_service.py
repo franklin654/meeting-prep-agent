@@ -603,6 +603,84 @@ def test_render_brief_prompt_lists_attendees_with_ids(world: World) -> None:
     assert "Today is 2026-09-28" in prompt
 
 
+async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
+    world: World,
+) -> None:
+    from app.memory.tags import account_tag, meeting_tag
+
+    world.memory.seed_fact(
+        "o_security_gap_m5",
+        "Karan said Anita Desai has not been in any of the security conversations.",
+        tags=[account_tag("acc_finedge"), meeting_tag("m5_finedge")],
+        memory_type="observation",
+        mentioned_at=date(2026, 9, 15),
+    )
+    with Session(world.engine) as session:
+        m3 = session.get(Meeting, "m3_finedge")
+        m5 = session.get(Meeting, "m5_finedge")
+        assert m3 is not None and m5 is not None
+        m3.transcript = (
+            "[2026-08-12T10:06:30+05:30] Sneha Iyer (IT Security Manager, FinEdge): "
+            "I need SOC 2 Type II and confirmation of India data residency."
+        )
+        m5.transcript = (
+            "[2026-09-15T10:05:45+05:30] Karan Shah (Data Platform Lead, FinEdge): "
+            "Anita hasn't been in any of the security conversations."
+        )
+        session.add_all([m3, m5])
+        session.commit()
+    world.memory.queue_reflect_response(
+        ReflectResult(
+            text="security gap",
+            structured={
+                "gaps": [{
+                    "concern": "SOC 2 and India data-residency",
+                    "raised_by": "Sneha Iyer",
+                    "answered_on": "2026-09-29",
+                    "not_heard_by": ["Anita Desai"],
+                    "extra": "tolerated",
+                }]
+            },
+            sources=[
+                MemoryHit(
+                    memory_id="o_sec",
+                    text="Sneha raised a concern about the SOC 2 report and data residency",
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="o_security_gap_m5",
+                    text=(
+                        "Karan said Anita Desai has not been in any of the security conversations."
+                    ),
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+            ],
+            structured_error=None,
+        )
+    )
+
+    brief, _ = await make(world)
+
+    assert len(world.memory.reflect_calls) == 2
+    assert set(world.memory.get_memory_calls) >= {"o_sec", "o_security_gap_m5"}
+    alerts = section(brief, SectionKey.alerts)
+    assert alerts, (world.memory.reflect_calls, world.memory.get_memory_calls)
+    alert = next(i for i in alerts if "SOC 2 and India" in i.text)
+    assert alert.severity == Severity.warning
+    assert alert.contact_ids == ["c_anita"]
+    assert {citation.meeting_id for citation in alert.citations} == {"m3_finedge", "m5_finedge"}
+    assert any("Anita hasn't been" in citation.quote for citation in alert.citations)
+    r3_query, r3_tags, _ = next(
+        call for call in world.memory.reflect_calls if "attendees from" in call[0]
+    )
+    assert "Anita Desai" in r3_query and "Rahul Mehta" in r3_query
+    assert r3_tags == [account_tag("acc_finedge")]
+
+
 # ---- cache ------------------------------------------------------------------------------
 
 

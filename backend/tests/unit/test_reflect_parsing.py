@@ -4,7 +4,7 @@ from datetime import date
 
 from app.schemas.ask import ReflectAnswer
 from app.schemas.memory import ReflectResult
-from app.schemas.reasoning import ContradictionReport
+from app.schemas.reasoning import ContradictionReport, GapReport
 from app.schemas.reflect import parse_reflect_result
 from app.services.evidence import ObjectionReport
 
@@ -68,6 +68,24 @@ def test_r5_ignores_extra_fields() -> None:
     )
 
     assert parsed == ReflectAnswer(answer="It is $75K.", confident=True)
+
+
+def test_r3_allows_missing_optional_date_and_parses_long_date() -> None:
+    parsed = parse_reflect_result(
+        "R3",
+        result({
+            "gaps": [{
+                "concern": "SOC 2",
+                "raised_by": "Sneha",
+                "not_heard_by": ["Anita"],
+                "ignored": "extra",
+            }]
+        }),
+        GapReport,
+    )
+
+    assert isinstance(parsed, GapReport)
+    assert parsed.gaps[0].answered_on is None
 
 
 def test_failure_log_reports_paths_keys_and_types_without_output_values(caplog) -> None:

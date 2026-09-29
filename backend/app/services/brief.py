@@ -62,6 +62,7 @@ from app.schemas.brief import (
 )
 from app.schemas.enums import FactKind, Owner
 from app.schemas.memory import MemoryHit
+from app.schemas.reasoning import GapReport
 from app.schemas.reflect import parse_reflect_result
 from app.services.evidence import (
     QUOTE_MAX_CHARS,
@@ -187,6 +188,7 @@ class MemoryContext:
     mental_model: MentalModelText | None = None
     recall_sections: list[list[MemoryHit]] = field(default_factory=list)  # rank order each
     objections: list[tuple[Objection, MemoryHit]] = field(default_factory=list)
+    cross_contact_alerts: list[BriefItem] = field(default_factory=list)
 
 
 TOP_HITS_PER_QUERY = 3
@@ -311,6 +313,166 @@ async def _objection_evidence(
     return match_objection_sources(report, sources)
 
 
+def _name_in_text(name: str, text: str) -> bool:
+    return name.casefold() in text.casefold()
+
+
+def _has_name_token(name: str, text: str) -> bool:
+    tokens = {token.strip(".,;:'\"()[]{}").casefold() for token in name.split()}
+    words = {token.strip(".,;:'\"()[]{}").casefold() for token in text.split()}
+    return bool(tokens & words)
+
+
+def _has_concern_token(concern: str, text: str) -> bool:
+    tokens = set(re.findall(r"[a-z0-9]{3,}", concern.casefold()))
+    words = set(re.findall(r"[a-z0-9]{3,}", text.casefold()))
+    return bool(tokens & words)
+
+
+def _cross_contact_item(
+    gap: Any,
+    attendees: Sequence[Contact],
+    sources: Sequence[MemoryHit],
+    meetings: Sequence[Meeting],
+) -> BriefItem | None:
+    absent = [
+        contact
+        for contact in attendees
+        if any(
+            _name_in_text(contact.name, name)
+            or any(_name_in_text(alias, name) for alias in contact.aliases)
+            for name in gap.not_heard_by
+        )
+    ]
+    if not absent:
+        return None
+    by_meeting = {
+        hit.meeting_id: hit
+        for hit in sources
+        if hit.meeting_id is not None and hit.meeting_date is not None
+    }
+    meeting_by_id = {meeting.id: meeting for meeting in meetings}
+
+    def quote_from(hit: MemoryHit, predicate: Any) -> str | None:
+        meeting = meeting_by_id.get(hit.meeting_id or "")
+        if meeting is None or not meeting.transcript:
+            return None
+        for raw in meeting.transcript.splitlines():
+            match = _LINE.match(raw.strip())
+            if match and predicate(match.group("speaker"), match.group("text")):
+                return match.group("text").strip()
+        return None
+
+    def raised_quote(speaker: str, quote: str) -> bool:
+        return _has_name_token(gap.raised_by, speaker) and _has_concern_token(
+            gap.concern, quote
+        )
+
+    raised = next(
+        (hit for hit in by_meeting.values() if quote_from(hit, raised_quote)), None
+    )
+    if raised is None or gap.answered_on is None:
+        return None
+    absent_hit = next(
+        (
+            hit
+            for hit in by_meeting.values()
+            if hit.meeting_id != raised.meeting_id
+            and quote_from(
+                hit,
+                lambda _speaker, quote: any(
+                    _name_in_text(contact.name.split()[0], quote) for contact in absent
+                )
+                and "security" in quote.casefold()
+                and any(
+                    phrase in quote.casefold()
+                    for phrase in ("hasn't been in", "has not been in", "not been in")
+                ),
+            )
+        ),
+        None,
+    )
+    if absent_hit is None:
+        return None
+    cited = [raised, absent_hit]
+    quotes = {
+        raised.memory_id: quote_from(raised, raised_quote),
+        absent_hit.memory_id: quote_from(
+            absent_hit,
+            lambda _speaker, quote: any(
+                _name_in_text(contact.name.split()[0], quote) for contact in absent
+            )
+            and "security" in quote.casefold()
+            and any(
+                phrase in quote.casefold()
+                for phrase in ("hasn't been in", "has not been in", "not been in")
+            ),
+        ),
+    }
+    citations = [
+        Citation(
+            source_type=SourceType.meeting,
+            meeting_id=hit.meeting_id,
+            meeting_date=hit.meeting_date,
+            label=f"{hit.meeting_id} on {format_date(hit.meeting_date)}",
+            quote=truncate(quotes.get(hit.memory_id) or hit.text, QUOTE_MAX_CHARS),
+            memory_id=hit.memory_id,
+        )
+        for hit in cited
+        if hit.meeting_id is not None and hit.meeting_date is not None
+    ]
+    names = ", ".join(contact.name for contact in absent)
+    return BriefItem(
+        id=f"cross_contact-{raised.memory_id}-{absent_hit.memory_id}",
+        text=(
+            f"{gap.raised_by}'s {gap.concern} concern was answered, but {names} "
+            "was not present when it was raised or answered."
+        ),
+        severity=Severity.warning,
+        contact_ids=[contact.id for contact in absent],
+        citations=citations,
+    )
+
+
+async def _cross_contact_alerts(
+    memory: MemoryService,
+    *,
+    account_id: str,
+    account_name: str,
+    attendees: Sequence[Contact],
+    meetings: Sequence[Meeting],
+    timings: Timings | None = None,
+) -> list[BriefItem]:
+    attendee_text = "; ".join(
+        f"{contact.name} ({contact.role})" if contact.role else contact.name
+        for contact in attendees
+    )
+    query = render_prompt(
+        "reflect_cross_contact",
+        today=today().isoformat(),
+        account_name=account_name,
+        attendees=attendee_text or "(none recorded)",
+    )
+    started = time.monotonic()
+    result = await memory.reflect_structured(
+        query=query, tags=[account_tag(account_id)], schema=GapReport, budget="mid"
+    )
+    if timings is not None:
+        timings.record_max("reflect", time.monotonic() - started)
+    report = parse_reflect_result("R3", result, GapReport)
+    if not isinstance(report, GapReport) or not report.gaps:
+        return []
+    resolve_started = time.monotonic()
+    sources = await memory.resolve_sources(result.sources)
+    if timings is not None:
+        timings.record_max("resolve", time.monotonic() - resolve_started)
+    return [
+        item
+        for gap in report.gaps
+        if (item := _cross_contact_item(gap, attendees, sources, meetings)) is not None
+    ]
+
+
 async def _timed_mental_model(
     memory: MemoryService, name: str, timings: Timings
 ) -> MentalModelText | None:
@@ -342,6 +504,14 @@ async def _gather_memory(
             today_=today_,
             timings=timings,
         ),
+        _cross_contact_alerts(
+            memory,
+            account_id=account.id,
+            account_name=account.name,
+            attendees=inputs.attendees,
+            meetings=inputs.account_meetings,
+            timings=timings,
+        ),
         _recall_top(
             memory,
             section="watch_outs",
@@ -365,7 +535,7 @@ async def _gather_memory(
         return_exceptions=True,
     )
     timings.set("gather", time.monotonic() - gather_started)
-    labels = ["mental_model", "unresolved_objections", "watch_outs"]
+    labels = ["mental_model", "unresolved_objections", "cross_contact_gaps", "watch_outs"]
     labels += [f"personal_touchpoints:{c.id}" for c in external]
 
     failed = 0
@@ -376,12 +546,16 @@ async def _gather_memory(
         elif isinstance(result, BaseException):
             raise result  # a bug or a non-memory error must not be swallowed
 
-    mental_model, objections, *recalls = results
+    mental_model, objections, cross_contact, *recalls = results
     context = MemoryContext()
     if isinstance(mental_model, MentalModelText):
         context.mental_model = mental_model
     if isinstance(objections, list):
         context.objections = [p for p in objections if isinstance(p, tuple)]
+    if isinstance(cross_contact, list):
+        context.cross_contact_alerts = [
+            item for item in cross_contact if isinstance(item, BriefItem)
+        ]
     for recall in recalls:
         if isinstance(recall, list):
             context.recall_sections.append([h for h in recall if isinstance(h, MemoryHit)])
@@ -714,6 +888,7 @@ def assemble_brief(
     generated_at: datetime,
     competitor_hits: Sequence[MemoryHit] = (),
     competitors: Sequence[str] = (),
+    cross_contact_alerts: Sequence[BriefItem] = (),
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
     sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
@@ -754,6 +929,13 @@ def assemble_brief(
                 )
             )
         _drop_repeated_competitor_objections(sections, competitors)
+
+    if mode == "memory" and cross_contact_alerts:
+        sections.setdefault(SectionKey.alerts, []).extend(
+            item
+            for item in cross_contact_alerts
+            if item.citations and all(_is_citable(c) for c in item.citations)
+        )
 
     if mode == "memory":
         for commitment in sorted(inputs.open_commitments, key=lambda c: c.due_date or date.max):
@@ -885,6 +1067,7 @@ async def generate_brief(
 
     table = EvidenceTable([])
     competitor_hits: Sequence[MemoryHit] = ()
+    cross_contact_alerts: Sequence[BriefItem] = ()
     if with_memory:
         context = await _gather_memory(
             inputs, memory, today(), competitors=persona.competitors, timings=timings
@@ -906,6 +1089,7 @@ async def generate_brief(
             today=today(),
         )
         competitor_hits = context.recall_sections[0] if context.recall_sections else []
+        cross_contact_alerts = context.cross_contact_alerts
         logger.info(
             "brief.gathered meeting=%s evidence=%d duration_ms=%d",
             meeting_id,
@@ -935,6 +1119,7 @@ async def generate_brief(
         generated_at=generated_at,
         competitor_hits=competitor_hits if with_memory else (),
         competitors=persona.competitors if with_memory else (),
+        cross_contact_alerts=cross_contact_alerts if with_memory else (),
     )
     if with_memory and not brief.sections:
         # Never persist (and so never serve from the cache) a brief with nothing in it.

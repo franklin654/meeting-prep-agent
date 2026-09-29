@@ -53,7 +53,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T18 | Contact timeline API and page | FE | T07, T03 | `api/contacts.py`, `pages/ContactTimeline.tsx` | Acceptance 10 passes | Done |
 | T19 | Feedback API, preferences service, style profile, FeedbackControls | BE-brief | T14, T17 | `services/preferences.py`, components | Acceptance 7–8 pass; phase 4 gate met | Done |
 | T20 | Reasoning: R2 contradictions after ingest, account alerts | BE-core | T12 | `services/reasoning.py`, prompt R2 | Acceptance 12 passes | Done: R2 runs after retain/idle; alerts require both cited meetings; fake-backed |
-| T21 | R1 objections and R3 cross-contact gaps in the brief | BE-brief | T14 | `services/brief.py`, prompts R1, R3 | Acceptance 13 passes | Not started |
+| T21 | R1 objections and R3 cross-contact gaps in the brief | BE-brief | T14 | `services/brief.py`, prompts R1, R3 | Acceptance 13 passes | In progress: source-grounded R3 path and fakes pass; sole live M6 run returned unrelated gaps and no B5 |
 | T22 | R4 cross-deal patterns in the brief | BE-brief | T14, T11 | prompt R4 | Acceptance 16 passes | Not started |
 | T23 | Ask backend: R5, pin, Remember this, `ask_answers` | BE-brief | T06, T07 | `services/ask.py`, `api/ask.py` | Acceptance 18 (API parts) passes | Done: scoped R5 answers/citations, pin section, note job; fake-backed |
 | T24 | AskPanel UI and P4 suggested questions | FE | T17, T23 | `components/AskPanel.tsx`, prompt P4 | Acceptance 18 passes in browser | Done: scoped Ask, P4 suggestions from cached brief, citations, pin and Remember this; mocked UI tests |

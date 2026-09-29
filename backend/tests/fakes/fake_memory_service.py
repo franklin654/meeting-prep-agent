@@ -214,10 +214,15 @@ class FakeMemoryService(MemoryService):
     ) -> ReflectResult:
         self.reflect_calls.append((query, list(tags), budget))
         if not self._reflect_queue:
-            if schema.__name__ == "ContradictionReport":
+            if schema.__name__ in {"ContradictionReport", "GapReport", "PatternReport"}:
+                field = {
+                    "ContradictionReport": "contradictions",
+                    "GapReport": "gaps",
+                    "PatternReport": "patterns",
+                }[schema.__name__]
                 return ReflectResult(
                     text="",
-                    structured={"contradictions": []},
+                    structured={field: []},
                     sources=[],
                     structured_error=None,
                 )
