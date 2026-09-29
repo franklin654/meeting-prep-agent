@@ -28,6 +28,7 @@ from __future__ import annotations
 import abc
 import asyncio
 import logging
+import time
 from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
@@ -37,7 +38,7 @@ from hindsight_client_api.exceptions import ApiException, OpenApiException
 from pydantic import BaseModel
 
 from app.config import settings
-from app.core.errors import MemoryUnavailableError
+from app.core.errors import MemoryUnavailableError, ValidationError
 from app.memory.tags import (
     MemoryKind,
     account_tag,
@@ -194,6 +195,34 @@ class MemoryService(abc.ABC):
         elapses. Returns `True` if it went idle, `False` on timeout.
         """
         raise NotImplementedError
+
+    @abc.abstractmethod
+    async def delete_bank(self, bank_id: str) -> None:
+        """Delete exactly the named bank. HARD GUARD: only ids starting with
+        `ae-` (with at least one more character) are accepted; anything else
+        raises `ValidationError` before any SDK call. An absent bank is success.
+        """
+        raise NotImplementedError
+
+
+DELETABLE_BANK_PREFIX = "ae-"
+
+
+def require_deletable_bank_id(bank_id: str) -> None:
+    """Hard guard for `delete_bank`: only `ae-<something>` ids may be deleted.
+
+    Raises `ValidationError` before any SDK call for anything else (including
+    "", "ae-" alone, other-case or whitespace-padded ids, "ami-test", "spike-*").
+    """
+    if (
+        bank_id != bank_id.strip()
+        or not bank_id.startswith(DELETABLE_BANK_PREFIX)
+        or len(bank_id) <= len(DELETABLE_BANK_PREFIX)
+    ):
+        raise ValidationError(
+            f"Refusing to delete bank {bank_id!r}: only ids starting with "
+            f"{DELETABLE_BANK_PREFIX!r} (plus a name) may be deleted."
+        )
 
 
 def _relationship_model_id(account_id: str) -> str:
@@ -497,6 +526,24 @@ class HindsightMemoryService(MemoryService):
             if asyncio.get_event_loop().time() >= deadline:
                 return False
             await asyncio.sleep(1.0)
+
+
+    async def delete_bank(self, bank_id: str) -> None:
+        require_deletable_bank_id(bank_id)
+        started = time.monotonic()
+        try:
+            await self._client.adelete_bank(bank_id)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise MemoryUnavailableError(f"Could not delete bank {bank_id!r}: {exc}") from exc
+        except (OpenApiException, TimeoutError, OSError) as exc:
+            raise MemoryUnavailableError(f"Could not delete bank {bank_id!r}: {exc}") from exc
+        finally:
+            logger.info(
+                "memory.delete_bank bank=%s duration_ms=%d",
+                bank_id,
+                int((time.monotonic() - started) * 1000),
+            )
 
 
 def _demo_today_iso() -> str:

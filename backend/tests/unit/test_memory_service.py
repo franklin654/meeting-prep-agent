@@ -260,3 +260,50 @@ async def test_wait_until_idle_returns_true(memory: FakeMemoryService) -> None:
 async def test_aclose_marks_closed(memory: FakeMemoryService) -> None:
     await memory.aclose()
     assert memory.closed is True
+
+
+# -- fake fidelity (Phase 3 commit 0) -------------------------------------------
+
+
+async def test_fake_retain_meeting_populates_hit_metadata(memory: FakeMemoryService) -> None:
+    await memory.retain_meeting(
+        meeting_id="m1_x",
+        account_id="acc_x",
+        contact_ids=["con_a"],
+        meeting_date=date(2026, 5, 1),
+        title="Kickoff",
+        transcript="pricing discussed",
+        source="seed",
+    )
+
+    (hit,) = await memory.recall_facts(query="pricing", tags=[account_tag("acc_x")])
+    assert hit.meeting_id == "m1_x"
+    assert hit.meeting_date == date(2026, 5, 1)
+
+    (record,) = memory.items
+    assert record.document_id == "meeting-m1_x"
+    assert record.title == "Kickoff"
+    assert record.source == "seed"
+    assert account_tag("acc_x") in record.tags
+    assert contact_tag("con_a") in record.tags
+
+
+async def test_fake_reretain_same_document_replaces_hits(memory: FakeMemoryService) -> None:
+    async def retain(transcript: str) -> None:
+        await memory.retain_meeting(
+            meeting_id="m1_x",
+            account_id="acc_x",
+            contact_ids=["con_a"],
+            meeting_date=date(2026, 5, 1),
+            title="Kickoff",
+            transcript=transcript,
+        )
+
+    await retain("first version")
+    await retain("second version")
+    await memory.retain_note(text="a note", scope_type=ScopeType.account, scope_id="acc_x")
+
+    meeting_records = [i for i in memory.items if i.document_id == "meeting-m1_x"]
+    assert len(meeting_records) == 1
+    assert meeting_records[0].text == "second version"
+    assert len(memory.items) == 2  # notes are untouched
