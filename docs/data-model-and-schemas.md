@@ -355,6 +355,13 @@ Overdue is computed, never stored: `status == open and due_date < settings.demo_
 
 Request and response bodies for the endpoints in the Technical design; routes return these models directly so the OpenAPI spec, and the generated frontend client, stay exact.
 
+Capture contracts: `POST /api/meetings/{meeting_id}/capture/preview` accepts a 50–200,000
+character transcript and returns `202 JobAccepted`; poll its `capture_preview` job for a
+`CaptureDraftResponse`. Preview writes only the job and draft. `POST /api/capture/{draft_id}/save`
+accepts `unchecked_item_ids`, returns `202 JobAccepted`, and applies only checked items before
+retaining the transcript; save is idempotent. `DELETE /api/capture/{draft_id}` discards an open
+draft. No new application error codes are introduced.
+
 ```python
 class ContactRef(BaseModel):
     id: str; name: str; role: str | None
@@ -393,6 +400,22 @@ class MeetingSummary(BaseModel):          # GET /api/meetings
 class NotesRequest(BaseModel):            # POST /api/meetings/{id}/notes
     transcript: str = Field(min_length=50)
 
+class CapturePreviewRequest(BaseModel):    # POST /api/meetings/{id}/capture/preview
+    transcript: str = Field(min_length=50, max_length=200_000)
+
+class CaptureSaveRequest(BaseModel):       # POST /api/capture/{draft_id}/save
+    unchecked_item_ids: list[str] = []
+
+class CaptureItem(BaseModel):
+    id: str; kind: Literal["commitment", "closes", "fact"]
+    fact_kind: FactKind | None; text: str; owner: str | None; contact: str | None
+    due_date: date | None; quote: str
+    badge: Literal["new", "closes", "duplicate", "updates_due_date"]
+    target_commitment_id: str | None; checked: bool
+
+class CaptureDraftResponse(BaseModel):
+    draft_id: str; meeting_id: str; items: list[CaptureItem]; counts: dict[str, int]
+
 class JobAccepted(BaseModel):             # 202 responses
     job_id: str
 
@@ -406,6 +429,7 @@ class JobStatus(BaseModel):               # GET /api/jobs/{id}
     id: str; kind: str
     status: Literal["pending", "done", "failed"]
     learned: LearnedSummary | None = None
+    draft: CaptureDraftResponse | None = None
     error: str | None = None
 
 class TimelineEntry(BaseModel):           # GET /api/contacts/{id}/timeline

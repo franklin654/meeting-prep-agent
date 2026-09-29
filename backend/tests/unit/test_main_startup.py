@@ -57,6 +57,8 @@ def test_valid_config_starts_and_serves_health(monkeypatch: pytest.MonkeyPatch) 
         assert client.get("/api/health").json() == {
             "status": "ok",
             "demo_today": "2026-09-28",
+            "ae_name": "Priya Nair",
+            "company_name": "Tracewise",
         }
 
 

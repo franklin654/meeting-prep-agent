@@ -21,8 +21,12 @@ def create_draft(
     items: list[dict[str, Any]],
 ) -> CaptureDraft:
     draft = CaptureDraft(
-        id=f"draft_{uuid.uuid4().hex[:8]}", meeting_id=meeting_id, transcript=transcript,
-        extraction=extraction, items=items, created_at=utcnow(),
+        id=f"draft_{uuid.uuid4().hex[:8]}",
+        meeting_id=meeting_id,
+        transcript=transcript,
+        extraction=extraction,
+        items=items,
+        created_at=utcnow(),
     )
     session.add(draft)
     session.commit()
@@ -39,6 +43,20 @@ def set_draft_status(session: Session, draft_id: str, status: str) -> CaptureDra
     if draft is None:
         raise NotFoundError(f"Capture draft {draft_id!r} not found.")
     draft.status = status
+    session.add(draft)
+    session.commit()
+    session.refresh(draft)
+    return draft
+
+
+def update_draft(
+    session: Session, draft_id: str, *, status: str, extraction: dict[str, Any]
+) -> CaptureDraft:
+    draft = get_draft(session, draft_id)
+    if draft is None:
+        raise NotFoundError(f"Capture draft {draft_id!r} not found.")
+    draft.status = status
+    draft.extraction = extraction
     session.add(draft)
     session.commit()
     session.refresh(draft)

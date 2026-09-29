@@ -101,7 +101,7 @@ class AskAnswer(SQLModel, table=True):
 
 class Job(SQLModel, table=True):
     id: str = Field(primary_key=True)
-    kind: str  # ingest | note | reasoning
+    kind: str  # ingest | note | reasoning | capture_preview | capture_save
     status: str  # pending | done | failed
     # doc writes `dict | None`; `dict[str, Any] | None` to satisfy mypy --strict.
     result: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))

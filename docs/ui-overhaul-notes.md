@@ -9,7 +9,7 @@
 | A1 | complete | implementation `ecd34d9` |
 | A2 | complete | `f5f7585` |
 | A3 | complete | `4599067` |
-| A4 | planned | — |
+| A4 | complete | implementation `532f731` |
 | A5 | planned | — |
 | A6 | planned | — |
 | A7 | planned | — |
@@ -52,6 +52,8 @@
 - Token totals are unavailable: A0 usage logging is INFO-level, but the standalone script had no INFO logging configuration, so the run log captured only the temperature warning and final summary. The script now enables INFO logging for future runs; do not rerun the real backfill solely to recover these counts.
 - A3 checks: 127 tests passed; Ruff and mypy passed. The requested fact-kind per-meeting tally was added to the script output.
 - Created `backend/app.sandbox.db` and `backend/app.sandbox-r.db` using SQLite's online backup command from the completed real DB; both pass `PRAGMA integrity_check`. Both paths are ignored by Git.
+- A4: added `POST /api/meetings/{meeting_id}/capture/preview`, `POST /api/capture/{draft_id}/save`, and `DELETE /api/capture/{draft_id}`. Preview runs P1 and conditional P2, writes only the capture draft/job, validates quotes, and annotates duplicates, closes, and due-date renewals. Save applies checked items, retains the transcript without rerunning P1/P2, and is idempotent; discard leaves the ledger and memory untouched. `JobStatus` now carries a draft response. Offline `app.openapi()` generation updated the frontend API client to 20 paths. No new DB table or application error code.
+- A4 checks: plain pytest 678 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Capture API tests cover preview isolation, selected-only save, no second extraction, save idempotency, discard, transcript length, duplicate and renewal badges. No live LLM or Hindsight calls in A4.
 
 ## B4–C4 plan addendum
 
