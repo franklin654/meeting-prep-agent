@@ -43,7 +43,7 @@ export function ContactTimeline() {
     return b.entry.learned_on.localeCompare(a.entry.learned_on)
   })
   return <section className="space-y-8">
-    <header><Link to="/" className="text-sm text-primary hover:underline">← Meetings</Link><p className="mt-5 text-sm font-medium text-primary">Memory inspector</p><h1 className="mt-1 text-2xl font-semibold">{contact.name}</h1><p className="mt-1 text-sm text-muted-foreground">{contact.role ?? 'Contact'} · {entries.length} remembered {entries.length === 1 ? 'fact' : 'facts'}</p></header>
+    <header><Link to="/" className="text-sm text-primary hover:underline">← Today</Link><p className="mt-5 text-sm font-medium text-primary">Contact memory</p><h1 className="mt-1 text-2xl font-semibold">{contact.name}</h1><p className="mt-1 text-sm text-muted-foreground">{contact.role ?? 'Contact'} · {entries.length} remembered {entries.length === 1 ? 'fact' : 'facts'}</p></header>
     {entries.length === 0 ? <div className="rounded-xl border border-dashed px-6 py-14 text-center"><h2 className="font-semibold">No memories for this contact yet</h2><p className="mt-2 text-sm text-muted-foreground">Facts learned from future meetings will appear here.</p></div> : <>
       <ol className="relative ml-2 space-y-0 border-l pl-6">
       {ordered.slice(0, showAll ? undefined : 8).map(({ entry, fact }, index) => <li key={`${entry.citation.memory_id ?? entry.citation.meeting_id ?? 'entry'}-${index}`} className="relative pb-7 last:pb-0">

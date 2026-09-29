@@ -1,39 +1,41 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
  * Design tokens.
- * - One accent: indigo (--primary). Used for actions, links, focus, the memory toggle
- *   and the personalization meter. Nothing else is coloured.
+ * - Memory accent is teal (--primary); primary actions use charcoal in button-variants.
  * - Severity only: red (--alert-critical) = overdue/critical, amber (--alert-warning) = warning.
  *   Each has a soft surface and a readable text colour for chips and rows.
- * - Neutrals are cool greys (hue 265, very low chroma) so the indigo sits naturally.
+ * - Neutral surfaces and text follow the warm palette in docs/ui-wireframes.md.
  */
 :root {
-  --background: oklch(0.985 0.003 265);
-  --foreground: oklch(0.21 0.02 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 265);
+  --background: #F7F5F0;
+  --foreground: #1F2328;
+  --card: #FFFFFF;
+  --card-foreground: #1F2328;
+  --popover: #FFFFFF;
+  --popover-foreground: #1F2328;
 
-  --primary: oklch(0.51 0.21 273);
-  --primary-foreground: oklch(0.99 0 0);
-  --primary-soft: oklch(0.955 0.03 273);
-  --primary-soft-foreground: oklch(0.4 0.17 273);
+  --primary: #0F6E7A;
+  --primary-foreground: #FFFFFF;
+  --primary-soft: #E6F2F3;
+  --primary-soft-foreground: #0B5B66;
 
-  --secondary: oklch(0.955 0.006 265);
-  --secondary-foreground: oklch(0.28 0.02 265);
-  --muted: oklch(0.955 0.006 265);
-  --muted-foreground: oklch(0.5 0.02 265);
-  --accent: oklch(0.955 0.012 265);
-  --accent-foreground: oklch(0.25 0.02 265);
+  --secondary: #EFECE5;
+  --secondary-foreground: #1F2328;
+  --muted: #EFECE5;
+  --muted-foreground: #4A4F57;
+  --accent: #E6E2D9;
+  --accent-foreground: #1F2328;
   --destructive: oklch(0.55 0.22 27);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.92 0.006 265);
-  --input: oklch(0.9 0.008 265);
-  --ring: oklch(0.6 0.16 273);
+  --destructive-foreground: #FFFFFF;
+  --border: #D6D2C8;
+  --input: #D6D2C8;
+  --ring: #0F6E7A;
 
   /* Severity: red = overdue/critical, amber = warning (AGENTS.md) */
   --alert-critical: oklch(0.55 0.22 27);
@@ -46,31 +48,32 @@
   --alert-warning-text: oklch(0.45 0.11 65);
 
   --radius: 0.625rem;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 .dark {
-  --background: oklch(0.17 0.015 265);
-  --foreground: oklch(0.96 0.005 265);
-  --card: oklch(0.21 0.017 265);
-  --card-foreground: oklch(0.96 0.005 265);
-  --popover: oklch(0.21 0.017 265);
-  --popover-foreground: oklch(0.96 0.005 265);
-  --primary: oklch(0.68 0.16 273);
-  --primary-foreground: oklch(0.15 0.02 265);
-  --primary-soft: oklch(0.29 0.06 273);
-  --primary-soft-foreground: oklch(0.86 0.07 273);
-  --secondary: oklch(0.27 0.015 265);
-  --secondary-foreground: oklch(0.96 0.005 265);
-  --muted: oklch(0.27 0.015 265);
-  --muted-foreground: oklch(0.72 0.02 265);
-  --accent: oklch(0.27 0.02 265);
-  --accent-foreground: oklch(0.96 0.005 265);
+  --background: #1F2322;
+  --foreground: #F7F5F0;
+  --card: #292D2C;
+  --card-foreground: #F7F5F0;
+  --popover: #292D2C;
+  --popover-foreground: #F7F5F0;
+  --primary: #66B5BC;
+  --primary-foreground: #102527;
+  --primary-soft: #263D3F;
+  --primary-soft-foreground: #B8E0E2;
+  --secondary: #2B302E;
+  --secondary-foreground: #F7F5F0;
+  --muted: #2B302E;
+  --muted-foreground: #B9B8B1;
+  --accent: #363A37;
+  --accent-foreground: #F7F5F0;
   --destructive: oklch(0.7 0.19 22);
   --destructive-foreground: oklch(0.15 0.02 265);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.6 0.14 273);
+  --border: #4A4E49;
+  --input: #4A4E49;
+  --ring: #66B5BC;
 
   --alert-critical: oklch(0.7 0.19 22);
   --alert-critical-foreground: oklch(0.15 0.02 265);
@@ -78,12 +81,13 @@
   --alert-critical-text: oklch(0.85 0.1 25);
   --alert-warning: oklch(0.8 0.16 78);
   --alert-warning-foreground: oklch(0.22 0.04 75);
-  --alert-warning-soft: oklch(0.3 0.05 80);
-  --alert-warning-text: oklch(0.88 0.12 85);
+  --alert-warning-soft: #3C3020;
+  --alert-warning-text: #F6C58F;
 }
 
 @theme inline {
   --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -117,7 +121,7 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
 
   /* Type scale: compact, readable, 1.2-ish ratio */
   --text-xs: 0.75rem;
@@ -142,6 +146,9 @@
   }
   html {
     -webkit-font-smoothing: antialiased;
+  }
+  body {
+    font-family: var(--font-sans);
   }
   body {
     @apply bg-background font-sans text-foreground;
