@@ -38,6 +38,8 @@ from app.schemas.extraction import (
     MeetingExtraction,
     PersonMention,
 )
+from app.schemas.memory import MemoryHit, ReflectResult
+from app.schemas.reasoning import Contradiction, ContradictionReport
 from app.services import ingest
 from app.services.ingest import (
     INGEST_LLM_TIMEOUT_SECONDS,
@@ -274,6 +276,60 @@ async def test_m4_commitments_quotes_and_no_commitment_in_facts(
     assert [c.schema for c in llm.calls] == [MeetingExtraction]
     assert llm.calls[0].temperature == 0.0
     assert "Tracewise" in llm.calls[0].prompt and "Karan Shah" in llm.calls[0].prompt
+
+
+async def test_r2_runs_after_retain_and_returns_source_meeting_alerts(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    llm.queue_response(_extraction("m4_extraction.json"))
+    memory.queue_reflect_response(
+        ReflectResult(
+            text="budget changed",
+            structured=ContradictionReport(
+                contradictions=[
+                    Contradiction(
+                        topic="budget",
+                        earlier_value="about $40K",
+                        earlier_date=date(2026, 7, 28),
+                        new_value="$75K",
+                        new_date=date(2026, 8, 27),
+                        summary="The budget increased.",
+                    )
+                ]
+            ).model_dump(mode="json"),
+            sources=[
+                MemoryHit(
+                    memory_id="budget-m2",
+                    text="Budget was about $40K",
+                    meeting_id="m2_finedge",
+                    meeting_date=date(2026, 7, 28),
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="budget-m4",
+                    text="Budget increased to $75K",
+                    meeting_id="m4_finedge",
+                    meeting_date=date(2026, 8, 27),
+                    tags=[],
+                ),
+            ],
+            structured_error=None,
+        )
+    )
+
+    summary = await run_ingest(
+        _job(seeded), "m4_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+
+    assert len(memory.items) == 1 and memory.items[0].meeting_id == "m4_finedge"
+    assert summary.alerts == [
+        "The budget increased. Earlier: about $40K (m2_finedge, Jul 28, 2026); "
+        "new: $75K (m4_finedge, Aug 27, 2026)."
+    ]
+    query, tags, budget = memory.reflect_calls[-1]
+    assert "FinEdge Payments" in query and "2026-08-27" in query
+    assert tags == ["account:acc_finedge"] and budget == "high"
 
 
 async def test_retained_once_with_right_kwargs_then_meeting_done(

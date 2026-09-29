@@ -36,7 +36,7 @@ from datetime import date
 
 from sqlmodel import Session
 
-from app.core.errors import AppError, NotFoundError
+from app.core.errors import AppError, MemoryUnavailableError, NotFoundError
 from app.db import ingest_repo, repository
 from app.db.models import Commitment, Contact
 from app.llm.client import LLMClient, get_llm_client
@@ -52,6 +52,7 @@ from app.schemas.extraction import (
     MeetingExtraction,
     PersonMention,
 )
+from app.services.reasoning import check_changes
 
 logger = logging.getLogger(__name__)
 
@@ -904,6 +905,16 @@ async def _ingest(
         "ingest retain meeting=%s duration_ms=%d", meeting_id, int((time.monotonic() - t0) * 1000)
     )
 
+    if not await memory.wait_until_idle(timeout_s=60.0):
+        raise MemoryUnavailableError("Hindsight did not become idle before contradiction analysis.")
+    alerts = await check_changes(
+        memory=memory,
+        account_id=account_id,
+        account_name=account_name,
+        meeting_id=meeting_id,
+        meeting_date=meeting_date,
+    )
+
     # 10. Done only now.
     ingest_repo.set_meeting_ingested(session, meeting_id, ingest_repo.stamp())
 
@@ -912,7 +923,7 @@ async def _ingest(
         facts=facts,
         new_commitments=len(created),
         closed_commitments=len(closed_ids),
-        alerts=[],
+        alerts=alerts,
     )
 
 
