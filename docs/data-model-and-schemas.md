@@ -285,7 +285,7 @@ Open commitments come from the SQLite ledger, not recall, so overdue logic stays
 
 ## SQLite tables
 
-Thirteen SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers), and nothing about Hindsight memories is stored here.
+Fourteen SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers, and cached contact patterns), and nothing about Hindsight memories is stored here. MemoryOverride records app-side visibility/correction choices only; they do not delete Hindsight memories.
 
 ```python
 class Account(SQLModel, table=True):
@@ -379,9 +379,16 @@ class MemoryOverride(SQLModel, table=True):
     id: str; target_type: str  # fact | memory
     target_id: str; action: str  # hidden | corrected
     corrected_text: str | None; created_at: datetime
+
+class ContactPatternCache(SQLModel, table=True):
+    contact_id: str  # primary key, foreign key to contact.id
+    patterns: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    refreshed_at: datetime
 ```
 
 Overdue is computed, never stored: `status == open and due_date < settings.demo_today`.
+
+Contact profile/control contracts: `GET /api/contacts/{contact_id}/profile` reads the SQLite contact, account, facts, commitments, app-side overrides, and cached patterns. `POST /api/contacts/{contact_id}/patterns/refresh` explicitly derives and caches up to four fact-cited patterns (one app LLM call, only when at least three visible facts exist). `POST /api/memories/{id}/hide` and `DELETE /api/memories/{id}/hide` hide/unhide in this app; `POST /api/memories/{id}/correct` hides the original and retains the correction through the existing note path. `PATCH /api/commitments/{id}` edits status, due date, or text; `DELETE` removes the ledger row. No Hindsight memory-delete operation is available.
 
 ## API models, jobs and errors
 

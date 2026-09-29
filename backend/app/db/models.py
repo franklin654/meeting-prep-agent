@@ -143,3 +143,9 @@ class MemoryOverride(SQLModel, table=True):
     action: str  # hidden | corrected
     corrected_text: str | None = None
     created_at: datetime
+
+
+class ContactPatternCache(SQLModel, table=True):
+    contact_id: str = Field(primary_key=True, foreign_key="contact.id")
+    patterns: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    refreshed_at: datetime

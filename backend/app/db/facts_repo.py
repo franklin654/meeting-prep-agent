@@ -50,6 +50,10 @@ def list_account_facts(session: Session, account_id: str) -> list[ExtractedFact]
     )
 
 
+def get_fact(session: Session, fact_id: str) -> ExtractedFact | None:
+    return session.get(ExtractedFact, fact_id)
+
+
 def list_backfill_candidates(
     session: Session, *, limit: int | None = None
 ) -> list[tuple[Meeting, Account]]:

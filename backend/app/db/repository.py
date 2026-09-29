@@ -17,7 +17,7 @@ real gateway to extend rather than a stub.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlmodel import Session, col, select
@@ -30,6 +30,7 @@ from app.db.models import (
     BriefRecord,
     Commitment,
     Contact,
+    ContactPatternCache,
     Feedback,
     Job,
     Meeting,
@@ -172,6 +173,59 @@ def get_commitment(session: Session, commitment_id: str) -> Commitment | None:
 def list_commitments_for_account(session: Session, account_id: str) -> list[Commitment]:
     statement = select(Commitment).where(Commitment.account_id == account_id)
     return list(session.exec(statement).all())
+
+
+def update_commitment(
+    session: Session,
+    commitment_id: str,
+    *,
+    status: CommitmentStatus | None = None,
+    due_date: date | None = None,
+    set_due_date: bool = False,
+    text: str | None = None,
+) -> Commitment:
+    commitment = session.get(Commitment, commitment_id)
+    if commitment is None:
+        raise NotFoundError(f"Commitment {commitment_id!r} not found.")
+    if status is not None:
+        commitment.status = status
+    if set_due_date:
+        commitment.due_date = due_date
+    if text is not None:
+        commitment.text = text
+    session.add(commitment)
+    session.commit()
+    session.refresh(commitment)
+    return commitment
+
+
+def delete_commitment(session: Session, commitment_id: str) -> None:
+    commitment = session.get(Commitment, commitment_id)
+    if commitment is None:
+        raise NotFoundError(f"Commitment {commitment_id!r} not found.")
+    session.delete(commitment)
+    session.commit()
+
+
+def get_contact_pattern_cache(session: Session, contact_id: str) -> ContactPatternCache | None:
+    return session.get(ContactPatternCache, contact_id)
+
+
+def save_contact_pattern_cache(
+    session: Session, contact_id: str, patterns: list[dict[str, Any]], refreshed_at: datetime
+) -> ContactPatternCache:
+    cached = session.get(ContactPatternCache, contact_id)
+    if cached is None:
+        cached = ContactPatternCache(
+            contact_id=contact_id, patterns=patterns, refreshed_at=refreshed_at
+        )
+    else:
+        cached.patterns = patterns
+        cached.refreshed_at = refreshed_at
+    session.add(cached)
+    session.commit()
+    session.refresh(cached)
+    return cached
 
 
 def close_commitment(

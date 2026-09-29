@@ -16,8 +16,8 @@
 | B1 | complete | `92b545b` |
 | B2 | complete | `621b7cc` |
 | B3 | complete | `de8dd2f` |
-| B4 | planned | — |
-| B5 | planned | — |
+| B4 | complete | 2026-09-30 |
+| B5 | in progress | — |
 | C1 | planned | — |
 | C2 | planned | — |
 | C3 | planned | — |
@@ -116,3 +116,10 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Sandbox-W: one first-meeting P3 brief, one pattern refresh, fact hide/correct, follow-up edit/delete, prepared state.
 - Sandbox-R: at most two M6 memory brief generations, record latency/recall timeouts/critical count and verify read-only Hindsight behavior.
 - Read cached M6 on the real-memory data path before generation to prove zero-call enrichment.
+
+### B4 implementation
+
+- Added SQLite-backed contact profile data (facts/preferences, grouped meeting timeline, follow-ups, cached patterns, hidden count), app-side hide/unhide/correct overrides, commitment patch/delete, and explicit pattern refresh. Pattern refresh uses at most 40 visible facts, makes one app LLM call only when at least three facts exist, validates cited fact IDs and caches up to four results. Added the strict pattern prompt/schema and the `ContactPatternCache` table; updated the schemas document and generated the OpenAPI client offline (27 paths).
+- Hidden memory IDs are filtered from brief Hindsight evidence and Ask citations; hidden/corrected extracted facts are excluded from profiles, brief-enrichment evidence, and matching Ask sources. The UI text explicitly says the original remains in Hindsight. Hindsight memory deletion is not claimed or attempted.
+- B4 checks: backend 694 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Profile/control/pattern tests use the temporary SQLite fixture, FakeLLM and FakeMemoryService; no live LLM, Hindsight, or real-DB operations.
+- B4 live correction was not attempted: the previously authorized successful Hindsight retain cap is already consumed. Sandbox-W correction would be a third successful retain. This is carried as a checkpoint gate blocker unless separately authorized; do not treat a fake-service test as live confirmation.

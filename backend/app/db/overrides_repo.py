@@ -30,3 +30,16 @@ def list_overrides(session: Session, *, target_type: str | None = None) -> list[
     if target_type is not None:
         statement = statement.where(MemoryOverride.target_type == target_type)
     return list(session.exec(statement))
+
+
+def delete_overrides(
+    session: Session, *, target_id: str, target_type: str | None = None
+) -> int:
+    statement = select(MemoryOverride).where(MemoryOverride.target_id == target_id)
+    if target_type is not None:
+        statement = statement.where(MemoryOverride.target_type == target_type)
+    rows = list(session.exec(statement))
+    for row in rows:
+        session.delete(row)
+    session.commit()
+    return len(rows)

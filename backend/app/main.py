@@ -8,7 +8,19 @@ from datetime import date
 
 from fastapi import FastAPI
 
-from app.api import accounts, ask, briefs, capture, contacts, feedback, jobs, meetings, nudges
+from app.api import (
+    accounts,
+    ask,
+    briefs,
+    capture,
+    commitments,
+    contacts,
+    feedback,
+    jobs,
+    meetings,
+    memories,
+    nudges,
+)
 from app.api.deps import close_memory_service
 from app.config import settings
 from app.core.company import company_data
@@ -42,6 +54,8 @@ app.include_router(jobs.router, prefix="/api")
 app.include_router(briefs.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
+app.include_router(memories.router, prefix="/api")
+app.include_router(commitments.router, prefix="/api")
 app.include_router(nudges.router, prefix="/api")
 
 

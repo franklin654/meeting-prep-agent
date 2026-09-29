@@ -26,7 +26,7 @@ from app.schemas.brief import SectionKey
 from app.schemas.enums import CommitmentStatus, Owner, ScopeType
 
 
-def test_all_thirteen_tables_are_registered_on_metadata() -> None:
+def test_all_fourteen_tables_are_registered_on_metadata() -> None:
     table_names = set(SQLModel.metadata.tables.keys())
     assert table_names == {
         "account",
@@ -42,6 +42,7 @@ def test_all_thirteen_tables_are_registered_on_metadata() -> None:
         "capturedraft",
         "meetingprepared",
         "memoryoverride",
+        "contactpatterncache",
     }
 
 

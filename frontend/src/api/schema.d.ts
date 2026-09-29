@@ -377,6 +377,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contact Profile */
+        get: operations["contact_profile_api_contacts__contact_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contacts/{contact_id}/patterns/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Patterns */
+        post: operations["refresh_patterns_api_contacts__contact_id__patterns_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/{memory_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hide Memory */
+        post: operations["hide_memory_api_memories__memory_id__hide_post"];
+        /** Unhide Memory */
+        delete: operations["unhide_memory_api_memories__memory_id__hide_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/{memory_id}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Correct Memory */
+        post: operations["correct_memory_api_memories__memory_id__correct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/commitments/{commitment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Commitment */
+        delete: operations["remove_commitment_api_commitments__commitment_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Commitment */
+        patch: operations["patch_commitment_api_commitments__commitment_id__patch"];
+        trace?: never;
+    };
     "/api/nudges": {
         parameters: {
             query?: never;
@@ -629,6 +716,33 @@ export interface components {
             /** Memory Id */
             memory_id: string | null;
         };
+        /** CommitmentPatch */
+        CommitmentPatch: {
+            status?: components["schemas"]["CommitmentStatus"] | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Text */
+            text?: string | null;
+        };
+        /** CommitmentResponse */
+        CommitmentResponse: {
+            /** Id */
+            id: string;
+            owner: components["schemas"]["Owner"];
+            /** Text */
+            text: string;
+            /** Due Date */
+            due_date: string | null;
+            status: components["schemas"]["CommitmentStatus"];
+            citation: components["schemas"]["Citation"];
+            /** Meeting Id */
+            meeting_id: string;
+        };
+        /**
+         * CommitmentStatus
+         * @enum {string}
+         */
+        CommitmentStatus: "open" | "done";
         /** ContactCard */
         ContactCard: {
             /** Contact Id */
@@ -667,6 +781,56 @@ export interface components {
             role?: string | null;
             /** Aliases */
             aliases?: string[];
+        };
+        /** ContactMeetingTimeline */
+        ContactMeetingTimeline: {
+            /** Meeting Id */
+            meeting_id: string;
+            /** Title */
+            title: string;
+            /**
+             * Meeting Date
+             * Format: date
+             */
+            meeting_date: string;
+            /** Items */
+            items: components["schemas"]["ProfileTimelineItem"][];
+        };
+        /** ContactPattern */
+        ContactPattern: {
+            /** Text */
+            text: string;
+            /** Fact Ids */
+            fact_ids: string[];
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+        };
+        /** ContactProfile */
+        ContactProfile: {
+            contact: components["schemas"]["ContactRef"];
+            account: components["schemas"]["AccountResponse"];
+            stats: components["schemas"]["ContactProfileStats"];
+            /** Timeline */
+            timeline: components["schemas"]["ContactMeetingTimeline"][];
+            /** Facts */
+            facts: components["schemas"]["ProfileFact"][];
+            /** Follow Ups */
+            follow_ups: components["schemas"]["ProfileCommitment"][];
+            /** Preferences */
+            preferences: components["schemas"]["ProfileFact"][];
+            /** Patterns */
+            patterns: components["schemas"]["ContactPattern"][];
+            /** Hidden Count */
+            hidden_count: number;
+        };
+        /** ContactProfileStats */
+        ContactProfileStats: {
+            /** Meetings */
+            meetings: number;
+            /** Facts */
+            facts: number;
+            /** Open Follow Ups */
+            open_follow_ups: number;
         };
         /** ContactRef */
         ContactRef: {
@@ -815,6 +979,14 @@ export interface components {
              */
             has_history: boolean;
         };
+        /** MemoryCorrectionRequest */
+        MemoryCorrectionRequest: {
+            /** Corrected Text */
+            corrected_text: string;
+            scope_type?: components["schemas"]["ScopeType"] | null;
+            /** Scope Id */
+            scope_id?: string | null;
+        };
         /** NoteRequest */
         NoteRequest: {
             /** Text */
@@ -859,10 +1031,54 @@ export interface components {
             /** Citations */
             citations: components["schemas"]["Citation"][];
         };
+        /**
+         * Owner
+         * @enum {string}
+         */
+        Owner: "us" | "them";
         /** PinRequest */
         PinRequest: {
             /** Meeting Id */
             meeting_id: string;
+        };
+        /** ProfileCommitment */
+        ProfileCommitment: {
+            /** Id */
+            id: string;
+            owner: components["schemas"]["Owner"];
+            /** Text */
+            text: string;
+            /** Due Date */
+            due_date: string | null;
+            status: components["schemas"]["CommitmentStatus"];
+            citation: components["schemas"]["Citation"];
+        };
+        /** ProfileFact */
+        ProfileFact: {
+            /** Id */
+            id: string;
+            kind: components["schemas"]["FactKind"];
+            /** Text */
+            text: string;
+            /**
+             * Learned On
+             * Format: date
+             */
+            learned_on: string;
+            citation: components["schemas"]["Citation"];
+        };
+        /** ProfileTimelineItem */
+        ProfileTimelineItem: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+            /**
+             * Learned On
+             * Format: date
+             */
+            learned_on: string;
+            citation: components["schemas"]["Citation"];
         };
         /** RankedObjection */
         RankedObjection: {
@@ -1704,6 +1920,225 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactTimeline"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contact_profile_api_contacts__contact_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_patterns_api_contacts__contact_id__patterns_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPattern"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hide_memory_api_memories__memory_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unhide_memory_api_memories__memory_id__hide_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_memory_api_memories__memory_id__correct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_commitment_api_commitments__commitment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commitment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_commitment_api_commitments__commitment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commitment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitmentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitmentResponse"];
                 };
             };
             /** @description Validation Error */

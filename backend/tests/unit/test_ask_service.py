@@ -10,7 +10,7 @@ import pytest
 from sqlmodel import Session
 
 from app.core.time import utcnow
-from app.db import brief_repo, ingest_repo, repository
+from app.db import brief_repo, ingest_repo, overrides_repo, repository
 from app.db.models import AskAnswer
 from app.schemas.ask import AskRequest, AskTurn, NoteRequest, ReflectAnswer, SuggestedQuestions
 from app.schemas.brief import Brief, SectionKey
@@ -84,6 +84,40 @@ async def test_ungrounded_answer_uses_fixed_reply_and_has_no_citations(world: Wo
             question="What is Rahul's favourite food?",
             scope_type=ScopeType.account,
             scope_id="acc_finedge",
+        ),
+        memory=memory,
+        session_factory=world.session_factory,
+    )
+
+    assert not response.grounded
+    assert response.answer == "Nothing in memory covers that yet."
+    assert response.citations == []
+
+
+async def test_hidden_memory_source_cannot_ground_an_ask_answer(world: World) -> None:
+    memory = FakeMemoryService()
+    memory.queue_reflect_response(
+        ReflectResult(
+            text="grounded only by the hidden source",
+            structured=ReflectAnswer(answer="About $40K.", confident=True).model_dump(),
+            sources=[hit()],
+            structured_error=None,
+        )
+    )
+    with Session(world.engine) as session:
+        overrides_repo.create_override(
+            session,
+            target_type="memory",
+            target_id="ask-source-m2",
+            action="hidden",
+            corrected_text=None,
+        )
+
+    response = await ask_question(
+        AskRequest(
+            question="What did Anita say about budget?",
+            scope_type=ScopeType.contact,
+            scope_id="c_anita",
         ),
         memory=memory,
         session_factory=world.session_factory,

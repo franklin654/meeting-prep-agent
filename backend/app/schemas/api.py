@@ -16,10 +16,11 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.brief import Citation, SectionKey
-from app.schemas.enums import FactKind
+from app.schemas.enums import CommitmentStatus, FactKind, Owner, ScopeType
+from app.schemas.patterns import ContactPattern
 
 
 class ContactRef(BaseModel):
@@ -141,6 +142,83 @@ class TimelineEntry(BaseModel):  # GET /api/contacts/{id}/timeline
 class ContactTimeline(BaseModel):
     contact: ContactRef
     entries: list[TimelineEntry]  # newest first
+
+
+class ProfileTimelineItem(BaseModel):
+    kind: str
+    text: str
+    learned_on: date
+    citation: Citation
+
+
+class ContactMeetingTimeline(BaseModel):
+    meeting_id: str
+    title: str
+    meeting_date: date
+    items: list[ProfileTimelineItem]
+
+
+class ProfileFact(BaseModel):
+    id: str
+    kind: FactKind
+    text: str
+    learned_on: date
+    citation: Citation
+
+
+class ProfileCommitment(BaseModel):
+    id: str
+    owner: Owner
+    text: str
+    due_date: date | None
+    status: CommitmentStatus
+    citation: Citation
+
+
+class ContactProfileStats(BaseModel):
+    meetings: int
+    facts: int
+    open_follow_ups: int
+
+
+class ContactProfile(BaseModel):
+    contact: ContactRef
+    account: AccountResponse
+    stats: ContactProfileStats
+    timeline: list[ContactMeetingTimeline]
+    facts: list[ProfileFact]
+    follow_ups: list[ProfileCommitment]
+    preferences: list[ProfileFact]
+    patterns: list[ContactPattern]
+    hidden_count: int
+
+
+class MemoryCorrectionRequest(BaseModel):
+    corrected_text: str = Field(min_length=3, max_length=1000)
+    scope_type: ScopeType | None = None
+    scope_id: str | None = None
+
+    @model_validator(mode="after")
+    def require_complete_scope(self) -> MemoryCorrectionRequest:
+        if (self.scope_type is None) != (self.scope_id is None):
+            raise ValueError("scope_type and scope_id must be supplied together.")
+        return self
+
+
+class CommitmentPatch(BaseModel):
+    status: CommitmentStatus | None = None
+    due_date: date | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def require_a_change(self) -> CommitmentPatch:
+        if not self.model_fields_set:
+            raise ValueError("At least one commitment field must be provided.")
+        return self
+
+
+class CommitmentResponse(ProfileCommitment):
+    meeting_id: str
 
 
 class FeedbackRequest(BaseModel):  # POST /api/briefs/{id}/feedback

@@ -8,7 +8,7 @@ from typing import Any
 
 from app.core.errors import AppError, NotFoundError, ValidationError
 from app.core.time import utcnow
-from app.db import brief_repo, ingest_repo, repository
+from app.db import brief_repo, facts_repo, ingest_repo, overrides_repo, repository
 from app.db.brief_repo import SessionFactory
 from app.db.models import AskAnswer
 from app.llm.client import LLMClient
@@ -129,7 +129,42 @@ async def ask_question(
     parsed = parse_reflect_result("R5", result, ReflectAnswer)
     answer = parsed if isinstance(parsed, ReflectAnswer) else None
 
-    citations = await memory.resolve_sources(result.sources) if answer and answer.confident else []
+    source_rows = result.sources
+    if answer and answer.confident:
+        with session_factory() as session:
+            hidden_memories = {
+                row.target_id
+                for row in overrides_repo.list_overrides(session, target_type="memory")
+                if row.action in {"hidden", "corrected"}
+            }
+            hidden_fact_ids = {
+                row.target_id
+                for row in overrides_repo.list_overrides(session, target_type="fact")
+                if row.action in {"hidden", "corrected"}
+            }
+            source_account_ids: set[str] = set()
+            for source in source_rows:
+                if source.meeting_id:
+                    meeting = repository.get_meeting(session, source.meeting_id)
+                    if meeting is not None:
+                        source_account_ids.add(meeting.account_id)
+            hidden_facts = [
+                fact
+                for account_id in source_account_ids
+                for fact in facts_repo.list_account_facts(session, account_id)
+                if fact.id in hidden_fact_ids
+            ]
+        source_rows = [
+            source
+            for source in source_rows
+            if source.memory_id not in hidden_memories
+            and not any(
+                fact.meeting_id == source.meeting_id
+                and (fact.text in source.text or fact.source_quote in source.text)
+                for fact in hidden_facts
+            )
+        ]
+    citations = await memory.resolve_sources(source_rows) if answer and answer.confident else []
     mapped = _citations(citations)
     grounded = bool(answer and answer.confident and answer.answer.strip() and mapped)
     response = AskResponse(
