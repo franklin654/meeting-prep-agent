@@ -122,7 +122,38 @@ class BriefSection(BaseModel):
     items: list[BriefItem]
     collapsed: bool = False      # from style profile
 
+class OwedItem(BaseModel):
+    text: str
+    due_date: date | None
+    status: Literal["open", "overdue"]
+    days_overdue: int
+    owner_name: str
+    severity: Severity
+    citations: list[Citation]
+
+class RankedObjection(BaseModel):
+    topic: str
+    count: int                  # distinct meetings
+    dates: list[date]
+    citations: list[Citation]
+
+class ContactCard(BaseModel):
+    name: str
+    role: str | None
+    account: str
+    style: str | None = None
+    style_citations: list[Citation] = []
+    recent_meetings: list[Citation] = []
+    open_follow_ups: int = 0
+
 class Brief(BaseModel):
+    # Existing fields above; the following enrichment is optional/backward-compatible.
+    you_owe: list[OwedItem] = []
+    they_owe: list[OwedItem] = []
+    objections: list[RankedObjection] = []
+    memory_used: dict[str, int] = {"facts": 0, "meetings": 0}
+    contact_cards: list[ContactCard] = []
+    first_meeting: bool = False
     id: str
     meeting_id: str
     mode: Literal["memory", "no_memory"]

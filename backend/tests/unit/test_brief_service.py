@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 from app.config import settings
 from app.core.errors import LLMTimeoutError, MemoryUnavailableError
 from app.db import repository
-from app.db.models import BriefRecord, Commitment, Contact, Meeting
+from app.db.models import BriefRecord, Commitment, Contact, Meeting, MemoryOverride
 from app.memory.memory_service import MemoryService, MentalModelText
 from app.schemas.brief import Brief, BriefDraft, BriefItem, SectionKey, Severity, SourceType
 from app.schemas.enums import CommitmentStatus, FactKind, Owner
@@ -85,7 +85,7 @@ async def test_b1_overdue_deck_is_critical_and_cited_to_m4(
 ) -> None:
     brief, _ = await make(world, lambda p: good_draft(p, llm_severity))
 
-    (deck,) = [i for i in section(brief, SectionKey.open_commitments) if "deck" in i.text.lower()]
+    (deck,) = [i for i in brief.you_owe if "deck" in i.text.lower()]
     assert deck.severity == Severity.critical  # forced in code whatever the LLM said
     (citation,) = deck.citations
     assert citation.source_type == SourceType.ledger
@@ -107,15 +107,17 @@ async def test_overdue_item_appended_when_llm_omits_it(world: World) -> None:
 
     brief, _ = await make(world, no_deck)
 
-    (forced,) = section(brief, SectionKey.open_commitments)
+    (forced,) = brief.you_owe
     assert forced.severity == Severity.critical
     assert "pricing deck" in forced.text
     assert forced.citations[0].meeting_id == "m4_finedge"
     assert forced.citations[0].quote == DECK_QUOTE
-    assert forced.contact_ids == ["c_rahul"]
+    assert forced.owner_name == "Rahul Mehta"
 
 
-async def test_closed_and_not_overdue_commitments_are_not_forced(world: World) -> None:
+async def test_closed_commitments_are_excluded_but_future_commitments_are_enriched(
+    world: World,
+) -> None:
     with Session(world.engine) as s:
         deck = s.get(Commitment, "cm_deck")
         assert deck is not None
@@ -125,7 +127,131 @@ async def test_closed_and_not_overdue_commitments_are_not_forced(world: World) -
 
     brief, _ = await make(world, lambda p: BriefDraft(sections={}))
 
+    assert len(brief.you_owe) == 1
+    assert brief.you_owe[0].status == "open"
+    assert brief.you_owe[0].severity == Severity.info
     assert section(brief, SectionKey.open_commitments) == []
+
+
+async def test_memory_brief_enriches_ledger_commitments_and_fact_objections(world: World) -> None:
+    from app.db.facts_repo import replace_meeting_facts
+
+    with Session(world.engine) as session:
+        replace_meeting_facts(
+            session,
+            "m3_finedge",
+            "acc_finedge",
+            [
+                (
+                    "c_rahul",
+                    FactKind.objection,
+                    "Needs India residency",
+                    "India residency is required",
+                )
+            ],
+        )
+
+    brief, _ = await make(world)
+
+    assert brief.you_owe[0].text == "Send revised pricing deck with pilot option"
+    assert brief.you_owe[0].severity == Severity.critical
+    assert brief.you_owe[0].citations[0].label == "Pilot scoping · Aug 27"
+    assert brief.objections[0].topic == "Needs India residency"
+    assert brief.objections[0].count == 1
+    assert brief.objections[0].citations[0].quote == "India residency is required"
+
+
+async def test_first_meeting_memory_brief_uses_empty_evidence_without_memory_calls(
+    world: World,
+) -> None:
+    from app.db.models import Meeting
+
+    with Session(world.engine) as session:
+        meeting = session.get(Meeting, "m6_finedge")
+        assert meeting is not None
+        meeting.status = "done"
+        session.add(meeting)
+        # Remove prior meetings to model a genuinely new account.
+        for old in session.exec(select(Meeting).where(Meeting.id != "m6_finedge")):
+            session.delete(old)
+        session.commit()
+    memory_calls = len(world.memory.recall_calls)
+
+    brief, _ = await make(world, lambda prompt: good_draft(prompt), memory=world.memory)
+
+    assert brief.first_meeting is True
+    assert len(world.memory.recall_calls) == memory_calls
+    assert brief.you_owe == []
+    assert brief.objections == []
+
+
+async def test_hidden_fact_and_memory_overrides_are_excluded_from_brief(world: World) -> None:
+    from app.db.facts_repo import replace_meeting_facts
+
+    with Session(world.engine) as session:
+        fact = replace_meeting_facts(
+            session,
+            "m3_finedge",
+            "acc_finedge",
+            [
+                (
+                    "c_rahul",
+                    FactKind.objection,
+                    "India residency blocker",
+                    "Must store data in India",
+                )
+            ],
+        )[0]
+        session.add_all(
+            [
+                MemoryOverride(
+                    id="ovr_fact_hidden",
+                    target_type="fact",
+                    target_id=fact.id,
+                    action="hidden",
+                    created_at=datetime(2026, 9, 28, tzinfo=UTC),
+                ),
+                MemoryOverride(
+                    id="ovr_memory_hidden",
+                    target_type="memory",
+                    target_id="w_datahawk",
+                    action="hidden",
+                    created_at=datetime(2026, 9, 28, tzinfo=UTC),
+                ),
+            ]
+        )
+        session.commit()
+
+    brief, _ = await make(world)
+
+    assert brief.objections == []
+    assert all("DataHawk" not in item.text for item in section(brief, SectionKey.watch_outs))
+
+
+async def test_contact_card_style_is_fact_backed_and_cited(world: World) -> None:
+    from app.db.facts_repo import replace_meeting_facts
+
+    with Session(world.engine) as session:
+        replace_meeting_facts(
+            session,
+            "m2_finedge",
+            "acc_finedge",
+            [
+                (
+                    "c_anita",
+                    FactKind.personal,
+                    "Anita prefers numbers-first summaries by email",
+                    "Numbers first please, send me the spreadsheet before the meeting",
+                )
+            ],
+        )
+
+    brief, _ = await make(world)
+
+    card = next(card for card in brief.contact_cards if card.name == "Anita Desai")
+    assert card.style == "Anita prefers numbers-first summaries by email"
+    assert card.style_citations[0].meeting_id == "m2_finedge"
+    assert card.style_citations[0].quote.startswith("Numbers first please")
 
 
 async def test_b3_personal_touchpoint_cited_to_m1_or_m5(world: World) -> None:
@@ -206,15 +332,14 @@ async def test_overdue_commitments_keep_one_red_group_us_and_mark_customer_info(
         s.commit()
 
     brief, _ = await make(world, lambda p: BriefDraft(sections={}))
-    commitments = section(brief, SectionKey.open_commitments)
-    critical = [entry for entry in all_items(brief) if entry.severity == Severity.critical]
-    assert len(critical) == 1
-    assert "pricing deck" in critical[0].text.lower()
-    (grouped,) = [entry for entry in commitments if entry.text.startswith("Also overdue:")]
-    assert grouped.severity == Severity.warning
-    assert "Send rollout plan" in grouped.text
-    (customer,) = [entry for entry in commitments if "pipeline shortlist" in entry.text.lower()]
-    assert customer.severity == Severity.info
+    assert sum(entry.severity == Severity.critical for entry in brief.you_owe) == 1
+    deck = next(entry for entry in brief.you_owe if "pricing deck" in entry.text.lower())
+    assert deck.severity == Severity.critical
+    rollout = next(entry for entry in brief.you_owe if "rollout plan" in entry.text.lower())
+    assert rollout.severity == Severity.warning
+    customer = next(entry for entry in brief.they_owe if "pipeline shortlist" in entry.text.lower())
+    assert customer.severity == Severity.warning
+    assert section(brief, SectionKey.open_commitments) == []
 
 
 async def test_overdue_alert_restatement_is_removed(world: World) -> None:
@@ -350,7 +475,7 @@ async def test_overdue_item_with_empty_source_quote_falls_back_to_commitment_tex
 
     brief, _ = await make(world, lambda p: BriefDraft(sections={}))
 
-    (forced,) = section(brief, SectionKey.open_commitments)
+    (forced,) = brief.you_owe
     (c,) = forced.citations
     assert c.quote == "Send revised pricing deck with pilot option"
     assert c.meeting_id == "m4_finedge" and c.meeting_date == date(2026, 8, 27)
@@ -513,7 +638,7 @@ async def test_objection_reflect_queue_is_not_used_by_the_brief_path(
     assert world.memory.reflect_calls == []
     assert section(brief, SectionKey.personal_touchpoints)
     assert section(brief, SectionKey.watch_outs)
-    assert section(brief, SectionKey.open_commitments)
+    assert brief.you_owe
 
 
 async def test_recall_failure_degrades_only_recall_sections(world: World) -> None:
@@ -524,7 +649,7 @@ async def test_recall_failure_degrades_only_recall_sections(world: World) -> Non
     assert section(brief, SectionKey.personal_touchpoints) == []
     assert section(brief, SectionKey.watch_outs) == []
     assert section(brief, SectionKey.unresolved_objections) == []
-    assert section(brief, SectionKey.open_commitments)
+    assert brief.you_owe
 
 
 async def test_every_memory_call_failing_raises_memory_unavailable(

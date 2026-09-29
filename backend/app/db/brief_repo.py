@@ -16,7 +16,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
@@ -25,7 +25,17 @@ from sqlmodel import Session, select
 from app.core.errors import NotFoundError
 from app.core.time import utcnow
 from app.db import repository
-from app.db.models import Account, AskAnswer, BriefRecord, Commitment, Contact, Meeting
+from app.db.facts_repo import list_account_facts
+from app.db.models import (
+    Account,
+    AskAnswer,
+    BriefRecord,
+    Commitment,
+    Contact,
+    ExtractedFact,
+    Meeting,
+)
+from app.db.overrides_repo import list_overrides
 from app.schemas.brief import Brief
 from app.schemas.enums import CommitmentStatus
 
@@ -51,6 +61,10 @@ class BriefInputs:
     attendee_ids_by_meeting: dict[str, set[str]]  # for every account meeting
     open_commitments: list[Commitment]
     pinned_ask_answers: list[AskAnswer]
+    extracted_facts: list[ExtractedFact] = field(default_factory=list)
+    hidden_fact_ids: set[str] = field(default_factory=set)
+    hidden_memory_ids: set[str] = field(default_factory=set)
+    first_meeting: bool = False
 
 
 def load_brief_inputs(
@@ -65,6 +79,13 @@ def load_brief_inputs(
             raise NotFoundError(f"Account {meeting.account_id!r} not found.")
 
         account_meetings = repository.list_meetings_for_account(session, account.id)
+        first_meeting = not any(
+            prior.id != meeting.id
+            and prior.status == "done"
+            and prior.scheduled_at < meeting.scheduled_at
+            for prior in account_meetings
+        )
+        read_memory_evidence = include_ledger and not first_meeting
         accounts = repository.list_accounts(session)
         other_accounts = [candidate for candidate in accounts if candidate.id != account.id]
         all_meetings = list(account_meetings)
@@ -87,7 +108,7 @@ def load_brief_inputs(
                 for c in repository.list_commitments_for_account(session, account.id)
                 if c.status == CommitmentStatus.open
             ]
-            if include_ledger
+            if read_memory_evidence
             else []
         )
         return BriefInputs(
@@ -102,9 +123,31 @@ def load_brief_inputs(
             open_commitments=open_commitments,
             pinned_ask_answers=(
                 repository.list_pinned_ask_answers_for_meeting(session, meeting_id)
-                if include_ledger
+                if read_memory_evidence
                 else []
             ),
+            extracted_facts=(
+                list_account_facts(session, account.id) if read_memory_evidence else []
+            ),
+            hidden_fact_ids=(
+                {
+                    override.target_id
+                    for override in list_overrides(session, target_type="fact")
+                    if override.action in {"hidden", "corrected"}
+                }
+                if read_memory_evidence
+                else set()
+            ),
+            hidden_memory_ids=(
+                {
+                    override.target_id
+                    for override in list_overrides(session, target_type="memory")
+                    if override.action in {"hidden", "corrected"}
+                }
+                if read_memory_evidence
+                else set()
+            ),
+            first_meeting=first_meeting,
         )
 
 

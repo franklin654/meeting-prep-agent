@@ -44,7 +44,7 @@ from app.db.brief_repo import (
     new_brief_stamp,
     save_brief,
 )
-from app.db.models import AskAnswer, Commitment, Contact, Meeting
+from app.db.models import AskAnswer, Commitment, Contact, ExtractedFact, Meeting
 from app.llm.client import LLMClient, get_llm_client
 from app.llm.prompt_loader import render_prompt
 from app.memory.memory_service import MemoryService, MentalModelText, _relationship_model_id
@@ -56,6 +56,9 @@ from app.schemas.brief import (
     BriefItem,
     BriefSection,
     Citation,
+    ContactCard,
+    OwedItem,
+    RankedObjection,
     SectionKey,
     Severity,
     SourceType,
@@ -1573,6 +1576,7 @@ def assemble_brief(
     cross_contact_alerts: Sequence[BriefItem] = (),
     cross_deal_patterns: Sequence[BriefItem] = (),
     deal_snapshot: Sequence[tuple[str, MemoryHit]] = (),
+    first_meeting: bool = False,
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
     account_names = {
@@ -1586,6 +1590,16 @@ def assemble_brief(
         meeting_account_ids={meeting.id: meeting.account_id for meeting in inputs.all_meetings},
     )
     sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
+
+    visible_facts = [
+        fact for fact in inputs.extracted_facts if fact.id not in inputs.hidden_fact_ids
+    ] if mode == "memory" else []
+    you_owe, they_owe = _enriched_commitments(inputs, meetings)
+    objections = _rank_fact_objections(visible_facts, meetings) if mode == "memory" else []
+    if mode == "memory" and (you_owe or they_owe):
+        sections[SectionKey.open_commitments] = []
+    if mode == "memory" and objections:
+        sections[SectionKey.unresolved_objections] = []
 
     if mode == "memory" and deal_snapshot:
         meeting_by_id = {meeting.id: meeting for meeting in inputs.all_meetings}
@@ -1687,6 +1701,10 @@ def assemble_brief(
                 ]
                 sections.setdefault(SectionKey.open_commitments, []).append(forced)
     _apply_severity_cap(sections, overdue_of)
+    if mode == "memory" and (you_owe or they_owe):
+        sections[SectionKey.open_commitments] = []
+    if mode == "memory" and objections:
+        sections[SectionKey.unresolved_objections] = []
 
     attendee_items = _attendee_items(inputs, mode=mode)
     if attendee_items:
@@ -1711,6 +1729,8 @@ def assemble_brief(
         for item in section.items
         for c in item.citations
     }
+    memory_meetings = {fact.meeting_id for fact in visible_facts}
+    contact_cards = _contact_cards(inputs, meetings, visible_facts) if mode == "memory" else []
     return Brief(
         id=brief_id,
         meeting_id=inputs.meeting.id,
@@ -1719,7 +1739,158 @@ def assemble_brief(
         sections=ordered,
         facts_used=len(cited),
         preferences_applied=[],
+        you_owe=you_owe if mode == "memory" else [],
+        they_owe=they_owe if mode == "memory" else [],
+        objections=objections,
+        memory_used={"facts": len(visible_facts), "meetings": len(memory_meetings)},
+        contact_cards=contact_cards,
+        first_meeting=first_meeting,
     )
+
+
+def _fact_citation(fact: ExtractedFact, meetings: Mapping[str, MeetingInfo]) -> Citation | None:
+    meeting = meetings.get(fact.meeting_id)
+    if meeting is None or not fact.source_quote.strip():
+        return None
+    return Citation(
+        source_type=SourceType.meeting,
+        meeting_id=meeting.id,
+        meeting_date=meeting.date,
+        label=f"{meeting.title} · {meeting.date:%b} {meeting.date.day}",
+        quote=truncate(fact.source_quote, QUOTE_MAX_CHARS),
+        memory_id=None,
+    )
+
+
+def _enriched_commitments(
+    inputs: BriefInputs, meetings: Mapping[str, MeetingInfo]
+) -> tuple[list[OwedItem], list[OwedItem]]:
+    today_date = today()
+    rows: list[tuple[Commitment, OwedItem]] = []
+    for commitment in inputs.open_commitments:
+        info = meetings.get(commitment.meeting_id)
+        if info is None:
+            continue
+        overdue = commitment.due_date is not None and commitment.due_date < today_date
+        contact = next((c for c in inputs.account_contacts if c.id == commitment.contact_id), None)
+        if commitment.contact_id is None:
+            contact = next((c for c in inputs.attendees if c.account_id is None), None)
+        owner_name = (
+            contact.name if contact else ("You" if commitment.owner == Owner.us else "Customer")
+        )
+        citation = Citation(
+            source_type=SourceType.ledger,
+            meeting_id=info.id,
+            meeting_date=info.date,
+            label=f"{info.title} · {info.date:%b} {info.date.day}",
+            quote=truncate(commitment.source_quote or commitment.text, QUOTE_MAX_CHARS),
+            memory_id=None,
+        )
+        rows.append((commitment, OwedItem(
+            text=commitment.text,
+            due_date=commitment.due_date,
+            status="overdue" if overdue else "open",
+            days_overdue=(
+                max((today_date - commitment.due_date).days, 0)
+                if overdue and commitment.due_date
+                else 0
+            ),
+            owner_name=owner_name,
+            severity=Severity.info,
+            citations=[citation],
+        )))
+    us_overdue = sorted(
+        ((c, i) for c, i in rows if c.owner == Owner.us and i.status == "overdue"),
+        key=lambda row: row[0].due_date or date.max,
+    )
+    if us_overdue:
+        us_overdue[0][1].severity = Severity.critical
+    for _commitment, item in rows:
+        if item.status == "overdue" and item.severity != Severity.critical:
+            item.severity = Severity.warning
+    return (
+        [item for c, item in rows if c.owner == Owner.us],
+        [item for c, item in rows if c.owner == Owner.them],
+    )
+
+
+def _rank_fact_objections(
+    facts: Sequence[ExtractedFact], meetings: Mapping[str, MeetingInfo]
+) -> list[RankedObjection]:
+    clusters: list[list[ExtractedFact]] = []
+    for fact in facts:
+        if fact.kind != FactKind.objection:
+            continue
+        words = {word.casefold().strip(".,;:!?()") for word in fact.text.split() if len(word) > 3}
+        match: list[ExtractedFact] | None = None
+        for cluster in clusters:
+            prior_words = {
+                word.casefold().strip(".,;:!?()")
+                for word in cluster[0].text.split()
+                if len(word) > 3
+            }
+            overlap = len(words & prior_words) / max(1, len(words | prior_words))
+            if words and overlap >= 0.45:
+                match = cluster
+                break
+        if match is None:
+            clusters.append([fact])
+        else:
+            match.append(fact)
+    result: list[RankedObjection] = []
+    for cluster in clusters:
+        citations = [c for fact in cluster if (c := _fact_citation(fact, meetings)) is not None]
+        if not citations:
+            continue
+        dates = sorted({citation.meeting_date for citation in citations if citation.meeting_date})
+        meeting_count = len({citation.meeting_id for citation in citations if citation.meeting_id})
+        result.append(
+            RankedObjection(
+                topic=cluster[0].text, count=meeting_count, dates=dates, citations=citations
+            )
+        )
+    return sorted(
+        result, key=lambda item: (-item.count, -max(item.dates, default=date.min).toordinal())
+    )[:5]
+
+
+def _contact_cards(
+    inputs: BriefInputs, meetings: Mapping[str, MeetingInfo], facts: Sequence[ExtractedFact]
+) -> list[ContactCard]:
+    cards: list[ContactCard] = []
+    for contact in inputs.account_contacts:
+        citations = [
+            Citation(source_type=SourceType.meeting, meeting_id=meeting.id,
+                     meeting_date=meeting.date,
+                     label=f"{meeting.title} · {meeting.date:%b} {meeting.date.day}",
+                     quote=None, memory_id=None)
+            for mid, ids in inputs.attendee_ids_by_meeting.items()
+            if contact.id in ids and (meeting := meetings.get(mid)) is not None
+        ]
+        citations.sort(key=lambda citation: citation.meeting_date or date.min, reverse=True)
+        style_fact = next(
+            (
+                fact
+                for fact in reversed(facts)
+                if fact.contact_id == contact.id
+                and fact.kind == FactKind.personal
+                and re.search(
+                    r"\b(prefers?|preference|likes to|wants|appreciates|communication|format)\b",
+                    fact.text,
+                    flags=re.IGNORECASE,
+                )
+            ),
+            None,
+        )
+        style_citation = _fact_citation(style_fact, meetings) if style_fact else None
+        cards.append(ContactCard(name=contact.name, role=contact.role, account=inputs.account.name,
+                                 style=truncate(style_fact.text, 140) if style_fact else None,
+                                 style_citations=[style_citation] if style_citation else [],
+                                 recent_meetings=citations[:3], open_follow_ups=sum(
+                                     1 for commitment in inputs.open_commitments
+                                     if commitment.contact_id == contact.id
+                                 )))
+    return cards
 
 
 def _pinned_ask_item(ask_answer: AskAnswer) -> BriefItem | None:
@@ -1803,10 +1974,12 @@ async def generate_brief(
     timings.set("load", time.monotonic() - started)
 
     table = EvidenceTable([])
+    context = MemoryContext()
     competitor_hits: Sequence[MemoryHit] = ()
     cross_contact_alerts: Sequence[BriefItem] = ()
     cross_deal_patterns: Sequence[BriefItem] = ()
-    if with_memory:
+    first_meeting = with_memory and inputs.first_meeting
+    if with_memory and not first_meeting:
         context = await _gather_memory(
             inputs,
             memory,
@@ -1815,6 +1988,7 @@ async def generate_brief(
             security_keywords=persona.security_keywords,
             timings=timings,
         )
+        _filter_hidden_memory(context, inputs.hidden_memory_ids)
         gathered_at = time.monotonic()
         ingested = [
             m
@@ -1867,6 +2041,7 @@ async def generate_brief(
         cross_contact_alerts=cross_contact_alerts if with_memory else (),
         cross_deal_patterns=cross_deal_patterns if with_memory else (),
         deal_snapshot=context.deal_snapshot if with_memory else (),
+        first_meeting=first_meeting,
     )
     lost_beats = context.beat_critical_degraded if with_memory else []
     if with_memory and not brief.sections:
@@ -1910,6 +2085,24 @@ async def generate_brief(
         ms.get("total", 0),
     )
     return brief
+
+
+def _filter_hidden_memory(context: MemoryContext, hidden_ids: set[str]) -> None:
+    if not hidden_ids:
+        return
+    def visible(hit: MemoryHit) -> bool:
+        return hit.memory_id not in hidden_ids
+
+    context.recall_sections = [
+        [hit for hit in group if visible(hit)] for group in context.recall_sections
+    ]
+    context.objection_hits = [hit for hit in context.objection_hits if visible(hit)]
+    context.cross_deal_hits = [hit for hit in context.cross_deal_hits if visible(hit)]
+    context.deal_snapshot = [entry for entry in context.deal_snapshot if visible(entry[1])]
+    context.cross_contact_alerts = [
+        item for item in context.cross_contact_alerts
+        if all(citation.memory_id not in hidden_ids for citation in item.citations)
+    ]
 
 
 async def get_cached_brief(

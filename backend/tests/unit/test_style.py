@@ -391,15 +391,14 @@ def test_briefs_come_back_styled_and_record_stays_unstyled(
     assert all(not s.collapsed for s in stored.sections)
 
 
-def test_pricing_deck_survives_hiding_open_commitments(client: TestClient) -> None:
+def test_pricing_deck_enrichment_is_not_hidden_by_open_commitment_style(client: TestClient) -> None:
     brief = _post_brief(client)
     for _ in range(5):
         _feedback(client, brief.id, "open_commitments", "collapsed")
     got = Brief.model_validate(client.get(f"/api/meetings/{M6}/brief").json())
-    section = next(s for s in got.sections if s.key == SK.open_commitments)
-    assert section.collapsed is True
-    assert any("pricing deck" in i.text.lower() for i in section.items)
-    assert any(i.severity == Severity.critical for i in section.items)
+    assert not any(s.key == SK.open_commitments for s in got.sections)
+    (deck,) = [item for item in got.you_owe if "pricing deck" in item.text.lower()]
+    assert deck.severity == Severity.critical
 
 
 def test_no_memory_response_styled_without_preferences(client: TestClient) -> None:

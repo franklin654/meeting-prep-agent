@@ -99,24 +99,22 @@ async def test_at_most_one_critical_item_and_group_remaining_overdue(world: Worl
 
     brief, _ = await make(world, draft)
 
-    # The most overdue us-owned commitment stays red; all other us-owned rows are grouped.
-    assert [k for k, _ in critical_items(brief)] == [SectionKey.open_commitments]
-    commitments = section(brief, SectionKey.open_commitments)
-    assert len(commitments) == 9  # critical, grouped us-owned, and individual customer rows
-    assert "pricing deck" in commitments[0].text
-    assert commitments[0].severity == Severity.critical
-    grouped = next(i for i in commitments if i.text.startswith("Also overdue:"))
-    assert grouped.severity == Severity.warning
-    assert "cm_us0" in grouped.text
-    # Customer-owned overdue rows are informational even though they are older.
-    them = [i for i in commitments if "cm_them" in i.text]
-    assert len(them) == 7 and all(i.severity == Severity.info for i in them)
+    # Enriched ledger rows own this surface; the P3 ledger section is suppressed.
+    commitments = brief.you_owe
+    assert len(commitments) == 7
+    deck = next(i for i in commitments if "pricing deck" in i.text)
+    assert deck.severity == Severity.critical
+    other_us = [i for i in commitments if i is not deck]
+    assert len(other_us) == 6 and all(i.severity == Severity.warning for i in other_us)
+    them = brief.they_owe
+    assert len(them) == 7 and all(i.severity == Severity.warning for i in them)
+    assert section(brief, SectionKey.open_commitments) == []
     # Restating overdue rows in other sections is never critical.
     assert all(i.severity == Severity.warning for i in section(brief, SectionKey.agenda))
     assert section(brief, SectionKey.alerts) == []
     assert all(i.severity == Severity.warning for i in section(brief, SectionKey.watch_outs))
     # The deck is still cited to its source meeting with the real quote.
-    (citation,) = commitments[0].citations
+    (citation,) = deck.citations
     assert citation.meeting_id == "m4_finedge" and citation.quote == DECK_QUOTE
 
 
@@ -131,15 +129,12 @@ async def test_customer_owned_overdue_items_are_never_critical(world: World) -> 
 
     brief, _ = await make(world)  # deck is the only us-owned overdue row
 
-    commitments = section(brief, SectionKey.open_commitments)
-    assert len(commitments) == 3
-    assert [i.severity for i in commitments] == [
-        Severity.critical,
-        Severity.info,
-        Severity.info,
-    ]
-    assert "pricing deck" in commitments[0].text  # us-owned outranks the older customer rows
-    assert len(critical_items(brief)) == 1
+    assert len(brief.you_owe) == 1
+    assert brief.you_owe[0].severity == Severity.critical
+    assert "pricing deck" in brief.you_owe[0].text
+    assert len(brief.they_owe) == 2
+    assert all(item.severity == Severity.warning for item in brief.they_owe)
+    assert section(brief, SectionKey.open_commitments) == []
 
 
 async def test_zero_us_owned_overdue_means_zero_critical(world: World) -> None:
@@ -165,15 +160,16 @@ async def test_zero_us_owned_overdue_means_zero_critical(world: World) -> None:
 
     brief, _ = await make(world, shouting)
 
-    assert critical_items(brief) == []
-    assert len(section(brief, SectionKey.open_commitments)) == 2
+    assert all(item.severity == Severity.warning for item in brief.they_owe)
+    assert section(brief, SectionKey.open_commitments) == []
 
 
 async def test_critical_cap_with_fewer_than_two_candidates(world: World) -> None:
     brief, _ = await make(world)  # only the deck is overdue
 
-    assert len(critical_items(brief)) == 1
-    assert section(brief, SectionKey.open_commitments)[0].severity == Severity.critical
+    assert sum(item.severity == Severity.critical for item in brief.you_owe) == 1
+    assert brief.you_owe[0].severity == Severity.critical
+    assert section(brief, SectionKey.open_commitments) == []
 
 
 async def test_no_overdue_means_nothing_critical_even_if_llm_says_so(world: World) -> None:

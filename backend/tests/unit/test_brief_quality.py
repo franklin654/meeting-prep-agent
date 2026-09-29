@@ -285,7 +285,7 @@ async def test_b1_still_critical_with_85_open_rows_and_prompt_stays_small(world:
     evidence_block = prompt.split("each has an id):\n")[1].split("\n\nUser's brief style:")[0]
     assert len(evidence_block.splitlines()) <= 25
     assert len(evidence_block) < 4000
-    (forced,) = section(brief, SectionKey.open_commitments)  # appended, cited, critical
+    forced = next(item for item in brief.you_owe if "pricing deck" in item.text.lower())
     assert forced.severity.value == "critical"
     assert forced.citations[0].quote == DECK_QUOTE
 
@@ -358,13 +358,14 @@ async def test_many_overdue_rows_do_not_squeeze_out_recall_and_all_overdue_stay_
     assert len([ln for ln in prompt.splitlines() if ln.startswith("[")]) <= 25
     assert section(brief, SectionKey.personal_touchpoints)
     assert section(brief, SectionKey.watch_outs)
-    forced = section(brief, SectionKey.open_commitments)
-    assert len(forced) == 2  # the red item and grouped warning cover every overdue row
+    forced = brief.you_owe
+    assert len(forced) == 14  # every overdue commitment is represented
     for it in forced:
         assert it.citations[0].meeting_id and it.citations[0].quote
     # Only the most overdue us-owned row stays critical.
     assert [i.severity.value for i in forced].count("critical") == 1
-    assert "pricing deck" in forced[0].text
+    assert any("pricing deck" in item.text for item in forced)
+    assert section(brief, SectionKey.open_commitments) == []
 
 
 async def test_top_five_resolved_keep_first_three_that_resolve(world: World) -> None:
@@ -421,7 +422,7 @@ async def test_labelled_watch_out_call_failing_degrades_only_watch_outs(
     assert section(brief, SectionKey.watch_outs) == []
     assert section(brief, SectionKey.personal_touchpoints)
     assert section(brief, SectionKey.unresolved_objections)
-    assert section(brief, SectionKey.open_commitments)
+    assert brief.you_owe
 
 
 async def test_watch_out_fallback_call_failing_degrades_only_watch_outs(

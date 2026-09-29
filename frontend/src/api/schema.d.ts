@@ -458,6 +458,41 @@ export interface components {
             facts_used: number;
             /** Preferences Applied */
             preferences_applied: string[];
+            /**
+             * You Owe
+             * @default []
+             */
+            you_owe: components["schemas"]["OwedItem"][];
+            /**
+             * They Owe
+             * @default []
+             */
+            they_owe: components["schemas"]["OwedItem"][];
+            /**
+             * Objections
+             * @default []
+             */
+            objections: components["schemas"]["RankedObjection"][];
+            /**
+             * Memory Used
+             * @default {
+             *       "facts": 0,
+             *       "meetings": 0
+             *     }
+             */
+            memory_used: {
+                [key: string]: number;
+            };
+            /**
+             * Contact Cards
+             * @default []
+             */
+            contact_cards: components["schemas"]["ContactCard"][];
+            /**
+             * First Meeting
+             * @default false
+             */
+            first_meeting: boolean;
         };
         /** BriefItem */
         BriefItem: {
@@ -553,6 +588,32 @@ export interface components {
             quote: string | null;
             /** Memory Id */
             memory_id: string | null;
+        };
+        /** ContactCard */
+        ContactCard: {
+            /** Name */
+            name: string;
+            /** Role */
+            role: string | null;
+            /** Account */
+            account: string;
+            /** Style */
+            style?: string | null;
+            /**
+             * Style Citations
+             * @default []
+             */
+            style_citations: components["schemas"]["Citation"][];
+            /**
+             * Recent Meetings
+             * @default []
+             */
+            recent_meetings: components["schemas"]["Citation"][];
+            /**
+             * Open Follow Ups
+             * @default 0
+             */
+            open_follow_ups: number;
         };
         /** ContactCreate */
         ContactCreate: {
@@ -737,10 +798,40 @@ export interface components {
             /** Link */
             link: string;
         };
+        /** OwedItem */
+        OwedItem: {
+            /** Text */
+            text: string;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "overdue";
+            /** Days Overdue */
+            days_overdue: number;
+            /** Owner Name */
+            owner_name: string;
+            severity: components["schemas"]["Severity"];
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+        };
         /** PinRequest */
         PinRequest: {
             /** Meeting Id */
             meeting_id: string;
+        };
+        /** RankedObjection */
+        RankedObjection: {
+            /** Topic */
+            topic: string;
+            /** Count */
+            count: number;
+            /** Dates */
+            dates: string[];
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
         };
         /**
          * ScopeType
