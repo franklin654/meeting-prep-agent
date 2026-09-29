@@ -11,6 +11,8 @@ from app.schemas.enums import CommitmentStatus, Owner
 from app.schemas.memory import MemoryHit
 from app.services.evidence import (
     EVIDENCE_CAP,
+    MAX_OVERDUE_EVIDENCE,
+    MIN_RECALL,
     MeetingInfo,
     Objection,
     ObjectionReport,
@@ -210,3 +212,52 @@ def test_objection_matching_uses_unresolved_only_and_best_source() -> None:
     pairs = match_objection_sources(report, sources)
 
     assert [(o.raised_by, h.memory_id) for o, h in pairs] == [("Sneha", "s")]
+
+
+def test_recall_floor_and_overdue_cap_hold_together() -> None:
+    sections = [[hit(10 * si + j, "m1") for j in range(3)] for si in range(6)]
+    rows = [commitment(f"over{i:02d}", date(2026, 9, 1 + i)) for i in range(14)]
+    rows += [commitment(f"soon{i}", date(2026, 10, 1 + i)) for i in range(6)]
+    objections = [
+        (Objection(concern=f"c{i}", raised_by="x", raised_on=date(2026, 7, 1), resolved=False),
+         hit(100 + i, "m2"))
+        for i in range(6)
+    ]  # fmt: skip
+    table = build_evidence(
+        mental_model=MentalModelText(id="r", name="n", content="S", last_refreshed_at=None),
+        latest_done_meeting=MEETINGS["m9"],
+        recall_sections=sections,
+        objections=objections,
+        commitments=rows,
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+
+    led = [r.commitment_id for r in table.refs if r.commitment_id]
+    overdue = [c for c in led if c and c.startswith("over")]
+    assert len(overdue) == MAX_OVERDUE_EVIDENCE == 8
+    assert overdue == [f"over{i:02d}" for i in range(6, 14)]  # latest due dates, shown oldest first
+    recall_ids = [
+        r.memory_id for r in table.refs if r.memory_id and not r.memory_id.startswith("h1")
+    ]
+    recall = [r for r in table.refs if r.source_type == SourceType.meeting and r.memory_id]
+    per_section = {int(r.memory_id[1:]) // 10 for r in recall if int(r.memory_id[1:]) < 100}  # type: ignore[index]
+    assert per_section == set(range(6))  # every section keeps at least one entry
+    assert len([r for r in recall if int(r.memory_id[1:]) < 100]) >= MIN_RECALL  # type: ignore[index]
+    assert len(table.refs) <= EVIDENCE_CAP
+    assert recall_ids  # sanity
+
+
+def test_recall_floor_reserves_a_slot_per_section_even_beyond_min_recall() -> None:
+    sections = [[hit(10 * si + j, "m1") for j in range(2)] for si in range(10)]
+    table = build_evidence(
+        mental_model=None,
+        latest_done_meeting=None,
+        recall_sections=sections,
+        objections=[],
+        commitments=[],
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+    firsts = {f"h{10 * si}" for si in range(10)}
+    assert firsts <= {r.memory_id for r in table.refs}

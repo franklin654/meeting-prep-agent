@@ -173,11 +173,12 @@ def first_line_spoken_by(transcript: str | None, names: Sequence[str]) -> str | 
 @dataclass
 class MemoryContext:
     mental_model: MentalModelText | None = None
-    recall_hits: list[MemoryHit] = field(default_factory=list)
+    recall_sections: list[list[MemoryHit]] = field(default_factory=list)  # rank order each
     objections: list[tuple[Objection, MemoryHit]] = field(default_factory=list)
 
 
 TOP_HITS_PER_QUERY = 3
+CANDIDATES_PER_QUERY = 5
 
 # Generic wording only: no fixture names, so the same queries work for any account.
 PERSONAL_QUERY = "personal life: family, children, hobbies, travel, milestones, non-work interests"
@@ -227,17 +228,22 @@ async def _recall_top(
     if not hits:
         fell_back = True
         hits = await memory.recall_facts(query=fallback_query or query, tags=tags)
-    kept = top_distinct_hits(hits)
-    resolved = await memory.resolve_sources(kept)
+    # Top 5 by rank are resolved; the first TOP_HITS_PER_QUERY that resolve to a dated meeting
+    # are kept, so unresolvable hits in the top 3 do not leave the section empty.
+    candidates = top_distinct_hits(hits, CANDIDATES_PER_QUERY)
+    resolved = await memory.resolve_sources(candidates)
+    kept = [h for h in resolved if h.meeting_id is not None and h.meeting_date is not None][
+        :TOP_HITS_PER_QUERY
+    ]
     logger.debug(
-        "brief.recall section=%s returned=%d kept=%d fallback=%s resolved=%d",
+        "brief.recall section=%s returned=%d candidates=%d kept=%d fallback=%s",
         section,
         len(hits),
+        len(candidates),
         len(kept),
         fell_back,
-        sum(1 for h in resolved if h.meeting_id is not None),
     )
-    return resolved
+    return kept
 
 
 async def _objection_evidence(
@@ -309,7 +315,7 @@ async def _gather_memory(inputs: BriefInputs, memory: MemoryService, today_: dat
         context.objections = [p for p in objections if isinstance(p, tuple)]
     for recall in recalls:
         if isinstance(recall, list):
-            context.recall_hits.extend(h for h in recall if isinstance(h, MemoryHit))
+            context.recall_sections.append([h for h in recall if isinstance(h, MemoryHit)])
     if failed == len(results):
         raise MemoryUnavailableError("Every memory call for the brief failed.")
     return context
@@ -569,7 +575,7 @@ async def generate_brief(
         table = build_evidence(
             mental_model=context.mental_model,
             latest_done_meeting=meetings[latest.id] if latest else None,
-            recall_hits=context.recall_hits,
+            recall_sections=context.recall_sections,
             objections=context.objections,
             commitments=inputs.open_commitments,
             meetings=meetings,

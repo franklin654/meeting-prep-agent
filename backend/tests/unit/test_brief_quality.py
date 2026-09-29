@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, select
 
+from app.core.errors import MemoryUnavailableError
 from app.db.models import Commitment
 from app.memory.tags import account_tag, contact_tag, fact_kind_tag, meeting_tag
 from app.schemas.brief import BriefDraft, SectionKey, SourceType
@@ -305,3 +306,127 @@ async def test_recall_and_evidence_counts_logged_at_debug_without_content(
     assert recall_lines and evidence_lines
     assert all(r.levelno == logging.DEBUG for r in recall_lines + evidence_lines)
     assert all("Ananya" not in r.getMessage() for r in caplog.records)
+
+
+# ---- recall floor and overdue cap -----------------------------------------------------------
+
+
+async def test_many_overdue_rows_do_not_squeeze_out_recall_and_all_overdue_stay_in_brief(
+    world: World,
+) -> None:
+    with Session(world.engine) as s:
+        for i in range(13):  # 14 dated overdue rows with cm_deck
+            s.add(
+                Commitment(
+                    id=f"cm_over{i:02d}", account_id=ACC, meeting_id="m3_finedge", owner=Owner.us,
+                    text=f"Overdue promise {i}", due_date=date(2026, 9, 4 + i),
+                    status=CommitmentStatus.open, source_quote=f"overdue quote {i}",
+                )
+            )  # fmt: skip
+        s.commit()
+
+    def only_recall(prompt: str) -> BriefDraft:
+        return BriefDraft(
+            sections={
+                SectionKey.personal_touchpoints: [
+                    item("Ask about Ananya", evidence_ids(prompt, "Ananya"))
+                ],
+                SectionKey.watch_outs: [item("Cheaper rival", evidence_ids(prompt, "DataHawk"))],
+            }
+        )
+
+    brief, llm = await make(world, only_recall)
+
+    prompt = llm.calls[0].prompt
+    assert prompt.count("[led:") == 8  # MAX_OVERDUE_EVIDENCE
+    assert "Ananya" in prompt and "DataHawk" in prompt  # B3 / B4 evidence survived
+    assert len([ln for ln in prompt.splitlines() if ln.startswith("[")]) <= 25
+    assert section(brief, SectionKey.personal_touchpoints)
+    assert section(brief, SectionKey.watch_outs)
+    forced = section(brief, SectionKey.open_commitments)
+    assert len(forced) == 14  # the appender covers every overdue dated commitment
+    for it in forced:
+        assert it.severity.value == "critical"
+        assert it.citations[0].meeting_id and it.citations[0].quote
+
+
+async def test_top_five_resolved_keep_first_three_that_resolve(world: World) -> None:
+    tags = [account_tag(ACC), contact_tag("c_rahul"), fact_kind_tag(FactKind.personal)]
+    for memory_id, text in [("bad1", "Rahul unresolvable one"), ("bad2", "Rahul unresolvable two")]:
+        world.memory.seed_fact(memory_id, text, tags=tags, memory_type="observation")
+        world.memory.items.insert(0, world.memory.items.pop())  # rank first, no meeting anywhere
+    for memory_id in ("g1", "g2", "g3"):
+        world.memory.seed_fact(
+            memory_id,
+            f"Rahul good fact {memory_id}",
+            tags=[*tags, meeting_tag("m3_finedge")],
+            meeting_id="m3_finedge",
+            meeting_date=date(2026, 8, 12),
+        )
+
+    _, llm = await make(world, lambda p: BriefDraft(sections={}))
+
+    prompt = llm.calls[0].prompt
+    assert "unresolvable" not in prompt  # unresolved top hits are skipped, not cited
+    # Candidates by rank: bad1, bad2, w_ananya, g1, g2 (g3 is 6th). First three that resolve:
+    assert "Rahul's daughter Ananya" in prompt
+    assert "good fact g1" in prompt and "good fact g2" in prompt
+    assert "good fact g3" not in prompt
+
+
+# ---- one failing call degrades only its own section ------------------------------------------
+
+
+def fail_recall_when(world: World, monkeypatch: pytest.MonkeyPatch, predicate: object) -> None:
+    original = world.memory.recall_facts
+
+    async def flaky(
+        *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+    ) -> list[MemoryHit]:
+        if predicate(tuple(tags), fact_kind):  # type: ignore[operator]
+            raise MemoryUnavailableError("recall down")
+        return await original(query=query, tags=tags, fact_kind=fact_kind)
+
+    monkeypatch.setattr(world.memory, "recall_facts", flaky)
+
+
+async def test_labelled_watch_out_call_failing_degrades_only_watch_outs(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fail_recall_when(world, monkeypatch, lambda tags, kind: kind == FactKind.competitor)
+
+    brief, _ = await make(world)
+
+    assert section(brief, SectionKey.watch_outs) == []
+    assert section(brief, SectionKey.personal_touchpoints)
+    assert section(brief, SectionKey.unresolved_objections)
+    assert section(brief, SectionKey.open_commitments)
+
+
+async def test_watch_out_fallback_call_failing_degrades_only_watch_outs(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.memory.items = [i for i in world.memory.items if i.memory_id != "w_datahawk"]
+    fail_recall_when(
+        world, monkeypatch, lambda tags, kind: tags == (account_tag(ACC),) and kind is None
+    )
+
+    brief, _ = await make(world)
+
+    assert section(brief, SectionKey.watch_outs) == []
+    assert section(brief, SectionKey.personal_touchpoints)
+    assert section(brief, SectionKey.unresolved_objections)
+
+
+async def test_one_attendees_recall_failing_degrades_only_that_attendee(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fail_recall_when(world, monkeypatch, lambda tags, kind: tags == (contact_tag("c_rahul"),))
+
+    brief, _ = await make(world)
+
+    (touch,) = section(brief, SectionKey.personal_touchpoints)
+    # Rahul's own M1 fact is gone; Karan's M5 observation (and everything else) still works.
+    assert {c.meeting_id for c in touch.citations} == {"m5_finedge"}
+    assert section(brief, SectionKey.watch_outs)
+    assert section(brief, SectionKey.unresolved_objections)
