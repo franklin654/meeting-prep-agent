@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Stage 0 | complete | pending docs-only commit |
 | A0 | complete | implementation `3f667b1` |
-| A1 | complete | implementation commit pending |
+| A1 | complete | implementation `ecd34d9` |
 | A2 | planned | — |
 | A3 | planned | — |
 | A4 | planned | — |
