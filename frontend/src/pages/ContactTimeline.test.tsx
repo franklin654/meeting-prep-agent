@@ -9,8 +9,8 @@ describe('ContactTimeline page', () => {
     const fetchMock = mockFetch({ 'GET /api/contacts/c_anita/timeline': { body: {
       contact: { id: 'c_anita', name: 'Anita Rao', role: 'CFO' },
       entries: [
-        { text: 'Anita approved a $75K budget.', fact_kind: 'deal_fact', learned_on: '2026-09-29', citation: { source_type: 'meeting', meeting_id: 'mtg_m6', meeting_date: '2026-09-29', label: 'M6 · Sep 29', quote: 'We can go up to $75K.', memory_id: 'mem_new' } },
-        { text: 'Anita planned a half marathon.', fact_kind: 'personal', learned_on: '2026-07-28', citation: { source_type: 'meeting', meeting_id: 'mtg_m2', meeting_date: '2026-07-28', label: 'M2 · Jul 28', quote: 'I am training for a half marathon.', memory_id: 'mem_old' } },
+        { text: 'Anita approved a $75K budget. | When: 2026-09-29 | Involving: Anita Rao | To prepare pricing.', fact_kind: 'deal_fact', learned_on: '2026-09-29', citation: { source_type: 'meeting', meeting_id: 'mtg_m6', meeting_date: '2026-09-29', label: 'M6 · Sep 29', quote: 'We can go up to $75K.', memory_id: 'mem_new' } },
+        { text: 'Anita planned a half marathon. | When: 2026-07-28 | Involving: Anita Rao', fact_kind: 'personal', learned_on: '2026-07-28', citation: { source_type: 'meeting', meeting_id: 'mtg_m2', meeting_date: '2026-07-28', label: 'M2 · Jul 28', quote: 'I am training for a half marathon.', memory_id: 'mem_old' } },
       ],
     } } })
     renderRoutes(routes, { route: '/contacts/c_anita' })
@@ -32,7 +32,7 @@ describe('ContactTimeline page', () => {
     mockFetch({ 'GET /api/contacts/c_many/timeline': { body: {
       contact: { id: 'c_many', name: 'Anita Rao', role: 'CFO' },
       entries: Array.from({ length: 12 }, (_, index) => ({
-        text: `Fact ${index + 1}`,
+        text: `Fact ${index + 1} | When: 2026-07-28 | Involving: Anita Rao`,
         fact_kind: 'deal_fact',
         learned_on: '2026-07-28',
         citation: { source_type: 'meeting', meeting_id: 'mtg_m2', meeting_date: '2026-07-28', label: 'M2 · Jul 28', quote: null, memory_id: `mem_${index}` },

@@ -22,7 +22,7 @@ function NotesDialog({ meetings, onClose }: { meetings: MeetingSummary[]; onClos
     completedJobId.current = jobId
     const learned = job.data.learned
     toast.success('Memory updated', {
-      description: learned.facts.length ? learned.facts.join(' · ') : `${learned.new_commitments} new commitments learned`,
+      description: [learned.facts.length ? learned.facts.join(' · ') : `${learned.new_commitments} new commitments learned`, learned.alerts.length ? `Alerts: ${learned.alerts.join(' · ')}` : ''].filter(Boolean).join(' · '),
     })
     onClose()
   }, [job.data, jobId, onClose])

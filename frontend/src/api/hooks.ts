@@ -10,10 +10,6 @@ export type JobStatus = components['schemas']['JobStatus']
 export type ContactTimelineData = components['schemas']['ContactTimeline']
 export type StyleProfile = components['schemas']['StyleProfile']
 
-function apiUrl(path: string): string {
-  return new URL(path, typeof window === 'undefined' ? 'http://localhost' : window.location.origin).toString()
-}
-
 export const JOB_POLL_MS = 2500
 /** ~150 s of polling, then stop. */
 const JOB_MAX_POLLS = 60
@@ -50,9 +46,8 @@ export function useSuggestedQuestions(meetingId: string | undefined, enabled = t
     enabled: !!meetingId && enabled,
     staleTime: 30 * 60 * 1000,
     queryFn: async (): Promise<string[]> => {
-      const response = await globalThis.fetch(apiUrl(`/api/meetings/${encodeURIComponent(meetingId!)}/suggested-questions`))
-      if (!response.ok) throw new Error('Suggested questions unavailable')
-      const data = await response.json() as { questions: string[] }
+      const { data, error } = await api.GET('/api/meetings/{meeting_id}/suggested-questions', { params: { path: { meeting_id: meetingId! } } })
+      if (error || !data) throw new Error('Suggested questions unavailable')
       return data.questions
     },
   })
@@ -61,9 +56,9 @@ export function useSuggestedQuestions(meetingId: string | undefined, enabled = t
 export function useAskQuestion() {
   return useMutation({
     mutationFn: async (body: { question: string; scope_type: 'meeting' | 'contact' | 'account'; scope_id: string; history?: { question: string; answer: string }[] }) => {
-      const response = await globalThis.fetch(apiUrl('/api/ask'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      if (!response.ok) throw new Error('Answer unavailable')
-      return await response.json() as { ask_answer_id: string; answer: string; grounded: boolean; citations: components['schemas']['Citation'][] }
+      const { data, error } = await api.POST('/api/ask', { body })
+      if (error || !data) throw new Error('Answer unavailable')
+      return data
     },
   })
 }
@@ -71,9 +66,9 @@ export function useAskQuestion() {
 export function usePinAnswer() {
   return useMutation({
     mutationFn: async ({ answerId, meetingId }: { answerId: string; meetingId: string }) => {
-      const response = await globalThis.fetch(apiUrl(`/api/ask/${encodeURIComponent(answerId)}/pin`), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ meeting_id: meetingId }) })
-      if (!response.ok) throw new Error('Answer could not be pinned')
-      return await response.json()
+      const { data, error } = await api.POST('/api/ask/{ask_answer_id}/pin', { params: { path: { ask_answer_id: answerId } }, body: { meeting_id: meetingId } })
+      if (error || !data) throw new Error('Answer could not be pinned')
+      return data
     },
   })
 }
@@ -81,9 +76,9 @@ export function usePinAnswer() {
 export function useRememberNote() {
   return useMutation({
     mutationFn: async (body: { text: string; scope_type: 'meeting' | 'contact' | 'account'; scope_id: string }) => {
-      const response = await globalThis.fetch(apiUrl('/api/memories/notes'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      if (!response.ok) throw new Error('Note could not be saved')
-      return await response.json() as JobStatus
+      const { data, error } = await api.POST('/api/memories/notes', { body })
+      if (error || !data) throw new Error('Note could not be saved')
+      return data
     },
   })
 }

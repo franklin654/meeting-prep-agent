@@ -42,6 +42,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/meetings/{meeting_id}/suggested-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Suggested Questions */
+        get: operations["get_suggested_questions_api_meetings__meeting_id__suggested_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Ask */
+        post: operations["post_ask_api_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ask/{ask_answer_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Pin */
+        post: operations["post_pin_api_ask__ask_answer_id__pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Note */
+        post: operations["post_note_api_memories_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -173,6 +241,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AskRequest */
+        AskRequest: {
+            /** Question */
+            question: string;
+            scope_type: components["schemas"]["ScopeType"];
+            /** Scope Id */
+            scope_id: string;
+            /** History */
+            history?: components["schemas"]["AskTurn"][];
+        };
+        /** AskResponse */
+        AskResponse: {
+            /** Ask Answer Id */
+            ask_answer_id: string;
+            /** Answer */
+            answer: string;
+            /** Grounded */
+            grounded: boolean;
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+        };
+        /** AskTurn */
+        AskTurn: {
+            /** Question */
+            question: string;
+            /** Answer */
+            answer: string;
+        };
         /** Brief */
         Brief: {
             /** Id */
@@ -322,11 +418,29 @@ export interface components {
             /** Brief Ready */
             brief_ready: boolean;
         };
+        /** NoteRequest */
+        NoteRequest: {
+            /** Text */
+            text: string;
+            scope_type: components["schemas"]["ScopeType"];
+            /** Scope Id */
+            scope_id: string;
+        };
         /** NotesRequest */
         NotesRequest: {
             /** Transcript */
             transcript: string;
         };
+        /** PinRequest */
+        PinRequest: {
+            /** Meeting Id */
+            meeting_id: string;
+        };
+        /**
+         * ScopeType
+         * @enum {string}
+         */
+        ScopeType: "account" | "contact" | "meeting";
         /**
          * SectionKey
          * @enum {string}
@@ -355,6 +469,11 @@ export interface components {
             length: "short" | "standard" | "detailed";
             /** Notes */
             notes: string[];
+        };
+        /** SuggestedQuestions */
+        SuggestedQuestions: {
+            /** Questions */
+            questions: string[];
         };
         /** TimelineEntry */
         TimelineEntry: {
@@ -433,6 +552,138 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["NotesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_suggested_questions_api_meetings__meeting_id__suggested_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meeting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedQuestions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ask_api_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_pin_api_ask__ask_answer_id__pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ask_answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_note_api_memories_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteRequest"];
             };
         };
         responses: {
