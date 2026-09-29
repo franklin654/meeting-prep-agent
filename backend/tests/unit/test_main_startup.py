@@ -6,15 +6,30 @@ other tests) does not, so no-key unit tests and CI are unaffected.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import create_engine
 
+import app.db.session as db_session
 import app.main as main_module
 from app.config import ConfigError, Settings
 
 SENTINEL = "sk-test-SENTINEL"
+
+
+@pytest.fixture(autouse=True)
+def _tmp_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
+    """The lifespan creates tables; keep it off the default ./app.db."""
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'startup.db'}", connect_args={"check_same_thread": False}
+    )
+    monkeypatch.setattr(db_session, "engine", engine)
+    yield
+    engine.dispose()
 
 
 def _settings(**overrides: Any) -> Settings:
