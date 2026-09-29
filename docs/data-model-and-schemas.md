@@ -253,7 +253,7 @@ Open commitments come from the SQLite ledger, not recall, so overdue logic stays
 
 ## SQLite tables
 
-Nine SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers), and nothing about memory itself is stored here.
+Thirteen SQLModel tables; JSON columns hold nested Pydantic data (brief content, answers), and nothing about Hindsight memories is stored here.
 
 ```python
 class Account(SQLModel, table=True):
@@ -359,11 +359,36 @@ Request and response bodies for the endpoints in the Technical design; routes re
 class ContactRef(BaseModel):
     id: str; name: str; role: str | None
 
+# POST/GET /api/accounts
+class AccountCreate(BaseModel):
+    name: str; industry: str | None = None
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"] = "discovery"
+
+class AccountResponse(BaseModel):
+    id: str; name: str; industry: str
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"]
+
+# POST/GET /api/contacts; GET supports query and account_id filters.
+class ContactCreate(BaseModel):
+    account_id: str; name: str; role: str | None; aliases: list[str]
+
+class ContactSummary(ContactRef):
+    account_id: str | None; account_name: str | None
+    meetings_count: int; open_followups: int; last_meeting_date: date | None
+
+# POST /api/meetings; POST/DELETE /api/meetings/{id}/prepared
+class MeetingCreate(BaseModel):
+    account_id: str; title: str; scheduled_at: datetime; attendee_ids: list[str]
+
 class MeetingSummary(BaseModel):          # GET /api/meetings
     id: str; account_id: str; account_name: str; title: str
     scheduled_at: datetime; status: str
     attendees: list[ContactRef]
     brief_ready: bool
+    prepared: bool = False; open_followups: int = 0
+    past_meetings: int = 0; has_history: bool = False
+
+# DELETE /api/meetings/{id} cancels an upcoming meeting without a transcript.
 
 class NotesRequest(BaseModel):            # POST /api/meetings/{id}/notes
     transcript: str = Field(min_length=50)

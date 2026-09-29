@@ -7,7 +7,7 @@
 | Stage 0 | complete | pending docs-only commit |
 | A0 | complete | implementation `3f667b1` |
 | A1 | complete | implementation `ecd34d9` |
-| A2 | planned | — |
+| A2 | complete | `9fc8b8a` |
 | A3 | planned | — |
 | A4 | planned | — |
 | A5 | planned | — |
@@ -32,6 +32,7 @@
 - Per the user's explicit resolution of the conflict with AGENTS.md rule 9, commits that change a schema, table, endpoint, or error code may update only the matching portions of `docs/data-model-and-schemas.md`; all other conflicts belong in this file.
 - A0: `MEMORY_READ_ONLY` defaults off. The real and fake memory gateways reject every write (`ensure_bank`, `ensure_mental_models`, meeting/note/preference retains) with `memory_read_only` before issuing an SDK call. Provider adapters now log provider, model, `json`/`text` call type, and provider-reported prompt/completion token counts only.
 - A1: Added only the requested additive tables (`extractedfact`, `capturedraft`, `meetingprepared`, `memoryoverride`) and their repository gateways. No `create_all` call was run against `backend/app.db`.
+- A2: Added account/contact creation and listing, meeting scheduling/cancellation, prepared markers, and enriched meeting summary metrics. Added `ae_name` and `company_name` to health using the seeded company file; Docker API mounts `./data` read-only at `/data` for the same source. Regenerated `frontend/src/api/schema.d.ts` offline from `app.openapi()` (17 paths). No new error codes.
 
 ## Live-call and token tally
 

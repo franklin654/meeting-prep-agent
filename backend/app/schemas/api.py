@@ -28,6 +28,41 @@ class ContactRef(BaseModel):
     role: str | None
 
 
+class AccountCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    industry: str | None = Field(default=None, max_length=100)
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"] = "discovery"
+
+
+class AccountResponse(BaseModel):
+    id: str
+    name: str
+    industry: str
+    stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"]
+
+
+class ContactCreate(BaseModel):
+    account_id: str
+    name: str = Field(min_length=1, max_length=200)
+    role: str | None = Field(default=None, max_length=200)
+    aliases: list[str] = Field(default_factory=list)
+
+
+class ContactSummary(ContactRef):
+    account_id: str | None
+    account_name: str | None
+    meetings_count: int = 0
+    open_followups: int = 0
+    last_meeting_date: date | None = None
+
+
+class MeetingCreate(BaseModel):
+    account_id: str
+    title: str = Field(min_length=1, max_length=200)
+    scheduled_at: datetime
+    attendee_ids: list[str] = Field(default_factory=list)
+
+
 class MeetingSummary(BaseModel):  # GET /api/meetings
     id: str
     account_id: str
@@ -37,6 +72,10 @@ class MeetingSummary(BaseModel):  # GET /api/meetings
     status: str
     attendees: list[ContactRef]
     brief_ready: bool
+    prepared: bool = False
+    open_followups: int = 0
+    past_meetings: int = 0
+    has_history: bool = False
 
 
 class NotesRequest(BaseModel):  # POST /api/meetings/{id}/notes

@@ -8,9 +8,10 @@ from datetime import date
 
 from fastapi import FastAPI
 
-from app.api import ask, briefs, contacts, feedback, jobs, meetings, nudges
+from app.api import accounts, ask, briefs, contacts, feedback, jobs, meetings, nudges
 from app.api.deps import close_memory_service
 from app.config import settings
+from app.core.company import company_data
 from app.core.errors import register_exception_handlers
 from app.db.session import create_db_and_tables
 
@@ -34,6 +35,7 @@ app = FastAPI(title="Meeting Prep Agent API", lifespan=lifespan)
 
 register_exception_handlers(app)
 app.include_router(meetings.router, prefix="/api")
+app.include_router(accounts.router, prefix="/api")
 app.include_router(ask.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(briefs.router, prefix="/api")
@@ -49,4 +51,10 @@ async def health() -> dict[str, str | date]:
     Full dependency checks (Hindsight, DB) land with the memory and db gateways
     (T06, T07); for now this only proves the API process is up.
     """
-    return {"status": "ok", "demo_today": settings.demo_today}
+    company = company_data()
+    return {
+        "status": "ok",
+        "demo_today": settings.demo_today,
+        "ae_name": company["ae"]["name"],
+        "company_name": company["vendor"]["name"],
+    }

@@ -12,8 +12,44 @@ export interface paths {
          */
         get: operations["list_meetings_api_meetings_get"];
         put?: never;
-        post?: never;
+        /** Schedule Meeting */
+        post: operations["schedule_meeting_api_meetings_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/{meeting_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Meeting */
+        delete: operations["delete_meeting_api_meetings__meeting_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/{meeting_id}/prepared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Meeting */
+        post: operations["prepare_meeting_api_meetings__meeting_id__prepared_post"];
+        /** Unprepare Meeting */
+        delete: operations["unprepare_meeting_api_meetings__meeting_id__prepared_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -36,6 +72,42 @@ export interface paths {
          *     closed when the request ends. The meeting is marked done by ingest itself.
          */
         post: operations["submit_notes_api_meetings__meeting_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Accounts */
+        get: operations["get_accounts_api_accounts_get"];
+        put?: never;
+        /** Post Account */
+        post: operations["post_account_api_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Contacts */
+        get: operations["get_contacts_api_contacts_get"];
+        put?: never;
+        /** Post Contact */
+        post: operations["post_contact_api_contacts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -258,6 +330,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountCreate */
+        AccountCreate: {
+            /** Name */
+            name: string;
+            /** Industry */
+            industry?: string | null;
+            /**
+             * Stage
+             * @default discovery
+             * @enum {string}
+             */
+            stage: "discovery" | "evaluation" | "closed_won" | "closed_lost";
+        };
+        /** AccountResponse */
+        AccountResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Industry */
+            industry: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "discovery" | "evaluation" | "closed_won" | "closed_lost";
+        };
         /** AskRequest */
         AskRequest: {
             /** Question */
@@ -348,6 +447,17 @@ export interface components {
             /** Memory Id */
             memory_id: string | null;
         };
+        /** ContactCreate */
+        ContactCreate: {
+            /** Account Id */
+            account_id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role?: string | null;
+            /** Aliases */
+            aliases?: string[];
+        };
         /** ContactRef */
         ContactRef: {
             /** Id */
@@ -356,6 +466,31 @@ export interface components {
             name: string;
             /** Role */
             role: string | null;
+        };
+        /** ContactSummary */
+        ContactSummary: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string | null;
+            /** Account Id */
+            account_id: string | null;
+            /** Account Name */
+            account_name: string | null;
+            /**
+             * Meetings Count
+             * @default 0
+             */
+            meetings_count: number;
+            /**
+             * Open Followups
+             * @default 0
+             */
+            open_followups: number;
+            /** Last Meeting Date */
+            last_meeting_date?: string | null;
         };
         /** ContactTimeline */
         ContactTimeline: {
@@ -413,6 +548,20 @@ export interface components {
             /** Alerts */
             alerts: string[];
         };
+        /** MeetingCreate */
+        MeetingCreate: {
+            /** Account Id */
+            account_id: string;
+            /** Title */
+            title: string;
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /** Attendee Ids */
+            attendee_ids?: string[];
+        };
         /** MeetingSummary */
         MeetingSummary: {
             /** Id */
@@ -434,6 +583,26 @@ export interface components {
             attendees: components["schemas"]["ContactRef"][];
             /** Brief Ready */
             brief_ready: boolean;
+            /**
+             * Prepared
+             * @default false
+             */
+            prepared: boolean;
+            /**
+             * Open Followups
+             * @default 0
+             */
+            open_followups: number;
+            /**
+             * Past Meetings
+             * @default 0
+             */
+            past_meetings: number;
+            /**
+             * Has History
+             * @default false
+             */
+            has_history: boolean;
         };
         /** NoteRequest */
         NoteRequest: {
@@ -569,6 +738,126 @@ export interface operations {
             };
         };
     };
+    schedule_meeting_api_meetings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_meeting_api_meetings__meeting_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meeting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_meeting_api_meetings__meeting_id__prepared_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meeting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unprepare_meeting_api_meetings__meeting_id__prepared_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meeting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     submit_notes_api_meetings__meeting_id__notes_post: {
         parameters: {
             query?: never;
@@ -591,6 +880,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_accounts_api_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"][];
+                };
+            };
+        };
+    };
+    post_account_api_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contacts_api_contacts_get: {
+        parameters: {
+            query?: {
+                query?: string | null;
+                account_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_contact_api_contacts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactSummary"];
                 };
             };
             /** @description Validation Error */
