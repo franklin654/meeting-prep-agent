@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import jobs, meetings
+from app.api import briefs, jobs, meetings
 from app.api.deps import close_memory_service
 from app.config import settings
 from app.core.errors import register_exception_handlers
@@ -34,6 +34,7 @@ app = FastAPI(title="Meeting Prep Agent API", lifespan=lifespan)
 register_exception_handlers(app)
 app.include_router(meetings.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(briefs.router, prefix="/api")
 
 
 @app.get("/api/health")
