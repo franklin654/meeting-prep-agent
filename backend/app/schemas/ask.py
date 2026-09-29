@@ -37,7 +37,7 @@ class AskRequest(BaseModel):
 
 # response_schema passed to Hindsight reflect
 class ReflectAnswer(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     answer: str
     confident: bool  # false when memory doesn't cover the question

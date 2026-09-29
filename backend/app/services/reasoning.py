@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from pydantic import ValidationError as PydanticValidationError
-
 from app.core.time import today
 from app.llm.prompt_loader import render_prompt
 from app.memory.memory_service import MemoryService
 from app.memory.tags import account_tag
 from app.schemas.memory import MemoryHit
 from app.schemas.reasoning import ContradictionReport
+from app.schemas.reflect import parse_reflect_result
 from app.services.evidence import format_date
 
 logger = logging.getLogger(__name__)
@@ -39,16 +38,8 @@ async def check_changes(
         schema=ContradictionReport,
         budget="high",
     )
-    if result.structured is None:
-        logger.warning(
-            "reasoning.r2.dropped reason=%s",
-            result.structured_error or "no structured output",
-        )
-        return []
-    try:
-        report = ContradictionReport.model_validate(result.structured)
-    except PydanticValidationError:
-        logger.warning("reasoning.r2.dropped reason=invalid_output")
+    report = parse_reflect_result("R2", result, ContradictionReport)
+    if not isinstance(report, ContradictionReport):
         return []
     if not report.contradictions:
         return []

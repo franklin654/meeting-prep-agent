@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from app.core.errors import MemoryUnavailableError
 from app.memory import memory_service as ms
@@ -73,6 +74,33 @@ async def test_fake_records_retain_timeout() -> None:
     await _retain(fake, timeout_s=120.0)
     await _retain(fake)
     assert fake.retain_timeouts == [120.0, None]
+
+
+async def test_structured_output_error_does_not_retry_reflect() -> None:
+    class Output(BaseModel):
+        answer: str
+
+    class ReflectClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def areflect(self, **kwargs: Any) -> Any:
+            self.calls += 1
+            return SimpleNamespace(
+                text="malformed",
+                structured_output={"partial": "data"},
+                structured_output_error="invalid shape",
+                based_on=None,
+            )
+
+    client = ReflectClient()
+    result = await _service(SimpleNamespace(areflect=client.areflect)).reflect_structured(
+        query="q", tags=[], schema=Output
+    )
+
+    assert client.calls == 1
+    assert result.structured is None
+    assert result.structured_error == "invalid shape"
 
 
 class _Ops:

@@ -62,6 +62,7 @@ from app.schemas.brief import (
 )
 from app.schemas.enums import FactKind, Owner
 from app.schemas.memory import MemoryHit
+from app.schemas.reflect import parse_reflect_result
 from app.services.evidence import (
     QUOTE_MAX_CHARS,
     EvidenceRef,
@@ -300,16 +301,8 @@ async def _objection_evidence(
     )
     if timings is not None:
         timings.record_max("reflect", time.monotonic() - reflect_started)
-    if result.structured is None:
-        logger.warning(
-            "brief.section_dropped section=unresolved_objections reason=%s",
-            result.structured_error or "no structured output",
-        )
-        return []
-    try:
-        report = ObjectionReport.model_validate(result.structured)
-    except PydanticValidationError:
-        logger.warning("brief.section_dropped section=unresolved_objections reason=invalid_output")
+    report = parse_reflect_result("R1", result, ObjectionReport)
+    if not isinstance(report, ObjectionReport):
         return []
     resolve_started = time.monotonic()
     sources = await memory.resolve_sources(result.sources)

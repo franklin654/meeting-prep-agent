@@ -20,7 +20,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.db.models import Commitment
 from app.memory.memory_service import MentalModelText
@@ -40,6 +40,8 @@ PROMPT_MENTAL_MODEL_MAX_CHARS = 500
 
 # ---- R1 output model (prompt: reflect_objections.md) ----
 class Objection(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     concern: str
     raised_by: str
     raised_on: date
@@ -48,6 +50,8 @@ class Objection(BaseModel):
 
 
 class ObjectionReport(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     objections: list[Objection]
 
 

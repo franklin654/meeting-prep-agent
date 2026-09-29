@@ -17,10 +17,8 @@ Bootstrap order (docs/hindsight-integration.md "Bootstrap"):
 Failure handling (docs/hindsight-integration.md "Failure handling"):
     - Unreachable / timeout (recall 5s, reflect 45s, retain 30s) -> `MemoryUnavailableError`.
     - Reflect HTTP 500 -> retry once after 2s, then `MemoryUnavailableError`.
-    - `structured_output_error` present -> retry once; if it persists, the
-      `ReflectResult` is returned with `structured=None` and `structured_error`
-      set so the caller can drop that brief section (this module never drops
-      sections itself -- it has no notion of "brief sections").
+    - `structured_output_error` present -> return it with empty structured output;
+      validation failures are logged and dropped by the stage parser without retry.
 """
 
 from __future__ import annotations
@@ -435,26 +433,9 @@ class HindsightMemoryService(MemoryService):
             query=query, tags=tags, budget=budget, response_schema=response_schema
         )
 
-        if response.structured_output_error:
-            logger.warning(
-                "memory.reflect.structured_output_error attempt=0 schema=%s error=%s",
-                schema.__name__,
-                response.structured_output_error,
-            )
-            response = await self._reflect_once(
-                query=query, tags=tags, budget=budget, response_schema=response_schema
-            )
-            if response.structured_output_error:
-                logger.warning(
-                    "memory.reflect.structured_output_error attempt=1 schema=%s error=%s -- "
-                    "dropping structured output",
-                    schema.__name__,
-                    response.structured_output_error,
-                )
-
         return ReflectResult(
             text=response.text or "",
-            structured=response.structured_output,
+            structured=None if response.structured_output_error else response.structured_output,
             sources=[_hit_from_reflect_fact(f) for f in (response.based_on.memories or [])]
             if response.based_on
             else [],
@@ -488,7 +469,9 @@ class HindsightMemoryService(MemoryService):
             except ApiException as exc:
                 if exc.status == 500 and attempt == 0:
                     logger.warning(
-                        "memory.reflect.http_500 retrying_after=%.1fs", REFLECT_RETRY_DELAY_S
+                        "memory.reflect.http_500 retrying_after=%.1fs attempt=%d",
+                        REFLECT_RETRY_DELAY_S,
+                        attempt + 1,
                     )
                     await asyncio.sleep(REFLECT_RETRY_DELAY_S)
                     continue

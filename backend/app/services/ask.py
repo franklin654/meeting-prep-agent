@@ -6,8 +6,6 @@ import logging
 import uuid
 from typing import Any
 
-from pydantic import ValidationError as PydanticValidationError
-
 from app.core.errors import AppError, NotFoundError, ValidationError
 from app.core.time import utcnow
 from app.db import brief_repo, ingest_repo, repository
@@ -28,6 +26,7 @@ from app.schemas.ask import (
 from app.schemas.brief import Citation, SourceType
 from app.schemas.enums import ScopeType
 from app.schemas.memory import MemoryHit
+from app.schemas.reflect import parse_reflect_result
 from app.services.brief import add_pinned_ask_answer, get_cached_brief
 from app.services.evidence import QUOTE_MAX_CHARS, format_date, truncate
 
@@ -127,11 +126,8 @@ async def ask_question(
         schema=ReflectAnswer,
         budget="mid",
     )
-    try:
-        answer = ReflectAnswer.model_validate(result.structured) if result.structured else None
-    except PydanticValidationError:
-        logger.warning("ask.answer_dropped reason=invalid_output")
-        answer = None
+    parsed = parse_reflect_result("R5", result, ReflectAnswer)
+    answer = parsed if isinstance(parsed, ReflectAnswer) else None
 
     citations = await memory.resolve_sources(result.sources) if answer and answer.confident else []
     mapped = _citations(citations)
