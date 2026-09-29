@@ -4,6 +4,7 @@ import { Brief } from '@/pages/Brief'
 import { ContactTimeline } from '@/pages/ContactTimeline'
 import { ComingSoon } from '@/pages/ComingSoon'
 import { Dashboard } from '@/pages/Dashboard'
+import { Capture } from '@/pages/Capture'
 
 /**
  * Shared shell route table. Existing meeting and contact-detail paths remain
@@ -19,7 +20,7 @@ export const routes: RouteObject[] = [
       { path: 'contacts', element: <ComingSoon title="Contacts" /> },
       { path: 'contacts/:id', element: <ContactTimeline /> },
       { path: 'ask', element: <ComingSoon title="Ask" /> },
-      { path: 'capture', element: <ComingSoon title="Capture notes" /> },
+      { path: 'capture', element: <Capture /> },
       { path: 'memory', element: <ComingSoon title="Memory inspector" /> },
     ],
   },

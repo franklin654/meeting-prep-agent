@@ -167,7 +167,7 @@ def test_preview_rejects_transcript_over_200kb(
 def test_duplicate_and_renewal_badges(
     capture_client: tuple[TestClient, Any, FakeLLM, FakeMemoryService],
 ) -> None:
-    client, engine, llm, _memory = capture_client
+    client, engine, llm, memory = capture_client
     with Session(engine) as session:
         session.add(
             Commitment(
@@ -190,6 +190,12 @@ def test_duplicate_and_renewal_badges(
     commitment = next(item for item in items if item["kind"] == "commitment")
     assert commitment["badge"] == "duplicate"
     assert commitment["checked"] is False
+    draft_id = client.get(f"/api/jobs/{response.json()['job_id']}").json()["draft"]["draft_id"]
+    saved = client.post(f"/api/capture/{draft_id}/save", json={"unchecked_item_ids": []})
+    assert saved.status_code == 202
+    with Session(engine) as session:
+        assert len(session.exec(select(Commitment)).all()) == 2
+    assert len(memory.items) == 1
 
 
 def test_renewal_is_badged_as_due_date_update(

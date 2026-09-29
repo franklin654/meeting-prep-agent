@@ -256,7 +256,7 @@ async def run_capture_save(
             selected = [
                 CaptureItem.model_validate(row)
                 for row in draft.items
-                if row.get("checked", True) and row["id"] not in unchecked_item_ids
+                if row["id"] not in unchecked_item_ids
             ]
             resolver = _Resolver.load(session, account.id)
             created = 0
@@ -280,8 +280,6 @@ async def run_capture_save(
                             session, item.target_commitment_id, item.due_date
                         )
                         learned.append(item.text)
-                        continue
-                    if item.badge == "duplicate":
                         continue
                     contact = resolver.find(item.contact or "") if item.contact else None
                     row = Commitment(
