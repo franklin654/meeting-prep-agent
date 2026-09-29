@@ -8,7 +8,7 @@
 | A0 | complete | implementation `3f667b1` |
 | A1 | complete | implementation `ecd34d9` |
 | A2 | complete | `f5f7585` |
-| A3 | WIP | implementation commit pending |
+| A3 | complete | `883c099` |
 | A4 | planned | — |
 | A5 | planned | — |
 | A6 | planned | — |
@@ -39,18 +39,18 @@
 
 | Operation | Calls | Prompt tokens | Completion tokens | Notes |
 | --- | ---: | ---: | ---: | --- |
-| App LLM | 1 attempted | unknown | unknown | P1 request returned temperature-unsupported parameter error; fallback request cancelled before response, no usage totals. |
+| App LLM | 16 attempts (15 completed + 1 earlier interrupted) | unavailable | unavailable | Backfill's INFO usage records were suppressed by the standalone script's default logging level; fixed the script to enable INFO for future runs. One expected temperature fallback, retry succeeded. |
 | Hindsight retain | 0 | — | — | — |
 | Hindsight reflect | 0 | — | — | — |
 | Brief generation | 0 | — | — | — |
 | Pattern refresh | 0 | — | — | — |
 
-## A3 interruption
+## A3 backfill completion
 
-- The pre-overhaul database backup passed `PRAGMA integrity_check`. In-process FastAPI startup created the four additive tables in the real DB without binding port 8000. The brief unique key had no duplicates. Backfill dry-run found 15 eligible meetings and made zero calls.
-- Backfill attempt: the configured `gpt-6-luna` rejected `temperature`; the existing adapter omitted the parameter and retried. The retry was still awaiting a response when cancelled. This is one logical app LLM attempt; prompt/completion token counts were not returned. No Hindsight calls occurred, and `extractedfact` remains empty. The DB still has 15 done meetings with transcripts.
-- Stop reason: the user-directed stop condition for model/parameter errors. Resume only after direction on retrying the backfill. Do not create sandbox copies until 12 of the 15 meetings have at least two facts.
-- A3 tests/checks before interruption: 127 tests passed; Ruff and mypy passed.
+- Confirmed `/home/saisivakesh/meeting-prep-backups/app.db.pre-overhaul` exists and passes `PRAGMA integrity_check`; the backfill client uses `timeout_seconds=120`, matching ingest. Backfill dry-run found 15 eligible meetings with zero calls.
+- Detached sequential real-DB backfill completed: 15 P1 calls, 15 meetings processed, 133 verified facts (`deal_fact:89`, `objection:26`, `personal:15`, `competitor:3`); all 15 meetings have at least two facts. Per-meeting counts are in the ignored log `artifacts/overhaul/a3-facts-backfill.log`. One expected `gpt-6-luna` temperature rejection was retried without temperature and succeeded. No Hindsight calls occurred.
+- Token totals are unavailable: A0 usage logging is INFO-level, but the standalone script had no INFO logging configuration, so the run log captured only the temperature warning and final summary. The script now enables INFO logging for future runs; do not rerun the real backfill solely to recover these counts.
+- A3 checks: 127 tests passed; Ruff and mypy passed. The requested fact-kind per-meeting tally was added to the script output.
 
 ## B4–C4 plan addendum
 

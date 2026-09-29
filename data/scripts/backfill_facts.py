@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -58,6 +59,7 @@ async def _run(*, dry_run: bool, limit: int | None) -> BackfillResult:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = _parser().parse_args(argv)
     if args.limit is not None and args.limit < 1:
         _parser().error("--limit must be at least 1")
