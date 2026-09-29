@@ -28,17 +28,17 @@ describe('NudgeDigest', () => {
     expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET'])
   })
 
-  it('renders nothing for an empty response', async () => {
+  it('renders an explicit empty state for an empty response', async () => {
     const fetchMock = mockFetch({ 'GET /api/nudges': { body: [] } })
-    const { container } = renderWithProviders(<NudgeDigest />)
+    renderWithProviders(<NudgeDigest />)
     await waitFor(() => expect(fetchMock.calls).toHaveLength(1))
-    expect(container.querySelector('[aria-label="Nudge digest"]')).not.toBeInTheDocument()
+    expect(await screen.findByText('You’re all caught up.')).toBeInTheDocument()
   })
 
-  it('renders nothing on request failure', async () => {
+  it('renders an error state on request failure', async () => {
     const fetchMock = mockFetch({ 'GET /api/nudges': { status: 503, body: { error: { code: 'server_error', message: 'unavailable' } } } })
-    const { container } = renderWithProviders(<NudgeDigest />)
+    renderWithProviders(<NudgeDigest />)
     await waitFor(() => expect(fetchMock.calls).toHaveLength(1))
-    expect(container.querySelector('[aria-label="Nudge digest"]')).not.toBeInTheDocument()
+    expect(await screen.findByText('Needs your attention could not be loaded.')).toBeInTheDocument()
   })
 })
