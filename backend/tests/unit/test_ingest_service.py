@@ -895,18 +895,32 @@ PLANTED = [
     "Send a shortlist of candidate pipelines",  # M5
     "Send the security package and data-flow detail",
     "Send a recap deck with the pricing options",  # allow list wins over 'recap'
+    "Prepare the migration plan",
+    "Send the security questionnaire responses",
+    "Confirm data residency in writing",
+    "Confirm receipt of the executed copy and send the countersigned version",
+    "Assign the security reviewer and send the questionnaire",
+    "Prepare the quick-start guide",
+    "Bring the architecture details for review",
+    "Ask the team to document the checks they would keep or test",
+    "Prepare vendor information and a concise scope outline",
+    "Confirm what is included in the proposed onboarding",
+    "Prepare a sanitized incident outline with timestamps and alert details",
+    "Ask the team to document checks to keep or test",
+    "Ask the team to document the checks they’d keep and want to test",
+    "Confirm what expansion from a smaller initial pipeline scope would look like commercially",
 ]
 
 LOGISTICS = [
     "Send a recap with the agenda, needed inputs, commercial questions, and decision timing",
     "Send a short technical-session outline explaining what the session will cover",
     "Send a short agenda with the integration questions",
-    "Bring the architecture details for the technical review",
     "Send a concise recap with owners and open questions",
     "Send a recap with the proposed agenda",
     "Bring a network diagram and explain the connection direction",
     "Send the attendee list",
     "Send a brief kickoff questionnaire",
+    "Send a short security-session questionnaire",
     "Send a recap with the owners and dates",
     "Send a short note listing the information needed and the sections to be included",
     "Identify the Airflow and warehouse contacts for the technical session",

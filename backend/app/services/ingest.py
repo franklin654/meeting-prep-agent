@@ -112,6 +112,22 @@ DELIVERABLE_ALLOW_TERMS: tuple[str, ...] = (
     "soc 2",
     "security package",
     "data flow",
+    "migration plan",
+    "questionnaire responses",
+    "security questionnaire",
+    "security reviewer",
+    "data residency",
+    "quick start guide",
+    "executed copy",
+    "countersigned version",
+    "architecture details",
+    "checks they would keep",
+    "vendor information",
+    "proposed onboarding",
+    "incident outline",
+    "checks to keep or test",
+    "document the checks",
+    "expansion from a smaller initial pipeline scope",
 )
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
