@@ -1190,8 +1190,11 @@ async def test_cache_returns_stored_brief_and_upserts_per_meeting_and_mode(
     assert await get_cached_brief(M6, "memory", session_factory=world.session_factory) is None
 
     first, _ = await make(world)
+    reflect_count = len(world.memory.reflect_calls)
     cached = await get_cached_brief(M6, "memory", session_factory=world.session_factory)
-    assert cached == first
+    assert cached is not None and cached.id == first.id
+    assert cached.contact_cards
+    assert len(world.memory.reflect_calls) == reflect_count
     assert await get_cached_brief(M6, "no_memory", session_factory=world.session_factory) is None
 
     queue_objections(world.memory)
@@ -1222,7 +1225,10 @@ async def test_cache_invalidated_by_later_ingest_on_the_account(
 
     cached = await get_cached_brief(M6, "memory", session_factory=world.session_factory)
 
-    assert (cached == brief) if expect_cached else (cached is None)
+    if expect_cached:
+        assert cached is not None and brief is not None and cached.id == brief.id
+    else:
+        assert cached is None
 
 
 # ---- helpers ---------------------------------------------------------------------------

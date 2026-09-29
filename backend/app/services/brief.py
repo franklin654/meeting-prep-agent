@@ -2121,4 +2121,35 @@ async def get_cached_brief(
     meeting_id: str, mode: BriefMode, *, session_factory: SessionFactory
 ) -> Brief | None:
     """The stored brief, or None if there is none or the account ingested a meeting since."""
-    return get_fresh_brief(session_factory, meeting_id, mode)
+    cached = get_fresh_brief(session_factory, meeting_id, mode)
+    if cached is None or mode != "memory":
+        return cached
+    inputs = load_brief_inputs(session_factory, meeting_id, include_ledger=True)
+    meetings = {
+        meeting.id: MeetingInfo(id=meeting.id, title=meeting.title, date=_meeting_date(meeting))
+        for meeting in inputs.all_meetings
+    }
+    visible_facts = [
+        fact for fact in inputs.extracted_facts if fact.id not in inputs.hidden_fact_ids
+    ]
+    you_owe, they_owe = _enriched_commitments(inputs, meetings)
+    objections = _rank_fact_objections(visible_facts, meetings)
+    sections = list(cached.sections)
+    if you_owe or they_owe:
+        sections = [section for section in sections if section.key != SectionKey.open_commitments]
+    if objections:
+        sections = [
+            section for section in sections if section.key != SectionKey.unresolved_objections
+        ]
+    account_meetings = {fact.meeting_id for fact in visible_facts}
+    return cached.model_copy(
+        update={
+            "sections": sections,
+            "you_owe": you_owe,
+            "they_owe": they_owe,
+            "objections": objections,
+            "memory_used": {"facts": len(visible_facts), "meetings": len(account_meetings)},
+            "contact_cards": _contact_cards(inputs, meetings, visible_facts),
+            "first_meeting": inputs.first_meeting,
+        }
+    )

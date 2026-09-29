@@ -13,11 +13,11 @@
 | A5 | complete | implementation `dc12c17` |
 | A6 | complete | implementation `2b59262` |
 | A7 | complete | implementation `5a95eb5` |
-| B1 | complete | `92b545b` |
-| B2 | complete | `621b7cc` |
-| B3 | complete | `de8dd2f` |
-| B4 | complete | 2026-09-30 |
-| B5 | complete | 2026-09-30 |
+| B1 | complete | `9dc5992` |
+| B2 | complete | `3f32451` |
+| B3 | complete | `2cc2f06` |
+| B4 | complete | `27c69a0` |
+| B5 | complete | `f341ef0` |
 | C1 | planned | — |
 | C2 | planned | — |
 | C3 | planned | — |
@@ -39,11 +39,11 @@
 
 | Operation | Calls | Prompt tokens | Completion tokens | Notes |
 | --- | ---: | ---: | ---: | --- |
-| App LLM | 20 logical P1 calls (19 completed + 1 earlier interrupted), 1 P2 | partial: 3,442 | partial: 1,485 | The 15-call A3 backfill and two original Sandbox-W previews have no recoverable usage records. Logging fix was demonstrated with a Sandbox-W Uvicorn P1+P2 and one isolated one-meeting backfill-script P1; their provider totals are 3,442 prompt / 1,485 completion tokens. Four temperature fallbacks succeeded (A3, first Sandbox-W preview, Uvicorn probe, script probe); one earlier interrupted call had its retry interrupted. |
+| App LLM | 20 logical P1 calls (19 completed + 1 earlier interrupted), 1 P2, 3 P3, 1 pattern refresh = 25 logical calls | partial total: 6,819 | partial total: 6,097 | Existing 3,442/1,485 probe totals plus the checkpoint calls below. The 15-call A3 backfill and two original Sandbox-W previews remain unknown. Three current temperature fallbacks succeeded. |
 | Hindsight retain | 3 attempts (2 reached service and completed; 1 connection-refused before a write) | unavailable | unavailable | The two accepted writes are both in `ae-overhaul-test`, at the original cap; the refused attempt never reached Hindsight. |
 | Hindsight reflect | 0 | — | — | — |
-| Brief generation | 0 | — | — | — |
-| Pattern refresh | 0 | — | — | — |
+| Brief generation | 3 total (1 Sandbox-W, 2 Sandbox-R; one Sandbox-R run used the wrong bank and is not valid gate evidence) | 3,161 | 4,572 | P3 calls only; counts/tokens for current checkpoint calls are broken down below. |
+| Pattern refresh | 1 Sandbox-W | 216 | 40 | Returned no cited patterns. |
 
 ## A3 backfill completion
 
@@ -127,5 +127,16 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 ### B5 implementation
 
 - Replaced the Contacts placeholder with a searchable, account-filtered contact list and a profile view with Timeline, Facts, Follow-ups, and Preferences tabs. Added cited meeting links, explicit correct/hide controls and Hindsight-retention disclosure, follow-up complete/edit-date/delete actions with confirmation, cached pattern refresh (only when at least three facts exist), and the existing scoped Ask drawer.
-- B5 checks: frontend ESLint and TypeScript passed; Vitest 54 passed. The running Sandbox-W services still answer on API :8001 and Vite :5174; API health reports `ok`, Vite responds HTTP 200.
-- No live Hindsight, LLM, or sandbox DB operations have been performed in B4/B5 yet. Checkpoint 2 live gates remain pending; the corrected-memory Hindsight retain action is quota-blocked as stated above.
+- B5 checks: frontend ESLint and TypeScript passed; Vitest 54 passed. The running Sandbox-W services answer on API :8001 and Vite :5174; API health reports `ok`, Vite responds HTTP 200.
+
+### Checkpoint 2 execution (2026-09-30)
+
+- Sandbox-W first-meeting brief `m1_finedge`: one P3 call, 7.59 s, 573 prompt / 629 completion tokens; expected temperature fallback succeeded. It returned `first_meeting=true` and zero memory use, but P3 generated no sections, so the service correctly did not cache it. No retry (the authorized one-call gate is spent).
+- Sandbox-W pattern refresh for Anita (7 visible facts): one call, 2.05 s, 216 / 40 tokens; returned no valid/cited patterns. No retry (the one-refresh gate is spent).
+- Sandbox-W app-side controls passed: hid `fact_787e66e5` (profile then showed 1 hidden item), patched `cm_f299e8a3`, deleted `cm_83506182`, and marked `m6_finedge` prepared. Correction was deliberately not run live: both authorized successful Hindsight retains are already consumed; a further correct-note retain would exceed the user's cap. Its endpoint behavior has FakeMemory/unit coverage only, not live evidence.
+- Sandbox-R was initially launched with the wrong `DEMO_USER_ID=overhaul-test`, targeting `ae-overhaul-test`. One read-only M6 generation ran there (13.33 s; 721 / 1,372 tokens). This was an operator configuration mistake, not valid real-bank evidence. It was not a write. The instance was corrected to `DEMO_USER_ID=user-demo-thomas`, `DATABASE_URL=sqlite:///./app.sandbox-r.db`, `MEMORY_READ_ONLY=true`; the expected bank is `ae-user-demo-thomas`.
+- With the corrected Sandbox-R, cached `GET /api/meetings/m6_finedge/brief?mode=memory` before generation took 70 ms and returned `br_ae8ce076` with SQLite enrichment: 47 facts across 5 meetings, 5 You owe, 6 They owe, 5 ranked objections, 3 contact cards, one critical item (the pricing deck). The read path made zero LLM/Hindsight calls. A regression test now verifies cached brief recomputation uses only local SQLite and does not add memory calls.
+- The one valid real-bank M6 generation then completed in 53.16 s (1,867 / 2,571 tokens), with `recall_ms=24,154`, `gather_ms=34,389`, `p3_ms=18,614`; no recall timeout was logged. It rendered 5 You owe, 6 They owe, 5 cited objections, 3 cited contact cards, and the pricing deck as the sole critical item. All 11 owed rows and all 5 objections had citations. The second and final Sandbox-R generation slot is spent on the misconfigured run; no more generations were made. `MEMORY_READ_ONLY=true` was verified on the process; no Hindsight write was attempted.
+- Current checkpoint tokens: Sandbox-W P3 573/629; Sandbox-W pattern 216/40; misconfigured Sandbox-R P3 721/1,372; corrected real-bank Sandbox-R P3 1,867/2,571. Added 3,377 prompt / 4,612 completion to the earlier partially known totals, now 6,819 / 6,097. A3 backfill usage and earlier unlogged calls remain unknown.
+- Screenshots saved (ignored): `artifacts/overhaul/checkpoint2-contacts-list.png`, `artifacts/overhaul/checkpoint2-contact-profile.png`. No real DB generation or write was performed. Sandbox-R's brief cache is in its copy only.
+- Checkpoint 2 is **not green**: the Sandbox-W brief was empty, refresh produced no patterns, live correct was blocked by the retain cap, and no Brief screenshot was captured. Stop here for user direction; do not retry or exceed any call/retain cap.
