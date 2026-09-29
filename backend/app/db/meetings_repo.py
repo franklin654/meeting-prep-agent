@@ -1,7 +1,8 @@
 """Queries behind the meetings/notes API (ticket T13).
 
 Kept apart from `repository.py` (owned by T07) so the API lane adds read models and
-`save_transcript` without editing that module.
+`save_transcript` without editing that module. Like `repository.py` and `ingest_repo.py`,
+this is a DB module: only these modules touch a `Session` (AGENTS.md hard rule 1).
 """
 
 from __future__ import annotations
