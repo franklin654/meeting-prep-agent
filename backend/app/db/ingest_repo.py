@@ -121,6 +121,20 @@ def mark_commitment_done(
     )
 
 
+def update_open_commitment_due_date(
+    session: Session, commitment_id: str, due_date: date
+) -> bool:
+    """Move an open commitment's due date without closing or replacing the row."""
+    row = session.get(Commitment, commitment_id)
+    if row is None or row.status != CommitmentStatus.open:
+        return False
+    row.due_date = due_date
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return True
+
+
 def create_commitment_rows(
     session: Session,
     *,

@@ -598,11 +598,70 @@ def _match_commitment_ids(
     return matched
 
 
-def _format_open_commitment(commitment: Commitment) -> str:
+def _match_renewed_commitments(
+    matches: AckMatches,
+    open_commitments: Sequence[Commitment],
+    new_commitments: Sequence[ExtractedCommitment],
+    resolver: _Resolver,
+) -> dict[str, int]:
+    """Accept only P2 renewals whose owner and deliverable match an existing open row."""
+    open_by_id = {commitment.id: commitment for commitment in open_commitments}
+    accepted: dict[str, int] = {}
+    used_new_indexes: set[int] = set()
+    dropped = 0
+    for match in matches.renewed:
+        existing = open_by_id.get(match.commitment_id)
+        if (
+            existing is None
+            or match.commitment_index < 0
+            or match.commitment_index >= len(new_commitments)
+            or match.commitment_id in accepted
+            or match.commitment_index in used_new_indexes
+        ):
+            dropped += 1
+            continue
+        candidate = new_commitments[match.commitment_index]
+        owner_contact = resolver.find(candidate.owner_person)
+        if (
+            candidate.due_date is None
+            or candidate.owner != existing.owner
+            or owner_contact is None
+            or owner_contact.id != existing.contact_id
+        ):
+            dropped += 1
+            continue
+        prior = ExtractedCommitment(
+            owner=existing.owner,
+            owner_person=owner_contact.name,
+            text=existing.text,
+            due_date=existing.due_date,
+            source_quote=existing.source_quote,
+        )
+        comparable = candidate.model_copy(update={"owner_person": owner_contact.name})
+        if not _is_near_duplicate(prior, comparable):
+            dropped += 1
+            continue
+        accepted[existing.id] = match.commitment_index
+        used_new_indexes.add(match.commitment_index)
+    if dropped:
+        logger.warning("ingest p2 dropped_invalid_renewals=%d", dropped)
+    return accepted
+
+
+def _format_open_commitment(commitment: Commitment, owner_name: str | None = None) -> str:
     """`id: text | original words: "quote"`, so P2 can match an acknowledgement that uses
     different words than the commitment's text (docs: quote truncated to 200 chars)."""
     quote = " ".join(commitment.source_quote.split())[:MAX_QUOTE_CHARS]
-    return f'{commitment.id}: {commitment.text} | original words: "{quote}"'
+    owner = f"{commitment.owner.value} ({owner_name})" if owner_name else commitment.owner.value
+    return f'{commitment.id}: {commitment.text} | owner: {owner} | original words: "{quote}"'
+
+
+def _format_new_commitment(index: int, commitment: ExtractedCommitment) -> str:
+    due = commitment.due_date.isoformat() if commitment.due_date else "unspecified"
+    return (
+        f"{index}: owner: {commitment.owner.value}, person: {commitment.owner_person}, "
+        f"text: {commitment.text}, due: {due}"
+    )
 
 
 def _format_ack(index: int, ack: Acknowledgement) -> str:
@@ -758,13 +817,23 @@ async def _ingest(
 
     # 5. P2, against open commitments from earlier meetings only.
     closed_ids: list[str] = []
+    renewed: dict[str, int] = {}
     earlier_open = ingest_repo.list_open_commitments(
         session, account_id, before=scheduled_at, exclude_meeting_id=meeting_id
     )
-    if verified.acknowledgements and earlier_open:
+    if earlier_open and (verified.acknowledgements or verified.commitments):
+        open_lines = []
+        for commitment in earlier_open:
+            owner = session.get(Contact, commitment.contact_id) if commitment.contact_id else None
+            open_lines.append(
+                _format_open_commitment(commitment, owner.name if owner is not None else None)
+            )
         p2_prompt = render_prompt(
             "match_acknowledgements",
-            open_commitments="\n".join(_format_open_commitment(c) for c in earlier_open),
+            open_commitments="\n".join(open_lines),
+            new_commitments="\n".join(
+                _format_new_commitment(i, item) for i, item in enumerate(verified.commitments)
+            ) or "(none)",
             meeting_date=meeting_date.isoformat(),
             acknowledgements="\n".join(
                 _format_ack(i, a) for i, a in enumerate(verified.acknowledgements)
@@ -776,14 +845,27 @@ async def _ingest(
             "ingest p2 meeting=%s duration_ms=%d", meeting_id, int((time.monotonic() - t0) * 1000)
         )
         closed_ids = _match_commitment_ids(matches, earlier_open, len(verified.acknowledgements))
+        renewed = _match_renewed_commitments(
+            matches, earlier_open, verified.commitments, resolver
+        )
+        closed_ids = [commitment_id for commitment_id in closed_ids if commitment_id not in renewed]
 
     # 6. Close matched commitments.
     for commitment_id in closed_ids:
         ingest_repo.mark_commitment_done(session, commitment_id, meeting_id)
 
+    renewed_indexes: set[int] = set()
+    for commitment_id, commitment_index in renewed.items():
+        due_date = verified.commitments[commitment_index].due_date
+        assert due_date is not None
+        if ingest_repo.update_open_commitment_due_date(session, commitment_id, due_date):
+            renewed_indexes.add(commitment_index)
+
     # 7. New commitments (after P2).
     rows: list[tuple[Owner, str | None, str, date | None, str]] = []
-    for item in verified.commitments:
+    for commitment_index, item in enumerate(verified.commitments):
+        if commitment_index in renewed_indexes:
+            continue
         contact = resolver.resolve(item.owner_person)
         rows.append(
             (
