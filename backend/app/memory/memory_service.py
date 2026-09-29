@@ -28,6 +28,7 @@ from __future__ import annotations
 import abc
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -221,22 +222,21 @@ class MemoryService(abc.ABC):
 
 
 DELETABLE_BANK_PREFIX = "ae-"
+_DELETABLE_BANK_RE = re.compile(r"^ae-[A-Za-z0-9_-]+$")
 
 
 def require_deletable_bank_id(bank_id: str) -> None:
-    """Hard guard for `delete_bank`: only `ae-<something>` ids may be deleted.
+    """Hard guard for `delete_bank`: only `ae-<name>` ids may be deleted.
 
-    Raises `ValidationError` before any SDK call for anything else (including
-    "", "ae-" alone, other-case or whitespace-padded ids, "ami-test", "spike-*").
+    The whole id must match `^ae-[A-Za-z0-9_-]+$` (no whitespace, newline or path
+    characters anywhere). Raises `ValidationError` before any SDK call for anything else
+    (including "", "ae-" alone, "AE-x", "ami-test", "spike-*", "ae-a b", "ae-../x").
     """
-    if (
-        bank_id != bank_id.strip()
-        or not bank_id.startswith(DELETABLE_BANK_PREFIX)
-        or len(bank_id) <= len(DELETABLE_BANK_PREFIX)
-    ):
+    # `fullmatch` so a trailing newline can never slip past `$`.
+    if _DELETABLE_BANK_RE.fullmatch(bank_id) is None:
         raise ValidationError(
-            f"Refusing to delete bank {bank_id!r}: only ids starting with "
-            f"{DELETABLE_BANK_PREFIX!r} (plus a name) may be deleted."
+            f"Refusing to delete bank {bank_id!r}: only ids matching "
+            f"{_DELETABLE_BANK_RE.pattern!r} may be deleted."
         )
 
 
