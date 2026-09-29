@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import seed as seed_module
 from seed import (
     CHAIN,
     EXCLUDED_FROM_INGEST,
@@ -318,6 +319,54 @@ def test_stops_at_first_failure_and_reports_meeting_and_code(factory: SessionFac
     assert ingest.calls == ORDER[:4]
     assert "mental_models" not in memory.events
     assert re.search(rf"\[04/15\] {ORDER[3]} FAILED llm_timeout after \d+\.\ds", "\n".join(log))
+
+
+def test_prepare_job_failure_on_first_meeting_prints_no_job_line(
+    factory: SessionFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(*args: Any, **kwargs: Any) -> str:
+        raise RuntimeError("db locked")
+
+    monkeypatch.setattr(seed_module, "_prepare_job", boom)
+    log = Lines()
+    ingest = FakeIngest(healthy_commitments())
+    with pytest.raises(SeedFailure) as info:
+        run_seed(factory, ingest, log=log)  # no UnboundLocalError
+    assert info.value.code == "internal_error" and ingest.calls == []
+    assert not [line for line in log if line.startswith("job ")]
+
+
+def test_failure_line_names_only_the_current_job_after_an_earlier_success(
+    factory: SessionFactory,
+) -> None:
+    ingest = FakeIngest(healthy_commitments(), fail_on=ORDER[3])
+    log = Lines()
+    with pytest.raises(SeedFailure):
+        run_seed(factory, ingest, log=log)
+    job_lines = [line for line in log if line.startswith("job ")]
+    assert job_lines == [f"job {ingest.jobs[3]} error: llm_timeout: "]
+    assert not any(j in "\n".join(job_lines) for j in ingest.jobs[:3])
+
+
+def test_prepare_job_failure_after_success_does_not_print_stale_job_id(
+    factory: SessionFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = seed_module._prepare_job
+    calls = {"n": 0}
+
+    def flaky(*args: Any, **kwargs: Any) -> str:
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise RuntimeError("db locked")
+        return real(*args, **kwargs)  # type: ignore[no-any-return]
+
+    monkeypatch.setattr(seed_module, "_prepare_job", flaky)
+    log = Lines()
+    ingest = FakeIngest(healthy_commitments())
+    with pytest.raises(SeedFailure):
+        run_seed(factory, ingest, log=log)
+    assert len(ingest.jobs) == 2
+    assert not [line for line in log if line.startswith("job ")]
 
 
 def test_resume_skips_done_meetings_and_creates_no_duplicates(factory: SessionFactory) -> None:

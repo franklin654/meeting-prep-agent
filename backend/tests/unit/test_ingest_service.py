@@ -984,3 +984,160 @@ async def test_run_ingest_drops_logistics_commitments(
     )
     assert summary.new_commitments == 2
     assert all("recap" not in c.text for c in _commitments(seeded))
+
+
+# ---- T12e: retain timeout, safe error messages, P2 original words ----
+
+
+def test_safe_error_message_redacts_secrets_and_truncates() -> None:
+    raw = (
+        "auth failed for sk-abcdef1234567890XYZ and gsk_AbCdEf123456 with "
+        "Bearer eyJhbGciOi.secret.token and blob " + "A1b2C3d4" * 6 + " end"
+    )
+    msg = ingest.safe_error_message(RuntimeError(raw))
+    for secret in ("sk-abcdef", "gsk_AbCd", "eyJhbGciOi", "A1b2C3d4A1b2"):
+        assert secret not in msg
+    assert "[redacted]" in msg and msg.endswith("end")
+    long = ingest.safe_error_message(RuntimeError("x " * 500))
+    assert len(long) == ingest.ERROR_MESSAGE_MAX_CHARS
+
+
+@pytest.mark.parametrize(
+    ("raw", "secret"),
+    [
+        ("call to https://api.x.com/v1?api_key=abcd1234efgh&x=1 failed", "abcd1234efgh"),
+        ("bad org org-abc123def456 here", "abc123def456"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("key=abcdef0123456789abcd rejected", "abcdef0123456789abcd"),
+        ("x-api-key: shortkey123", "shortkey123"),
+        ("Authorization: abcdef", "abcdef"),
+        ("bad key sk_live_abcdefghijklmnop", "abcdefghijklmnop"),
+        ("bad key gsk-abc", "gsk-abc"),
+        ("password=hunter2 nope", "hunter2"),
+        ("https://h/x?access_token=zzz999&y=2", "zzz999"),
+        ("Token abc.def.ghi expired", "abc.def.ghi"),
+        ("Bad request. HTTP RESPONSE BODY: sk-verysecretvalue123", "verysecret"),
+    ],
+)
+def test_safe_error_message_redacts_secret_shapes(raw: str, secret: str) -> None:
+    assert secret not in ingest.safe_error_message(RuntimeError(raw))
+
+
+@pytest.mark.parametrize(
+    "benign", ["Retain timed out after 120s.", "LLM call exceeded the 120.0s timeout."]
+)
+def test_safe_error_message_leaves_benign_messages_unchanged(benign: str) -> None:
+    assert ingest.safe_error_message(RuntimeError(benign)) == benign
+
+
+def test_safe_error_message_cuts_response_bodies_and_never_empty() -> None:
+    exc = RuntimeError('HTTP 400 Reason: Bad. HTTP response body: {"prompt": "TRANSCRIPT TEXT"}')
+    msg = ingest.safe_error_message(exc)
+    assert "TRANSCRIPT" not in msg and msg.startswith("HTTP 400")
+    assert ingest.safe_error_message(RuntimeError("")) == "RuntimeError"
+    assert "second" not in ingest.safe_error_message(RuntimeError("first\nsecond"))
+
+
+async def test_ingest_passes_120s_retain_timeout(seeded: Session, factory: SessionFactory) -> None:
+    memory = FakeMemoryService()
+    await _ingest_m4(seeded, factory, FakeLLM(), memory)
+    assert ingest.INGEST_RETAIN_TIMEOUT_S == 120.0
+    assert memory.retain_timeouts == [120.0]
+
+
+async def test_failed_job_stores_code_and_safe_message_done_job_does_not(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm = FakeLLM()
+    llm.queue_error(MemoryUnavailableError("Retain timed out after 120s. key sk-abcdef1234567"))
+    bad = _job(seeded)
+    with pytest.raises(MemoryUnavailableError):
+        await run_ingest(
+            bad, "m4_finedge", llm=llm, memory=FakeMemoryService(), session_factory=factory
+        )
+    seeded.expire_all()
+    job = repo.get_job(seeded, bad)
+    assert job is not None and job.error == "memory_unavailable"
+    assert job.result is not None
+    assert job.result["error_code"] == "memory_unavailable"
+    assert job.result["error_message"].startswith("Retain timed out after 120s.")
+    assert "sk-abcdef" not in job.result["error_message"]
+
+    good = await _ingest_m4(seeded, factory, FakeLLM(), FakeMemoryService())
+    seeded.expire_all()
+    ok = repo.get_job(seeded, good)
+    assert ok is not None and ok.error is None and ok.result is not None
+    assert "error_code" not in ok.result and "new_commitments" in ok.result
+
+
+async def test_p2_prompt_lists_original_words_and_roi_one_pager_case(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    text = "Prepare a decision-oriented comparison of the current approach and proposed scope"
+    ingest_repo.create_commitment_rows(
+        seeded,
+        account_id="acc_finedge",
+        meeting_id="m4_finedge",
+        rows=[
+            (Owner.us, "c_priya", text, date(2026, 8, 5), "I'll send the ROI one-pager by Aug 5")
+        ],
+    )
+    cm_id = _commitments(seeded)[0].id
+    llm = FakeLLM()
+    llm.queue_response(
+        MeetingExtraction(
+            people=[],
+            commitments=[],
+            facts=[],
+            deal_budget_usd=None,
+            acknowledgements=[
+                Acknowledgement(
+                    description="ROI one-pager received",
+                    source_quote="thanks for sending the DAG configs",
+                )
+            ],
+        )
+    )
+    llm.queue_response(
+        AckMatches(closed=[ClosedMatch(commitment_id=cm_id, acknowledgement_index=0)])
+    )
+    summary = await run_ingest(
+        _job(seeded), "m5_finedge", llm=llm, memory=FakeMemoryService(), session_factory=factory
+    )
+    prompt = llm.calls[-1].prompt
+    assert f"{cm_id}: {text}" in prompt
+    assert '| original words: "I\'ll send the ROI one-pager by Aug 5"' in prompt
+    assert "different words than the commitment's text" in prompt
+    assert '{"closed": []}' in prompt
+    assert summary.closed_commitments == 1
+
+
+def test_p2_original_words_are_truncated_to_200_chars() -> None:
+    c = Commitment(
+        id="cm_x",
+        account_id="a",
+        meeting_id="m",
+        owner=Owner.us,
+        text="T",
+        source_quote="w " * 300,
+        status=CommitmentStatus.open,
+    )
+    line = ingest._format_open_commitment(c)
+    quote = line.split('original words: "', 1)[1].rstrip('"')
+    assert len(quote) <= ingest.MAX_QUOTE_CHARS
+
+
+async def test_non_receipt_complaint_cannot_close_via_unknown_id(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    llm, memory = FakeLLM(), FakeMemoryService()
+    await _ingest_m4(seeded, factory, llm, memory)
+    llm.queue_response(_extraction("m5_extraction.json"))
+    llm.queue_response(
+        AckMatches(closed=[ClosedMatch(commitment_id="cm_madeup", acknowledgement_index=1)])
+    )
+    summary = await run_ingest(
+        _job(seeded), "m5_finedge", llm=llm, memory=memory, session_factory=factory
+    )
+    assert summary.closed_commitments == 0
+    assert all(c.status == CommitmentStatus.open for c in _commitments(seeded))

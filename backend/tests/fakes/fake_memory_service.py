@@ -66,6 +66,8 @@ class FakeMemoryService(MemoryService):
         self.deleted_banks: list[str] = []
         self.bank_ensured = False
         self._next_id = 0
+        self.retain_timeouts: list[float | None] = []
+        self.idle_polls: list[bool] | None = None  # scripted busy(False)/idle(True) polls
         self.get_memory_calls: list[str] = []
 
     # -- test helpers ---------------------------------------------------
@@ -152,7 +154,9 @@ class FakeMemoryService(MemoryService):
         title: str,
         transcript: str,
         source: str = "ingest",
+        timeout_s: float | None = None,
     ) -> None:
+        self.retain_timeouts.append(timeout_s)
         tags = [account_tag(account_id)]
         tags.extend(contact_tag(cid) for cid in contact_ids)
         tags.append(meeting_tag(meeting_id))
@@ -264,8 +268,24 @@ class FakeMemoryService(MemoryService):
                 }
         return None
 
-    async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
-        return True
+    async def wait_until_idle(
+        self,
+        timeout_s: float = 60.0,
+        *,
+        consecutive_idle: int = 3,
+        poll_interval_s: float = 5.0,
+    ) -> bool:
+        """Always idle unless a test scripts `idle_polls` (True = idle poll); then it needs
+        `consecutive_idle` idle polls in a row, and a script that runs out means timeout.
+        """
+        if self.idle_polls is None:
+            return True
+        streak = 0
+        for idle in self.idle_polls:
+            streak = streak + 1 if idle else 0
+            if streak >= max(1, consecutive_idle):
+                return True
+        return False
 
     async def delete_bank(self, bank_id: str) -> None:
         require_deletable_bank_id(bank_id)

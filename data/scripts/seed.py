@@ -203,6 +203,16 @@ def _is_done(session_factory: SessionFactory, meeting_id: str) -> bool:
         return row is not None and row.status == "done" and row.ingested_at is not None
 
 
+def _job_failure_line(session_factory: SessionFactory, job_id: str, code: str) -> str:
+    """`job <id> error: <code>: <message>` from the stored job row (message is redacted)."""
+    message = ""
+    with session_factory() as session:
+        job = repo.get_job(session, job_id)
+        if job is not None and job.result:
+            message = str(job.result.get("error_message", ""))
+    return f"job {job_id} error: {code}: {message}"
+
+
 def _prepare_job(session_factory: SessionFactory, meeting_id: str, transcript: str) -> str:
     with session_factory() as session:
         meetings_repo.save_transcript(session, meeting_id, transcript)
@@ -246,6 +256,7 @@ async def seed(
 
         log(f"{tag} {meeting['date']} {meeting_id} start {_clock()}")
         started = time.monotonic()
+        job_id: str | None = None  # per meeting: never a stale id from the previous one
         try:
             job_id = _prepare_job(session_factory, meeting_id, texts[meeting_id])
             summary = await ingest_fn(
@@ -255,6 +266,8 @@ async def seed(
         except Exception as exc:  # noqa: BLE001 - any failure stops the run, code reported
             code = exc.code if isinstance(exc, AppError) else "internal_error"
             log(f"{tag} {meeting_id} FAILED {code} after {time.monotonic() - started:.1f}s")
+            if job_id is not None:
+                log(_job_failure_line(session_factory, job_id, code))
             raise SeedFailure(meeting_id, code, type(exc).__name__) from exc
         elapsed = time.monotonic() - started
         if not idle:
