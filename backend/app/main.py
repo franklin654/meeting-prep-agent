@@ -7,8 +7,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api import jobs, meetings
+from app.api.deps import close_memory_service
 from app.config import settings
 from app.core.errors import register_exception_handlers
+from app.db.session import create_db_and_tables
 
 
 @asynccontextmanager
@@ -19,12 +22,18 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     gateway startup/shutdown around the `yield`.
     """
     settings.validate_llm_config()
-    yield
+    create_db_and_tables()  # idempotent: a fresh DB works without `make reset-demo`
+    try:
+        yield
+    finally:
+        await close_memory_service()  # no-op unless a request created it
 
 
 app = FastAPI(title="Meeting Prep Agent API", lifespan=lifespan)
 
 register_exception_handlers(app)
+app.include_router(meetings.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")
 
 
 @app.get("/api/health")
