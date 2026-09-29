@@ -1,5 +1,8 @@
 """Brief endpoints (docs/technical-design.md "API routes"; ticket T15).
 
+Style (order, hiding) is applied to every response at read time; the stored brief stays
+unstyled.
+
 POST always generates a fresh brief (the explicit refresh; the service upserts the record
 for meeting and mode). GET only reads the cache and never generates.
 """
@@ -19,6 +22,7 @@ from app.memory.memory_service import MemoryService
 from app.schemas.brief import Brief
 from app.services.brief import generate_brief, get_cached_brief
 from app.services.ingest import SessionFactory
+from app.services.preferences import apply_style, current_style
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +65,7 @@ async def create_brief(
     if not brief.sections:
         logger.warning("brief.empty meeting=%s mode=%s: no sections generated", meeting_id, mode)
     _log("generate", meeting_id, mode, started, "ok")
-    return brief
+    return apply_style(brief, current_style(session_factory))
 
 
 @router.get("/meetings/{meeting_id}/brief", response_model=Brief)
@@ -77,4 +81,4 @@ async def read_brief(
         _log("read", meeting_id, mode, started, "miss")
         raise NotFoundError(f"No fresh {mode} brief for meeting {meeting_id!r}.")
     _log("read", meeting_id, mode, started, "hit")
-    return brief
+    return apply_style(brief, current_style(session_factory))
