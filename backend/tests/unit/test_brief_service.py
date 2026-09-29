@@ -17,7 +17,7 @@ from app.db import repository
 from app.db.models import BriefRecord, Commitment, Meeting
 from app.memory.memory_service import MemoryService, MentalModelText
 from app.schemas.brief import Brief, BriefDraft, BriefItem, SectionKey, Severity, SourceType
-from app.schemas.enums import FactKind
+from app.schemas.enums import CommitmentStatus, FactKind, Owner
 from app.schemas.memory import MemoryHit, ReflectResult
 from app.services import brief as brief_module
 from app.services.brief import (
@@ -146,9 +146,68 @@ async def test_b4_competitor_watch_out_cited_to_m3(world: World) -> None:
     brief, _ = await make(world)
 
     (watch,) = section(brief, SectionKey.watch_outs)
+    assert watch.text == "FinEdge has looked at DataHawk."
     assert [c.meeting_id for c in watch.citations] == ["m3_finedge"]
     assert watch.citations[0].meeting_date == date(2026, 8, 12)
     assert watch.severity == Severity.warning  # floor for watch_outs
+
+
+async def test_overdue_commitments_keep_one_red_group_us_and_mark_customer_info(
+    world: World,
+) -> None:
+    with Session(world.engine) as s:
+        s.add(
+            Commitment(
+                id="cm_us_second",
+                account_id="acc_finedge",
+                meeting_id="m4_finedge",
+                owner=Owner.us,
+                contact_id="c_rahul",
+                text="Send rollout plan",
+                due_date=date(2026, 9, 10),
+                status=CommitmentStatus.open,
+                source_quote="I will send the rollout plan",
+            )
+        )
+        s.add(
+            Commitment(
+                id="cm_customer",
+                account_id="acc_finedge",
+                meeting_id="m4_finedge",
+                owner=Owner.them,
+                contact_id="c_rahul",
+                text="Provide the pipeline shortlist",
+                due_date=date(2026, 9, 12),
+                status=CommitmentStatus.open,
+                source_quote="We will provide the shortlist",
+            )
+        )
+        s.commit()
+
+    brief, _ = await make(world, lambda p: BriefDraft(sections={}))
+    commitments = section(brief, SectionKey.open_commitments)
+    critical = [entry for entry in all_items(brief) if entry.severity == Severity.critical]
+    assert len(critical) == 1
+    assert "pricing deck" in critical[0].text.lower()
+    (grouped,) = [entry for entry in commitments if entry.text.startswith("Also overdue:")]
+    assert grouped.severity == Severity.warning
+    assert "Send rollout plan" in grouped.text
+    (customer,) = [entry for entry in commitments if "pipeline shortlist" in entry.text.lower()]
+    assert customer.severity == Severity.info
+
+
+async def test_overdue_alert_restatement_is_removed(world: World) -> None:
+    def draft(prompt: str) -> BriefDraft:
+        deck_id = evidence_ids(prompt, "pricing deck")
+        return BriefDraft(
+            sections={
+                SectionKey.alerts: [item("Pricing deck overdue", deck_id)],
+            }
+        )
+
+    brief, _ = await make(world, draft)
+
+    assert section(brief, SectionKey.alerts) == []
 
 
 async def test_unresolved_objection_cited_via_reflect_source(world: World) -> None:
@@ -202,9 +261,9 @@ async def test_unresolved_evidence_ids_are_dropped(world: World) -> None:
 
     brief, _ = await make(world, draft)
 
-    (kept,) = section(brief, SectionKey.watch_outs)
-    assert kept.text == "kept"
-    assert len(kept.citations) == 1
+    (competitor,) = section(brief, SectionKey.watch_outs)
+    assert competitor.text == "FinEdge has looked at DataHawk."
+    assert len(competitor.citations) == 1
 
 
 async def test_llm_item_without_evidence_is_dropped(world: World) -> None:
