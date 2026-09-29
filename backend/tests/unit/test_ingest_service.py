@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ from app.core.errors import (
     NotFoundError,
     RateLimitedError,
 )
+from app.core.time import utcnow
 from app.db import ingest_repo
 from app.db import repository as repo
 from app.db.models import Account, Commitment, Contact, Job, Meeting
@@ -702,10 +703,23 @@ def test_repo_open_commitments_before_and_contacts_for_matching(seeded: Session)
 def test_repo_job_helpers_use_demo_clock_and_prefixed_ids(db: Session) -> None:
     job = ingest_repo.create_job_row(db)
     assert job.id.startswith("job_") and len(job.id) == 12 and job.status == "pending"
-    assert job.created_at == datetime(2026, 9, 28, 0, tzinfo=UTC)
+    assert abs(job.created_at - utcnow()) < timedelta(seconds=30)
     done = ingest_repo.finish_job(db, job.id, result={"facts": []})
-    assert done.status == "done" and done.finished_at == datetime(2026, 9, 28, 0, tzinfo=UTC)
+    assert done.status == "done" and done.finished_at is not None
+    assert abs(done.finished_at - utcnow()) < timedelta(seconds=30)
     other = ingest_repo.create_job_row(db)
     failed = ingest_repo.finish_job(db, other.id, error="llm_timeout")
     assert failed.status == "failed" and failed.error == "llm_timeout"
     assert len(db.exec(select(Job)).all()) == 2
+
+
+async def test_ingested_at_is_wall_clock_later_than_earlier_stamp(
+    seeded: Session, factory: SessionFactory
+) -> None:
+    before = utcnow()
+    llm = FakeLLM()
+    await _ingest_m4(seeded, factory, llm, FakeMemoryService())
+    seeded.expire_all()
+    meeting = repo.get_meeting(seeded, "m4_finedge")
+    assert meeting is not None and meeting.ingested_at is not None
+    assert meeting.ingested_at > before

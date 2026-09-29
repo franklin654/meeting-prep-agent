@@ -4,30 +4,30 @@ Kept separate from `app/db/repository.py` (owned by an earlier ticket) so ingest
 add what it needs without editing that file. Same conventions: `session` first, each
 call commits, and only DB modules touch a `Session` (AGENTS.md hard rule 1).
 
-Timestamps: AGENTS.md hard rule 6 forbids `datetime.now()` for business logic and
-`app.core.time` only offers `today()`, so audit timestamps (`ingested_at`, job
-`created_at`/`finished_at`) are the demo date at midnight (`stamp()`).
+Timestamps: record-keeping stamps (`ingested_at`, job `created_at`/`finished_at`) use the
+wall clock `app.core.time.utcnow()` so cache invalidation can compare them; business dates
+still come from `today()`.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime
 from typing import Any
 
 from sqlmodel import Session, col, select
 
 from app.core.errors import NotFoundError
-from app.core.time import today
+from app.core.time import utcnow
 from app.db import repository
 from app.db.models import Account, Commitment, Contact, Job, Meeting, MeetingAttendee
 from app.schemas.enums import CommitmentStatus, Owner
 
 
 def stamp() -> datetime:
-    """Demo "today" at midnight UTC (columns are tz-aware); never the wall clock."""
-    return datetime.combine(today(), time.min, tzinfo=UTC)
+    """Record-keeping timestamp: the tz-aware wall clock (see `app.core.time.utcnow`)."""
+    return utcnow()
 
 
 def new_id(prefix: str) -> str:
