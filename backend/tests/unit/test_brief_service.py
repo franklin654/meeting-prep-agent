@@ -391,10 +391,17 @@ class SpyMemory(MemoryService):
         self._note("retain_preference")
 
     async def recall_facts(
-        self, *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        self,
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
         self._note("recall_facts")
-        return await self.inner.recall_facts(query=query, tags=tags, fact_kind=fact_kind)
+        return await self.inner.recall_facts(
+            query=query, tags=tags, fact_kind=fact_kind, timeout_s=timeout_s
+        )
 
     async def reflect_structured(
         self, *, query: str, tags: Sequence[str], schema: type[BaseModel], budget: str = "mid"

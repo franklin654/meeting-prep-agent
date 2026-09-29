@@ -158,10 +158,16 @@ class MemoryService(abc.ABC):
 
     @abc.abstractmethod
     async def recall_facts(
-        self, *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        self,
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
-        """Recall matching facts. `fact_kind`, if given, is appended as a
-        `fact_kind:<value>` tag. Fixed `tags_match="all_strict"`, `budget="mid"`
+        """Recall matching facts. `timeout_s` overrides `RECALL_TIMEOUT_S` (default 5 s)
+        for callers that fire many recalls at once (the brief). `fact_kind`, if given, is
+        appended as a `fact_kind:<value>` tag. Fixed `tags_match="all_strict"`, `budget="mid"`
         per docs/hindsight-integration.md's Operation recipes table (see this
         module's `HindsightMemoryService.recall_facts` docstring for why that
         overrides the interface table's "any_strict" summary).
@@ -396,14 +402,20 @@ class HindsightMemoryService(MemoryService):
             raise MemoryUnavailableError(f"Retain failed: {exc}") from exc
 
     async def recall_facts(
-        self, *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        self,
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
         full_tags = list(tags)
         if fact_kind is not None:
             full_tags.append(fact_kind_tag(fact_kind))
+        limit = RECALL_TIMEOUT_S if timeout_s is None else timeout_s
 
         try:
-            async with asyncio.timeout(RECALL_TIMEOUT_S):
+            async with asyncio.timeout(limit):
                 response = await self._client.arecall(
                     bank_id=BANK_ID,
                     query=query,
@@ -413,7 +425,7 @@ class HindsightMemoryService(MemoryService):
                     query_timestamp=_demo_today_iso(),
                 )
         except TimeoutError as exc:
-            raise MemoryUnavailableError(f"Recall timed out after {RECALL_TIMEOUT_S}s.") from exc
+            raise MemoryUnavailableError(f"Recall timed out after {limit:g}s.") from exc
         except (ApiException, OpenApiException, OSError) as exc:
             raise MemoryUnavailableError(f"Recall failed: {exc}") from exc
 

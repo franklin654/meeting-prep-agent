@@ -240,7 +240,11 @@ def log_recalls(world: World, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str
     original = world.memory.recall_facts
 
     async def logged(
-        *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
         if tuple(tags) == (account_tag(ACC),):
             calls.append((query, fact_kind))

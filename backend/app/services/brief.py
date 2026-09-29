@@ -197,10 +197,38 @@ class MemoryContext:
     cross_deal_hits: list[MemoryHit] = field(default_factory=list)
     cross_contact_alerts: list[BriefItem] = field(default_factory=list)
     deal_snapshot: list[tuple[str, MemoryHit]] = field(default_factory=list)
+    degraded_stages: list[str] = field(default_factory=list)
+
+    @property
+    def beat_critical_degraded(self) -> list[str]:
+        return [stage for stage in self.degraded_stages if is_beat_critical(stage)]
 
 
 TOP_HITS_PER_QUERY = 3
 CANDIDATES_PER_QUERY = 5
+SNAPSHOT_CANDIDATES = 8
+
+# Brief recalls fire together, so each may wait on Hindsight; 5 s is too tight for the brief.
+BRIEF_RECALL_TIMEOUT_S = 25.0
+MAX_CONCURRENT_RECALLS = 4
+
+# Stages whose loss removes a story beat: a brief missing any of them is not persisted.
+_BEAT_CRITICAL_STAGES = frozenset(
+    {
+        "watch_outs",
+        "security_gaps",
+        "security_absence",
+        "budget_snapshot",
+        "decision_snapshot",
+        "cross_deal",
+    }
+)
+_BEAT_CRITICAL_PREFIXES = ("personal_touchpoints",)
+
+
+def is_beat_critical(stage: str) -> bool:
+    return stage in _BEAT_CRITICAL_STAGES or stage.startswith(_BEAT_CRITICAL_PREFIXES)
+
 
 # Generic wording only: no fixture names, so the same queries work for any account.
 PERSONAL_QUERY = "personal life: family, children, hobbies, travel, milestones, non-work interests"
@@ -215,6 +243,63 @@ WATCH_OUT_CANDIDATES = 8
 def competitor_query(names: Sequence[str]) -> str:
     """The generic competitor wording, plus ' such as <names>' when the persona lists any."""
     return f"{COMPETITOR_QUERY} such as {', '.join(names)}" if names else COMPETITOR_QUERY
+
+
+class BriefRecalls:
+    """Every `recall_facts` the brief makes for one generation goes through here.
+
+    - at most `limit` recalls are in flight at once (one semaphore for all stages);
+    - identical (query, tags, fact_kind) calls hit memory once and share the result;
+    - the brief's 25 s timeout is passed down, and a failure is logged with the stage name
+      and elapsed time before it is re-raised.
+    """
+
+    def __init__(
+        self,
+        memory: MemoryService,
+        *,
+        timeout_s: float = BRIEF_RECALL_TIMEOUT_S,
+        limit: int = MAX_CONCURRENT_RECALLS,
+    ) -> None:
+        self._memory = memory
+        self._timeout_s = timeout_s
+        self._semaphore = asyncio.Semaphore(limit)
+        self._tasks: dict[tuple[str, tuple[str, ...], FactKind | None], asyncio.Task[Any]] = {}
+
+    async def _call(
+        self, query: str, tags: list[str], fact_kind: FactKind | None
+    ) -> list[MemoryHit]:
+        async with self._semaphore:
+            return await self._memory.recall_facts(
+                query=query, tags=tags, fact_kind=fact_kind, timeout_s=self._timeout_s
+            )
+
+    async def facts(
+        self,
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        stage: str = "recall",
+    ) -> list[MemoryHit]:
+        key = (query, tuple(tags), fact_kind)
+        task = self._tasks.get(key)
+        if task is None:
+            task = asyncio.ensure_future(self._call(query, list(tags), fact_kind))
+            self._tasks[key] = task
+        started = time.monotonic()
+        try:
+            return list(await asyncio.shield(task))
+        except MemoryUnavailableError as exc:
+            event = "recall_timeout" if "timed out" in exc.message else "recall_failed"
+            logger.warning(
+                "brief.%s stage=%s elapsed_ms=%d error=%s",
+                event,
+                stage,
+                int((time.monotonic() - started) * 1000),
+                exc.message,
+            )
+            raise
 
 
 class Timings:
@@ -262,17 +347,20 @@ async def _recall_top(
     tags: list[str],
     fact_kind: FactKind,
     candidates: int = CANDIDATES_PER_QUERY,
+    keep: int = TOP_HITS_PER_QUERY,
     timings: Timings | None = None,
+    recalls: BriefRecalls | None = None,
 ) -> list[MemoryHit]:
     """Labelled recall; if it returns nothing, ONE retry without `fact_kind` (the extraction
     model does not always label facts). Top hits are then resolved to meetings.
     """
+    recalls = recalls or BriefRecalls(memory)
     recall_started = time.monotonic()
-    hits = await memory.recall_facts(query=query, tags=tags, fact_kind=fact_kind)
+    hits = await recalls.facts(query=query, tags=tags, fact_kind=fact_kind, stage=section)
     fell_back = False
     if not hits:
         fell_back = True
-        hits = await memory.recall_facts(query=query, tags=tags)
+        hits = await recalls.facts(query=query, tags=tags, stage=section)
     if timings is not None:
         timings.record_max("recall", time.monotonic() - recall_started)
     # The top `candidates` by rank are resolved; the first TOP_HITS_PER_QUERY that resolve to a
@@ -282,9 +370,7 @@ async def _recall_top(
     resolved = await memory.resolve_sources(pool)
     if timings is not None:
         timings.record_max("resolve", time.monotonic() - resolve_started)
-    kept = [h for h in resolved if h.meeting_id is not None and h.meeting_date is not None][
-        :TOP_HITS_PER_QUERY
-    ]
+    kept = [h for h in resolved if h.meeting_id is not None and h.meeting_date is not None][:keep]
     logger.debug(
         "brief.recall section=%s returned=%d candidates=%d kept=%d fallback=%s",
         section,
@@ -464,13 +550,18 @@ def _b5_alerts(
 
 
 async def _recall_objection_hits(
-    memory: MemoryService, account_id: str, timings: Timings
+    memory: MemoryService,
+    account_id: str,
+    timings: Timings,
+    recalls: BriefRecalls | None = None,
 ) -> list[MemoryHit]:
+    recalls = recalls or BriefRecalls(memory)
     started = time.monotonic()
-    hits = await memory.recall_facts(
+    hits = await recalls.facts(
         query="unresolved objection blocker concern requirement must-have not yet resolved",
         tags=[account_tag(account_id)],
         fact_kind=FactKind.objection,
+        stage="unresolved_objections",
     )
     timings.record_max("recall", time.monotonic() - started)
     return [hit for hit in hits if hit.meeting_id and hit.meeting_date][:5]
@@ -483,16 +574,19 @@ async def _cross_deal_recall(
     other_accounts: Sequence[Any],
     objections: Sequence[MemoryHit],
     timings: Timings,
+    recalls: BriefRecalls | None = None,
 ) -> list[MemoryHit]:
     work = [(topic, account) for topic in objections for account in other_accounts]
     if not work:
         return []
+    recalls = recalls or BriefRecalls(memory)
 
     async def recall(topic: MemoryHit, account: Any) -> list[MemoryHit]:
         started = time.monotonic()
-        hits = await memory.recall_facts(
+        hits = await recalls.facts(
             query=f"{topic.text} resolved resolution worked trust portal pen-test",
             tags=[account_tag(account.id)],
+            stage="cross_deal",
         )
         timings.record_max("recall", time.monotonic() - started)
         return [
@@ -504,12 +598,98 @@ async def _cross_deal_recall(
             and account_tag(current_account_id) not in hit.tags
         ]
 
-    groups = await asyncio.gather(*(recall(topic, account) for topic, account in work))
+    outcomes = await asyncio.gather(
+        *(recall(topic, account) for topic, account in work), return_exceptions=True
+    )
+    groups: list[list[MemoryHit]] = []
+    for outcome in outcomes:
+        if isinstance(outcome, BaseException):
+            raise outcome  # after every branch has finished, so nothing is left running
+        groups.append(outcome)
     dedup: dict[str, MemoryHit] = {}
     for group in groups:
         for hit in group:
             dedup.setdefault(hit.memory_id, hit)
     return list(dedup.values())
+
+
+_AMOUNT = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)\s?([kKmM])?(?![\w])")
+_DATE_IN_TEXT = re.compile(
+    r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?"
+    r"|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?",
+    re.I,
+)
+_DATE_PATTERNS = ("%B %d, %Y", "%B %d %Y", "%b %d, %Y", "%b %d %Y", "%B %d", "%b %d")
+
+
+def _stated_amount(text: str) -> int | None:
+    """The last dollar figure in `text` in whole USD (the last one is the newest when a hit
+    says 'moved from $40K to $75K'), or None."""
+    matches = list(_AMOUNT.finditer(text))
+    if not matches:
+        return None
+    number, suffix = matches[-1].groups()
+    scale = {"k": 1_000, "m": 1_000_000}.get((suffix or "").lower(), 1)
+    return int(float(number.replace(",", "")) * scale)
+
+
+def _format_amount(usd: int) -> str:
+    return f"${usd / 1000:g}K" if usd % 1000 == 0 else f"${usd:,}"
+
+
+def _decision_label(text: str) -> str | None:
+    match = _DATE_IN_TEXT.search(text)
+    if match is None:
+        return None
+    value = match.group(0)
+    parsed = next(
+        (
+            parsed
+            for pattern in _DATE_PATTERNS
+            if (parsed := _try_parse_snapshot_date(value, pattern)) is not None
+        ),
+        None,
+    )
+    return f"{parsed:%b} {parsed.day}, {parsed.year}" if parsed else value
+
+
+def _budget_part(budget_hits: Sequence[MemoryHit]) -> tuple[str, MemoryHit] | None:
+    """The amount is read from the memory itself. The newest hit that states a budget gives
+    the current figure; it is cited to the EARLIEST hit that states that same figure (the
+    meeting where it was actually said, not a later echo of it)."""
+    stated = [
+        (hit, amount)
+        for hit in budget_hits
+        if hit.meeting_id
+        and hit.meeting_date
+        and re.search(r"budget", hit.text, re.I)
+        and (amount := _stated_amount(hit.text)) is not None
+    ]
+    if not stated:
+        return None
+    _, current = max(stated, key=lambda pair: pair[0].meeting_date or date.min)
+    source = min(
+        (hit for hit, amount in stated if amount == current),
+        key=lambda hit: hit.meeting_date or date.max,
+    )
+    return f"Budget about {_format_amount(current)}", source
+
+
+def _decision_part(decision_hits: Sequence[MemoryHit]) -> tuple[str, MemoryHit] | None:
+    """The newest decision hit that carries a date; a decision hit without one never
+    displaces one that does."""
+    dated = [
+        (hit, label)
+        for hit in decision_hits
+        if hit.meeting_id
+        and hit.meeting_date
+        and re.search(r"decision|decide", hit.text, re.I)
+        and (label := _decision_label(hit.text)) is not None
+    ]
+    if not dated:
+        return None
+    hit, label = max(dated, key=lambda pair: pair[0].meeting_date or date.min)
+    return f"Decision by {label}", hit
 
 
 def _deal_snapshot_parts(
@@ -521,57 +701,18 @@ def _deal_snapshot_parts(
     deal_value_usd: int | None,
 ) -> list[tuple[str, MemoryHit]]:
     parts: list[tuple[str, MemoryHit]] = []
-    budget = max(
-        (
-            hit
-            for hit in budget_hits
-            if hit.meeting_id and hit.meeting_date and re.search(r"budget|\$|usd", hit.text, re.I)
-        ),
-        key=lambda hit: hit.meeting_date or date.min,
-        default=None,
-    )
-    if budget and deal_value_usd is not None:
-        amount = (
-            f"${deal_value_usd / 1000:g}K" if deal_value_usd % 1000 == 0 else f"${deal_value_usd:,}"
+    if budget := _budget_part(budget_hits):
+        parts.append(budget)
+    elif deal_value_usd is not None:
+        # The account carries a deal value but memory has no citable budget statement. The
+        # snapshot says nothing rather than cite a meeting that did not say it.
+        logger.warning(
+            "brief.budget_uncited deal_value_usd=%d budget_hits=%d",
+            deal_value_usd,
+            len(budget_hits),
         )
-        parts.append((f"Budget about {amount}", budget))
-
-    decision = max(
-        (
-            hit
-            for hit in decision_hits
-            if hit.meeting_id and hit.meeting_date and re.search(r"decision|decide", hit.text, re.I)
-        ),
-        key=lambda hit: hit.meeting_date or date.min,
-        default=None,
-    )
-    if decision:
-        date_match = re.search(
-            r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?",
-            decision.text,
-            re.I,
-        )
-        if date_match:
-            value = date_match.group(0)
-            parsed_date = next(
-                (
-                    parsed
-                    for pattern in (
-                        "%B %d, %Y",
-                        "%B %d %Y",
-                        "%b %d, %Y",
-                        "%b %d %Y",
-                        "%B %d",
-                        "%b %d",
-                    )
-                    if (parsed := _try_parse_snapshot_date(value, pattern)) is not None
-                ),
-                None,
-            )
-            decision_label = (
-                f"{parsed_date:%b} {parsed_date.day}, {parsed_date.year}" if parsed_date else value
-            )
-            parts.append((f"Decision by {decision_label}", decision))
+    if decision := _decision_part(decision_hits):
+        parts.append(decision)
 
     competitor = next(
         (
@@ -588,11 +729,16 @@ def _deal_snapshot_parts(
 
 
 def _try_parse_snapshot_date(value: str, pattern: str) -> date | None:
+    yearless = "%Y" not in pattern
     try:
-        parsed = datetime.strptime(value, pattern).date()
+        # A yearless date takes the demo year; the year is added before parsing so that
+        # strptime never has to guess (and never warns about leap days).
+        parsed = datetime.strptime(
+            f"{value} 2026" if yearless else value, pattern + (" %Y" if yearless else "")
+        )
     except ValueError:
         return None
-    return parsed.replace(year=2026) if "%Y" not in pattern else parsed
+    return parsed.date()
 
 
 def _cross_contact_item(
@@ -820,11 +966,14 @@ async def _cross_deal_patterns(
     deal_stage: str,
     meetings: Sequence[MeetingInfo] = (),
     timings: Timings | None = None,
+    recalls: BriefRecalls | None = None,
 ) -> list[BriefItem]:
+    recalls = recalls or BriefRecalls(memory)
     recall_started = time.monotonic()
-    current_hits = await memory.recall_facts(
+    current_hits = await recalls.facts(
         query="Current objections, security blockers and must-have requirements",
         tags=[account_tag(account_id)],
+        stage="cross_deal_patterns",
     )
     if timings is not None:
         timings.record_max("recall", time.monotonic() - recall_started)
@@ -873,12 +1022,13 @@ async def _gather_memory(
     account = inputs.account
     external = [c for c in inputs.attendees if c.account_id is not None]
     timings = timings or Timings()
+    recalls = BriefRecalls(memory)
 
     async def recall(
-        query: str, tags: Sequence[str], kind: FactKind | None = None
+        stage: str, query: str, tags: Sequence[str], kind: FactKind | None = None
     ) -> list[MemoryHit]:
         started = time.monotonic()
-        hits = await memory.recall_facts(query=query, tags=tags, fact_kind=kind)
+        hits = await recalls.facts(query=query, tags=tags, fact_kind=kind, stage=stage)
         timings.record_max("recall", time.monotonic() - started)
         return [hit for hit in hits if hit.meeting_id and hit.meeting_date]
 
@@ -893,23 +1043,43 @@ async def _gather_memory(
             fact_kind=FactKind.competitor,
             candidates=WATCH_OUT_CANDIDATES,
             timings=timings,
+            recalls=recalls,
         ),
         recall(
+            "unresolved_objections",
             "unresolved objection blocker concern requirement must-have not yet resolved",
             [account_tag(account.id)],
             FactKind.objection,
         ),
-        recall(" ".join(security_keywords), [account_tag(account.id)]),
-        recall("hasn't been in the security conversations", [account_tag(account.id)]),
+        recall("security_gaps", " ".join(security_keywords), [account_tag(account.id)]),
         recall(
-            "account budget approved amount deal value pilot budget",
+            "security_absence",
+            "hasn't been in the security conversations",
             [account_tag(account.id)],
-            FactKind.deal_fact,
         ),
-        recall(
-            "decision date by which decision must be made",
-            [account_tag(account.id)],
-            FactKind.deal_fact,
+        # Snapshot facts are resolved to meetings (observations carry no metadata) and fall
+        # back to an unlabelled recall, like the watch-outs.
+        _recall_top(
+            memory,
+            section="budget_snapshot",
+            query="account budget approved amount deal value pilot budget",
+            tags=[account_tag(account.id)],
+            fact_kind=FactKind.deal_fact,
+            candidates=SNAPSHOT_CANDIDATES,
+            keep=SNAPSHOT_CANDIDATES,
+            timings=timings,
+            recalls=recalls,
+        ),
+        _recall_top(
+            memory,
+            section="decision_snapshot",
+            query="decision date by which decision must be made",
+            tags=[account_tag(account.id)],
+            fact_kind=FactKind.deal_fact,
+            candidates=SNAPSHOT_CANDIDATES,
+            keep=SNAPSHOT_CANDIDATES,
+            timings=timings,
+            recalls=recalls,
         ),
         *(
             _recall_top(
@@ -919,6 +1089,7 @@ async def _gather_memory(
                 tags=[contact_tag(c.id)],
                 fact_kind=FactKind.personal,
                 timings=timings,
+                recalls=recalls,
             )
             for c in external
         ),
@@ -936,9 +1107,11 @@ async def _gather_memory(
     labels += [f"personal_touchpoints:{c.id}" for c in external]
 
     failed = 0
+    degraded: list[str] = []
     for label, result in zip(labels, results, strict=True):
         if isinstance(result, MemoryUnavailableError):
             failed += 1
+            degraded.append(label)
             logger.warning("brief.section_degraded section=%s error=%s", label, result.message)
         elif isinstance(result, BaseException):
             raise result  # a bug or a non-memory error must not be swallowed
@@ -978,9 +1151,11 @@ async def _gather_memory(
             other_accounts=inputs.other_accounts,
             objections=context.objection_hits,
             timings=timings,
+            recalls=recalls,
         )
     except MemoryUnavailableError as exc:
         failed += 1
+        degraded.append("cross_deal")
         logger.warning("brief.section_degraded section=cross_deal error=%s", exc.message)
     context.deal_snapshot = _deal_snapshot_parts(
         budget_hits=budget_hits if isinstance(budget_hits, list) else [],
@@ -991,6 +1166,7 @@ async def _gather_memory(
     )
     if context.deal_snapshot:
         context.recall_sections.append([hit for _, hit in context.deal_snapshot])
+    context.degraded_stages = degraded
     timings.set("gather", time.monotonic() - gather_started)
     if failed >= len(results):
         raise MemoryUnavailableError("Every memory call for the brief failed.")
@@ -1655,9 +1831,19 @@ async def generate_brief(
         cross_deal_patterns=cross_deal_patterns if with_memory else (),
         deal_snapshot=context.deal_snapshot if with_memory else (),
     )
+    lost_beats = context.beat_critical_degraded if with_memory else []
     if with_memory and not brief.sections:
         # Never persist (and so never serve from the cache) a brief with nothing in it.
         logger.warning("brief.empty_not_persisted meeting=%s mode=%s", meeting_id, mode)
+    elif lost_beats:
+        # Returned to this caller, but never stored: GET must not serve a brief that lost a
+        # beat-critical section to a memory failure.
+        logger.warning(
+            "brief.degraded_not_persisted meeting=%s mode=%s stages=%s",
+            meeting_id,
+            mode,
+            ",".join(lost_beats),
+        )
     else:
         brief = save_brief(session_factory, brief)
     timings.set("post", time.monotonic() - post_started)

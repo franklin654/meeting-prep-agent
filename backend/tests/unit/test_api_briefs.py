@@ -147,7 +147,14 @@ def test_bad_mode_422(client: TestClient, method: str) -> None:
 
 
 class BrokenMemory(FakeMemoryService):
-    async def recall_facts(self, *, query: str, tags: Sequence[str], fact_kind: Any = None) -> Any:
+    async def recall_facts(
+        self,
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: Any = None,
+        timeout_s: float | None = None,
+    ) -> Any:
         raise MemoryUnavailableError("down")
 
     async def reflect_structured(self, **kwargs: Any) -> Any:

@@ -42,7 +42,11 @@ def log_recalls(world: World, monkeypatch: pytest.MonkeyPatch) -> list[RecallCal
     original = world.memory.recall_facts
 
     async def logged(
-        *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
         calls.append((query, tuple(tags), fact_kind))
         return await original(query=query, tags=tags, fact_kind=fact_kind)
@@ -394,7 +398,11 @@ def fail_recall_when(world: World, monkeypatch: pytest.MonkeyPatch, predicate: o
     original = world.memory.recall_facts
 
     async def flaky(
-        *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
+        *,
+        query: str,
+        tags: Sequence[str],
+        fact_kind: FactKind | None = None,
+        timeout_s: float | None = None,
     ) -> list[MemoryHit]:
         if predicate(tuple(tags), fact_kind):  # type: ignore[operator]
             raise MemoryUnavailableError("recall down")
