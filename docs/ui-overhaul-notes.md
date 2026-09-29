@@ -15,7 +15,7 @@
 | A7 | complete | implementation `5a95eb5` |
 | B1 | complete | `92b545b` |
 | B2 | complete | `621b7cc` |
-| B3 | planned | — |
+| B3 | complete | `de8dd2f` |
 | B4 | planned | — |
 | B5 | planned | — |
 | C1 | planned | — |
@@ -97,6 +97,8 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - B1 checks: backend 683 passed, 1 skipped, 6 deselected; Ruff and mypy passed; frontend lint/typecheck and 53 Vitest tests passed; production build passed (existing >500 kB bundle advisory). New tests cover enrichment, first-meeting no-memory retrieval, hidden-source filtering, contact-style citations, and legacy cached brief payload rendering. No live LLM or Hindsight calls and no real DB reads/writes for B1.
 - B2: added deterministic `they_owe_overdue` and `no_history` nudge kinds with the specified priority order and eight-row cap. Added `POST /api/style/reset` and `DELETE /api/style/rules/{section}`; both delete only SQLite feedback, return the recomputed profile, and make no Hindsight call. Updated the typed nudge UI tones, documented the changed schema/routes, and regenerated the client offline from `app.openapi()` (22 paths).
 - B2 checks: backend 686 passed, 1 skipped, 6 deselected; Ruff and mypy passed; frontend lint/typecheck and 53 Vitest tests passed. Tests cover priority/cap, closed-account exclusion, the two style deletion semantics, and both new nudge kinds as links. No live LLM/Hindsight calls or real DB operations.
+- B3: rebuilt the brief header with a Today/account breadcrumb, meeting title/time, Regenerate/Generate confirmation, and Mark as prepared. Main content now orders where-left-off, owed ledger items, ranked objections, suggested plan, and remaining sections; critical ledger obligations also appear in Needs attention. The right rail shows attendee cards with fact-backed style citations, recent meeting source chips, follow-up counts, contact Ask actions, Full history links, and Memory used. Preserved mode toggle, side-by-side view, counters, citation popovers, section feedback, and old cached brief section fallbacks. Added `contact_id` to `ContactCard`; updated the schema doc and regenerated the client offline (22 paths).
+- B3 checks: backend 686 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Frontend lint/typecheck passed; 54 Vitest tests passed; production build passed (existing >500 kB chunk advisory). UI tests cover the new layout, prepared action, Ask rail, legacy cache payloads, feedback, and side-by-side mode. No live LLM/Hindsight calls or real DB operations.
 
 ## B4–C4 plan addendum
 

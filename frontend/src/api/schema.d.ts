@@ -631,6 +631,8 @@ export interface components {
         };
         /** ContactCard */
         ContactCard: {
+            /** Contact Id */
+            contact_id: string;
             /** Name */
             name: string;
             /** Role */

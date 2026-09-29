@@ -249,6 +249,18 @@ export function useSubmitFeedback(meetingId: string, briefId: string) {
   })
 }
 
+export function useMarkPrepared(meetingId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      await api.POST('/api/meetings/{meeting_id}/prepared', {
+        params: { path: { meeting_id: meetingId } },
+      })
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.meetingsAll() }),
+  })
+}
+
 /** Polls an ingest job every 2.5 s until done or failed, giving up after ~150 s. */
 export function useJob(jobId: string | undefined) {
   return useQuery({

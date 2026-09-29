@@ -1858,7 +1858,10 @@ def _contact_cards(
     inputs: BriefInputs, meetings: Mapping[str, MeetingInfo], facts: Sequence[ExtractedFact]
 ) -> list[ContactCard]:
     cards: list[ContactCard] = []
+    current_attendee_ids = {contact.id for contact in inputs.attendees}
     for contact in inputs.account_contacts:
+        if contact.id not in current_attendee_ids:
+            continue
         citations = [
             Citation(source_type=SourceType.meeting, meeting_id=meeting.id,
                      meeting_date=meeting.date,
@@ -1883,13 +1886,22 @@ def _contact_cards(
             None,
         )
         style_citation = _fact_citation(style_fact, meetings) if style_fact else None
-        cards.append(ContactCard(name=contact.name, role=contact.role, account=inputs.account.name,
-                                 style=truncate(style_fact.text, 140) if style_fact else None,
-                                 style_citations=[style_citation] if style_citation else [],
-                                 recent_meetings=citations[:3], open_follow_ups=sum(
-                                     1 for commitment in inputs.open_commitments
-                                     if commitment.contact_id == contact.id
-                                 )))
+        cards.append(
+            ContactCard(
+                contact_id=contact.id,
+                name=contact.name,
+                role=contact.role,
+                account=inputs.account.name,
+                style=truncate(style_fact.text, 140) if style_fact else None,
+                style_citations=[style_citation] if style_citation else [],
+                recent_meetings=citations[:3],
+                open_follow_ups=sum(
+                    1
+                    for commitment in inputs.open_commitments
+                    if commitment.contact_id == contact.id
+                ),
+            )
+        )
     return cards
 
 

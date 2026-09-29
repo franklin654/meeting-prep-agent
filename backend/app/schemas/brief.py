@@ -108,6 +108,7 @@ class RankedObjection(BaseModel):
 
 
 class ContactCard(BaseModel):
+    contact_id: str
     name: str
     role: str | None
     account: str

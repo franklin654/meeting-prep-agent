@@ -24,11 +24,12 @@ describe('routing', () => {
   it('renders shared layout nav on every route', () => {
     renderRoutes(routes, { route: '/meetings/mtg-123' })
     expect(screen.getByRole('link', { name: 'Prep Agent' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Today' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Contacts' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ask' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Capture' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Memory' })).toBeInTheDocument()
+    const mainNav = within(screen.getByRole('navigation', { name: 'Main navigation' }))
+    expect(mainNav.getByRole('link', { name: 'Today' })).toBeInTheDocument()
+    expect(mainNav.getByRole('link', { name: 'Contacts' })).toBeInTheDocument()
+    expect(mainNav.getByRole('link', { name: 'Ask' })).toBeInTheDocument()
+    expect(mainNav.getByRole('link', { name: 'Capture' })).toBeInTheDocument()
+    expect(mainNav.getByRole('link', { name: 'Memory' })).toBeInTheDocument()
   })
 
   it('registers the new shell routes', () => {

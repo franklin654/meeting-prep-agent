@@ -25,6 +25,42 @@ describe('Brief page', () => {
     expect(f.calls.some((call) => call.method === 'POST')).toBe(false)
   })
 
+  it('shows enriched brief layout, memory rail, and marks a meeting prepared', async () => {
+    const f = mockFetch({
+      'GET /api/meetings': { body: [{
+        id: 'mtg_1', account_id: 'acc_1', account_name: 'FinEdge', title: 'Pilot decision',
+        scheduled_at: '2026-09-29T10:00:00Z', status: 'upcoming',
+        attendees: [{ id: 'c_anita', name: 'Anita Desai', role: 'CFO' }], brief_ready: true,
+        prepared: false, open_followups: 1, past_meetings: 2, has_history: true,
+      }] },
+      'GET /api/meetings/mtg_1/brief': { body: {
+        id: 'br_rich', meeting_id: 'mtg_1', mode: 'memory', generated_at: '2026-09-29T10:00:00Z',
+        sections: [{ key: 'agenda', title: 'Suggested agenda', collapsed: false, items: [{
+          id: 'agenda_1', text: 'Confirm the pilot timeline', severity: 'info', contact_ids: [], citations: [],
+        }] }], facts_used: 2, preferences_applied: [], first_meeting: false,
+        you_owe: [{ text: 'Send the pricing deck', due_date: '2026-09-28', status: 'overdue', days_overdue: 1, owner_name: 'Priya', severity: 'critical', citations: [{ source_type: 'ledger', meeting_id: 'mtg_old', meeting_date: '2026-09-20', label: 'Pilot scoping · Sep 20', quote: 'I will send the deck', memory_id: null }] }],
+        they_owe: [], objections: [{ topic: 'Data residency', count: 2, dates: ['2026-09-20'], citations: [{ source_type: 'meeting', meeting_id: 'mtg_old', meeting_date: '2026-09-20', label: 'Pilot scoping · Sep 20', quote: 'Data must stay in India', memory_id: null }] }],
+        memory_used: { facts: 2, meetings: 1 }, contact_cards: [{ contact_id: 'c_anita', name: 'Anita Desai', role: 'CFO', account: 'FinEdge', style: 'Prefers numbers first', style_citations: [], recent_meetings: [{ source_type: 'meeting', meeting_id: 'mtg_old', meeting_date: '2026-09-20', label: 'Pilot scoping · Sep 20', quote: null, memory_id: null }], open_follow_ups: 1 }],
+      } },
+      'POST /api/meetings/mtg_1/prepared': { status: 204 },
+    })
+    renderRoutes(routes, { route: '/meetings/mtg_1' })
+
+    await screen.findByText('Brief for Pilot decision')
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Today / FinEdge')
+    expect(screen.getByText('You owe them')).toBeInTheDocument()
+    expect(screen.getByText('Objections to expect')).toBeInTheDocument()
+    expect(screen.getByText('Suggested plan for the call')).toBeInTheDocument()
+    expect(screen.getByText('2 facts from 1 meetings')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Needs attention' })).toHaveTextContent('Send the pricing deck')
+    expect(screen.getByRole('link', { name: 'Full history' })).toHaveAttribute('href', '/contacts/c_anita')
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as prepared' }))
+    expect(await screen.findByRole('button', { name: 'Prepared' })).toBeDisabled()
+    expect(f.calls.find((call) => call.path.endsWith('/prepared'))?.method).toBe('POST')
+    fireEvent.click(screen.getByRole('button', { name: 'Ask about Anita' }))
+    expect(await screen.findByRole('region', { name: 'Ask your memory' })).toBeInTheDocument()
+  })
+
   it('shows the empty state and keeps generation behind an explicit confirmation', async () => {
     const f = mockFetch({ 'GET /api/meetings/mtg_1/brief': { status: 404, body: { error: { code: 'not_found', message: 'No brief' } } } })
     renderRoutes(routes, { route: '/meetings/mtg_1' })

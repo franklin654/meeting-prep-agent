@@ -138,6 +138,7 @@ class RankedObjection(BaseModel):
     citations: list[Citation]
 
 class ContactCard(BaseModel):
+    contact_id: str
     name: str
     role: str | None
     account: str
