@@ -45,6 +45,9 @@ class BriefInputs:
     account: Account
     attendees: list[Contact]  # everyone on the meeting, ours included
     account_meetings: list[Meeting]
+    all_meetings: list[Meeting]
+    other_accounts: list[Account]
+    account_contacts: list[Contact]
     attendee_ids_by_meeting: dict[str, set[str]]  # for every account meeting
     open_commitments: list[Commitment]
     pinned_ask_answers: list[AskAnswer]
@@ -62,6 +65,12 @@ def load_brief_inputs(
             raise NotFoundError(f"Account {meeting.account_id!r} not found.")
 
         account_meetings = repository.list_meetings_for_account(session, account.id)
+        accounts = repository.list_accounts(session)
+        other_accounts = [candidate for candidate in accounts if candidate.id != account.id]
+        all_meetings = list(account_meetings)
+        for other_account in other_accounts:
+            all_meetings.extend(repository.list_meetings_for_account(session, other_account.id))
+        account_contacts = repository.list_contacts_for_account(session, account.id)
         attendee_ids_by_meeting = {
             m.id: {a.contact_id for a in repository.list_attendees_for_meeting(session, m.id)}
             for m in account_meetings
@@ -86,6 +95,9 @@ def load_brief_inputs(
             account=account,
             attendees=attendees,
             account_meetings=account_meetings,
+            all_meetings=all_meetings,
+            other_accounts=other_accounts,
+            account_contacts=account_contacts,
             attendee_ids_by_meeting=attendee_ids_by_meeting,
             open_commitments=open_commitments,
             pinned_ask_answers=(

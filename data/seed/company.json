@@ -45,5 +45,6 @@
     "fictional": true,
     "positioning": "Cheaper, no India data residency"
   },
+  "security_keywords": ["SOC 2", "data residency", "security", "RBI", "pen-test"],
   "demo_today": "2026-09-28"
 }

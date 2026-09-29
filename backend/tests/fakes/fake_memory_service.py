@@ -69,6 +69,7 @@ class FakeMemoryService(MemoryService):
         self.retain_timeouts: list[float | None] = []
         self.idle_polls: list[bool] | None = None  # scripted busy(False)/idle(True) polls
         self.get_memory_calls: list[str] = []
+        self.recall_calls: list[tuple[str, list[str], FactKind | None]] = []
 
     # -- test helpers ---------------------------------------------------
 
@@ -197,6 +198,7 @@ class FakeMemoryService(MemoryService):
     async def recall_facts(
         self, *, query: str, tags: Sequence[str], fact_kind: FactKind | None = None
     ) -> list[MemoryHit]:
+        self.recall_calls.append((query, list(tags), fact_kind))
         full_tags = list(tags)
         if fact_kind is not None:
             full_tags.append(fact_kind_tag(fact_kind))

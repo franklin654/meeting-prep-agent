@@ -25,7 +25,7 @@ import json
 import logging
 import re
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import lru_cache
@@ -127,6 +127,7 @@ class Persona:
     user_name: str
     our_company: str
     competitors: list[str] = field(default_factory=list)
+    security_keywords: list[str] = field(default_factory=list)
 
 
 def _competitor_names(raw: Any) -> list[str]:
@@ -159,6 +160,11 @@ def load_persona() -> Persona:
         user_name=data["ae"]["name"],
         our_company=data["vendor"]["name"],
         competitors=_competitor_names(data.get("competitor")),
+        security_keywords=[
+            word.strip()
+            for word in data.get("security_keywords", [])
+            if isinstance(word, str) and word.strip()
+        ],
     )
 
 
@@ -187,9 +193,10 @@ def first_line_spoken_by(transcript: str | None, names: Sequence[str]) -> str | 
 class MemoryContext:
     mental_model: MentalModelText | None = None
     recall_sections: list[list[MemoryHit]] = field(default_factory=list)  # rank order each
-    objections: list[tuple[Objection, MemoryHit]] = field(default_factory=list)
+    objection_hits: list[MemoryHit] = field(default_factory=list)
+    cross_deal_hits: list[MemoryHit] = field(default_factory=list)
     cross_contact_alerts: list[BriefItem] = field(default_factory=list)
-    cross_deal_patterns: list[BriefItem] = field(default_factory=list)
+    deal_snapshot: list[tuple[str, MemoryHit]] = field(default_factory=list)
 
 
 TOP_HITS_PER_QUERY = 3
@@ -330,6 +337,264 @@ def _has_concern_token(concern: str, text: str) -> bool:
     return bool(tokens & words)
 
 
+def _meeting_label(meeting: Meeting | MeetingInfo | None, meeting_date: date) -> str:
+    title = meeting.title if meeting is not None else "Meeting"
+    return f"{title} · {meeting_date:%b} {meeting_date.day}"
+
+
+def _security_hit(text: str, keywords: Sequence[str]) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", text.casefold())
+    return any(re.sub(r"[^a-z0-9]+", "", word.casefold()) in normalized for word in keywords)
+
+
+def _security_concern_hit(text: str, keywords: Sequence[str]) -> bool:
+    return _security_hit(text, keywords) and bool(
+        re.search(
+            r"\b(raised?|concern|require[sd]?|must(?:-have)?|blocker|mandatory|insist(?:ed)?|need(?:s|ed)?)\b",
+            text,
+            re.I,
+        )
+    )
+
+
+def _contact_mentioned(text: str, contacts: Sequence[Contact]) -> Contact | None:
+    lowered = text.casefold()
+    return next(
+        (
+            contact
+            for contact in contacts
+            if contact.account_id is not None
+            and any(
+                name and name.casefold() in lowered for name in [contact.name, *contact.aliases]
+            )
+        ),
+        None,
+    )
+
+
+def _b5_alerts(
+    inputs: BriefInputs,
+    security_hits: Sequence[MemoryHit],
+    absence_hits: Sequence[MemoryHit],
+    keywords: Sequence[str],
+) -> list[BriefItem]:
+    meetings = {meeting.id: meeting for meeting in inputs.all_meetings}
+    upcoming = [contact for contact in inputs.attendees if contact.account_id is not None]
+    grouped: dict[str, list[MemoryHit]] = {}
+    for hit in security_hits:
+        if (
+            hit.meeting_id
+            and hit.meeting_date
+            and hit.meeting_id in meetings
+            and _security_concern_hit(hit.text, keywords)
+        ):
+            grouped.setdefault(hit.meeting_id, []).append(hit)
+
+    output: list[BriefItem] = []
+    for meeting_id, hits in grouped.items():
+        call_attendees = inputs.attendee_ids_by_meeting.get(meeting_id, set())
+        absent = [contact for contact in upcoming if contact.id not in call_attendees]
+        if not absent:
+            continue
+        raised = next(
+            (
+                (hit, raiser)
+                for hit in hits
+                if (raiser := _contact_mentioned(hit.text, inputs.account_contacts)) is not None
+            ),
+            None,
+        )
+        if raised is None or raised[1] is None:
+            continue
+        source_hit, raiser = raised
+        assert source_hit.meeting_date is not None
+        citations = [
+            Citation(
+                source_type=SourceType.meeting,
+                meeting_id=meeting_id,
+                meeting_date=source_hit.meeting_date,
+                label=_meeting_label(meetings[meeting_id], source_hit.meeting_date),
+                quote=truncate(source_hit.text, QUOTE_MAX_CHARS),
+                memory_id=source_hit.memory_id,
+            )
+        ]
+        absent_names = {contact.name.split()[0].casefold() for contact in absent}
+        for hit in absence_hits:
+            if (
+                hit.meeting_id
+                and hit.meeting_id != meeting_id
+                and hit.meeting_date
+                and any(name in hit.text.casefold() for name in absent_names)
+                and "security" in hit.text.casefold()
+                and re.search(r"has(?:n't| not) been in", hit.text, re.IGNORECASE)
+            ):
+                source_meeting = meetings.get(hit.meeting_id)
+                if source_meeting is not None:
+                    citations.append(
+                        Citation(
+                            source_type=SourceType.meeting,
+                            meeting_id=hit.meeting_id,
+                            meeting_date=hit.meeting_date,
+                            label=_meeting_label(source_meeting, hit.meeting_date),
+                            quote=truncate(hit.text, QUOTE_MAX_CHARS),
+                            memory_id=hit.memory_id,
+                        )
+                    )
+                    break
+        names = ", ".join(contact.name for contact in absent)
+        topics = [
+            keyword
+            for keyword in keywords
+            if keyword.casefold() != "security" and _security_hit(source_hit.text, [keyword])
+        ]
+        topic_text = " and ".join(topics) or "security"
+        output.append(
+            BriefItem(
+                id=f"b5-{meeting_id}-{source_hit.memory_id}",
+                text=(
+                    f"{raiser.name} raised a {topic_text} concern on "
+                    f"{format_date(source_hit.meeting_date)}; {names} was not on that call."
+                ),
+                severity=Severity.warning,
+                contact_ids=[contact.id for contact in absent],
+                citations=citations,
+            )
+        )
+    return output
+
+
+async def _recall_objection_hits(
+    memory: MemoryService, account_id: str, timings: Timings
+) -> list[MemoryHit]:
+    started = time.monotonic()
+    hits = await memory.recall_facts(
+        query="unresolved objection blocker concern requirement must-have not yet resolved",
+        tags=[account_tag(account_id)],
+        fact_kind=FactKind.objection,
+    )
+    timings.record_max("recall", time.monotonic() - started)
+    return [hit for hit in hits if hit.meeting_id and hit.meeting_date][:5]
+
+
+async def _cross_deal_recall(
+    memory: MemoryService,
+    *,
+    current_account_id: str,
+    other_accounts: Sequence[Any],
+    objections: Sequence[MemoryHit],
+    timings: Timings,
+) -> list[MemoryHit]:
+    work = [(topic, account) for topic in objections for account in other_accounts]
+    if not work:
+        return []
+
+    async def recall(topic: MemoryHit, account: Any) -> list[MemoryHit]:
+        started = time.monotonic()
+        hits = await memory.recall_facts(
+            query=f"{topic.text} resolved resolution worked trust portal pen-test",
+            tags=[account_tag(account.id)],
+        )
+        timings.record_max("recall", time.monotonic() - started)
+        return [
+            hit
+            for hit in hits[:3]
+            if hit.meeting_id
+            and hit.meeting_date
+            and account_tag(account.id) in hit.tags
+            and account_tag(current_account_id) not in hit.tags
+        ]
+
+    groups = await asyncio.gather(*(recall(topic, account) for topic, account in work))
+    dedup: dict[str, MemoryHit] = {}
+    for group in groups:
+        for hit in group:
+            dedup.setdefault(hit.memory_id, hit)
+    return list(dedup.values())
+
+
+def _deal_snapshot_parts(
+    *,
+    budget_hits: Sequence[MemoryHit],
+    decision_hits: Sequence[MemoryHit],
+    competitor_hits: Sequence[MemoryHit],
+    competitors: Sequence[str],
+    deal_value_usd: int | None,
+) -> list[tuple[str, MemoryHit]]:
+    parts: list[tuple[str, MemoryHit]] = []
+    budget = max(
+        (
+            hit
+            for hit in budget_hits
+            if hit.meeting_id and hit.meeting_date and re.search(r"budget|\$|usd", hit.text, re.I)
+        ),
+        key=lambda hit: hit.meeting_date or date.min,
+        default=None,
+    )
+    if budget and deal_value_usd is not None:
+        amount = (
+            f"${deal_value_usd / 1000:g}K" if deal_value_usd % 1000 == 0 else f"${deal_value_usd:,}"
+        )
+        parts.append((f"Budget about {amount}", budget))
+
+    decision = max(
+        (
+            hit
+            for hit in decision_hits
+            if hit.meeting_id and hit.meeting_date and re.search(r"decision|decide", hit.text, re.I)
+        ),
+        key=lambda hit: hit.meeting_date or date.min,
+        default=None,
+    )
+    if decision:
+        date_match = re.search(
+            r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?",
+            decision.text,
+            re.I,
+        )
+        if date_match:
+            value = date_match.group(0)
+            parsed_date = next(
+                (
+                    parsed
+                    for pattern in (
+                        "%B %d, %Y",
+                        "%B %d %Y",
+                        "%b %d, %Y",
+                        "%b %d %Y",
+                        "%B %d",
+                        "%b %d",
+                    )
+                    if (parsed := _try_parse_snapshot_date(value, pattern)) is not None
+                ),
+                None,
+            )
+            decision_label = (
+                f"{parsed_date:%b} {parsed_date.day}, {parsed_date.year}" if parsed_date else value
+            )
+            parts.append((f"Decision by {decision_label}", decision))
+
+    competitor = next(
+        (
+            (name, hit)
+            for name in competitors
+            for hit in competitor_hits
+            if hit.meeting_id and hit.meeting_date and name.casefold() in hit.text.casefold()
+        ),
+        None,
+    )
+    if competitor:
+        parts.append((f"{competitor[0]} evaluated", competitor[1]))
+    return parts
+
+
+def _try_parse_snapshot_date(value: str, pattern: str) -> date | None:
+    try:
+        parsed = datetime.strptime(value, pattern).date()
+    except ValueError:
+        return None
+    return parsed.replace(year=2026) if "%Y" not in pattern else parsed
+
+
 def _cross_contact_item(
     gap: Any,
     attendees: Sequence[Contact],
@@ -365,13 +630,9 @@ def _cross_contact_item(
         return None
 
     def raised_quote(speaker: str, quote: str) -> bool:
-        return _has_name_token(gap.raised_by, speaker) and _has_concern_token(
-            gap.concern, quote
-        )
+        return _has_name_token(gap.raised_by, speaker) and _has_concern_token(gap.concern, quote)
 
-    raised = next(
-        (hit for hit in by_meeting.values() if quote_from(hit, raised_quote)), None
-    )
+    raised = next((hit for hit in by_meeting.values() if quote_from(hit, raised_quote)), None)
     if raised is None or gap.answered_on is None:
         return None
     absent_hit = next(
@@ -381,13 +642,13 @@ def _cross_contact_item(
             if hit.meeting_id != raised.meeting_id
             and quote_from(
                 hit,
-                lambda _speaker, quote: any(
-                    _name_in_text(contact.name.split()[0], quote) for contact in absent
-                )
-                and "security" in quote.casefold()
-                and any(
-                    phrase in quote.casefold()
-                    for phrase in ("hasn't been in", "has not been in", "not been in")
+                lambda _speaker, quote: (
+                    any(_name_in_text(contact.name.split()[0], quote) for contact in absent)
+                    and "security" in quote.casefold()
+                    and any(
+                        phrase in quote.casefold()
+                        for phrase in ("hasn't been in", "has not been in", "not been in")
+                    )
                 ),
             )
         ),
@@ -400,13 +661,13 @@ def _cross_contact_item(
         raised.memory_id: quote_from(raised, raised_quote),
         absent_hit.memory_id: quote_from(
             absent_hit,
-            lambda _speaker, quote: any(
-                _name_in_text(contact.name.split()[0], quote) for contact in absent
-            )
-            and "security" in quote.casefold()
-            and any(
-                phrase in quote.casefold()
-                for phrase in ("hasn't been in", "has not been in", "not been in")
+            lambda _speaker, quote: (
+                any(_name_in_text(contact.name.split()[0], quote) for contact in absent)
+                and "security" in quote.casefold()
+                and any(
+                    phrase in quote.casefold()
+                    for phrase in ("hasn't been in", "has not been in", "not been in")
+                )
             ),
         ),
     }
@@ -415,7 +676,7 @@ def _cross_contact_item(
             source_type=SourceType.meeting,
             meeting_id=hit.meeting_id,
             meeting_date=hit.meeting_date,
-            label=f"{hit.meeting_id} on {format_date(hit.meeting_date)}",
+            label=_meeting_label(meeting_by_id.get(hit.meeting_id or ""), hit.meeting_date),
             quote=truncate(quotes.get(hit.memory_id) or hit.text, QUOTE_MAX_CHARS),
             memory_id=hit.memory_id,
         )
@@ -484,6 +745,7 @@ def _pattern_item(
     pattern: Any,
     current_account_id: str,
     sources: Sequence[MemoryHit],
+    meetings: Sequence[MeetingInfo] = (),
 ) -> BriefItem | None:
     current_tag = account_tag(current_account_id)
     named_account_tokens = set(re.findall(r"[a-z0-9]{3,}", pattern.other_account.casefold()))
@@ -526,12 +788,13 @@ def _pattern_item(
     if resolved_hit is None:
         return None
 
+    meeting_by_id = {meeting.id: meeting for meeting in meetings}
     citations = [
         Citation(
             source_type=SourceType.meeting,
             meeting_id=source.meeting_id,
             meeting_date=source.meeting_date,
-            label=f"{source.meeting_id} on {format_date(source.meeting_date)}",
+            label=_meeting_label(meeting_by_id.get(source.meeting_id), source.meeting_date),
             quote=truncate(source.text, QUOTE_MAX_CHARS),
             memory_id=source.memory_id,
         )
@@ -555,6 +818,7 @@ async def _cross_deal_patterns(
     *,
     account_id: str,
     deal_stage: str,
+    meetings: Sequence[MeetingInfo] = (),
     timings: Timings | None = None,
 ) -> list[BriefItem]:
     recall_started = time.monotonic()
@@ -584,7 +848,7 @@ async def _cross_deal_patterns(
     return [
         item
         for pattern in report.patterns
-        if (item := _pattern_item(pattern, account_id, sources)) is not None
+        if (item := _pattern_item(pattern, account_id, sources, meetings)) is not None
     ]
 
 
@@ -603,36 +867,24 @@ async def _gather_memory(
     memory: MemoryService,
     today_: date,
     competitors: Sequence[str] = (),
+    security_keywords: Sequence[str] = (),
     timings: Timings | None = None,
 ) -> MemoryContext:
     account = inputs.account
     external = [c for c in inputs.attendees if c.account_id is not None]
     timings = timings or Timings()
 
+    async def recall(
+        query: str, tags: Sequence[str], kind: FactKind | None = None
+    ) -> list[MemoryHit]:
+        started = time.monotonic()
+        hits = await memory.recall_facts(query=query, tags=tags, fact_kind=kind)
+        timings.record_max("recall", time.monotonic() - started)
+        return [hit for hit in hits if hit.meeting_id and hit.meeting_date]
+
     gather_started = time.monotonic()
     results = await asyncio.gather(
         _timed_mental_model(memory, _relationship_model_id(account.id), timings),
-        _objection_evidence(
-            memory,
-            account_id=account.id,
-            account_name=account.name,
-            today_=today_,
-            timings=timings,
-        ),
-        _cross_contact_alerts(
-            memory,
-            account_id=account.id,
-            account_name=account.name,
-            attendees=inputs.attendees,
-            meetings=inputs.account_meetings,
-            timings=timings,
-        ),
-        _cross_deal_patterns(
-            memory,
-            account_id=account.id,
-            deal_stage=account.stage,
-            timings=timings,
-        ),
         _recall_top(
             memory,
             section="watch_outs",
@@ -641,6 +893,23 @@ async def _gather_memory(
             fact_kind=FactKind.competitor,
             candidates=WATCH_OUT_CANDIDATES,
             timings=timings,
+        ),
+        recall(
+            "unresolved objection blocker concern requirement must-have not yet resolved",
+            [account_tag(account.id)],
+            FactKind.objection,
+        ),
+        recall(" ".join(security_keywords), [account_tag(account.id)]),
+        recall("hasn't been in the security conversations", [account_tag(account.id)]),
+        recall(
+            "account budget approved amount deal value pilot budget",
+            [account_tag(account.id)],
+            FactKind.deal_fact,
+        ),
+        recall(
+            "decision date by which decision must be made",
+            [account_tag(account.id)],
+            FactKind.deal_fact,
         ),
         *(
             _recall_top(
@@ -655,13 +924,14 @@ async def _gather_memory(
         ),
         return_exceptions=True,
     )
-    timings.set("gather", time.monotonic() - gather_started)
     labels = [
         "mental_model",
-        "unresolved_objections",
-        "cross_contact_gaps",
-        "cross_deal_patterns",
         "watch_outs",
+        "unresolved_objections",
+        "security_gaps",
+        "security_absence",
+        "budget_snapshot",
+        "decision_snapshot",
     ]
     labels += [f"personal_touchpoints:{c.id}" for c in external]
 
@@ -673,24 +943,56 @@ async def _gather_memory(
         elif isinstance(result, BaseException):
             raise result  # a bug or a non-memory error must not be swallowed
 
-    mental_model, objections, cross_contact, cross_deal, *recalls = results
+    (
+        mental_model,
+        competitor_hits,
+        objections,
+        security_hits,
+        absence_hits,
+        budget_hits,
+        decision_hits,
+        *personal_recalls,
+    ) = results
     context = MemoryContext()
     if isinstance(mental_model, MentalModelText):
         context.mental_model = mental_model
     if isinstance(objections, list):
-        context.objections = [p for p in objections if isinstance(p, tuple)]
-    if isinstance(cross_contact, list):
-        context.cross_contact_alerts = [
-            item for item in cross_contact if isinstance(item, BriefItem)
-        ]
-    if isinstance(cross_deal, list):
-        context.cross_deal_patterns = [
-            item for item in cross_deal if isinstance(item, BriefItem)
-        ]
-    for recall in recalls:
-        if isinstance(recall, list):
-            context.recall_sections.append([h for h in recall if isinstance(h, MemoryHit)])
-    if failed == len(results):
+        context.objection_hits = [hit for hit in objections if isinstance(hit, MemoryHit)][:5]
+    if isinstance(security_hits, list) and isinstance(absence_hits, list):
+        context.cross_contact_alerts = _b5_alerts(
+            inputs, security_hits, absence_hits, security_keywords
+        )
+    if isinstance(competitor_hits, list):
+        context.recall_sections.append(
+            [hit for hit in competitor_hits if isinstance(hit, MemoryHit)]
+        )
+    for personal_recall in personal_recalls:
+        if isinstance(personal_recall, list):
+            context.recall_sections.append(
+                [hit for hit in personal_recall if isinstance(hit, MemoryHit)]
+            )
+    try:
+        context.cross_deal_hits = await _cross_deal_recall(
+            memory,
+            current_account_id=account.id,
+            other_accounts=inputs.other_accounts,
+            objections=context.objection_hits,
+            timings=timings,
+        )
+    except MemoryUnavailableError as exc:
+        failed += 1
+        logger.warning("brief.section_degraded section=cross_deal error=%s", exc.message)
+    context.deal_snapshot = _deal_snapshot_parts(
+        budget_hits=budget_hits if isinstance(budget_hits, list) else [],
+        decision_hits=decision_hits if isinstance(decision_hits, list) else [],
+        competitor_hits=context.recall_sections[0] if context.recall_sections else [],
+        competitors=competitors,
+        deal_value_usd=account.deal_value_usd,
+    )
+    if context.deal_snapshot:
+        context.recall_sections.append([hit for _, hit in context.deal_snapshot])
+    timings.set("gather", time.monotonic() - gather_started)
+    if failed >= len(results):
         raise MemoryUnavailableError("Every memory call for the brief failed.")
     return context
 
@@ -792,9 +1094,7 @@ def _apply_severity_cap(
         group_contacts = list(
             dict.fromkeys(contact for item in grouped for contact in item.contact_ids)
         )
-        details = "; ".join(
-            item.text.removeprefix("Overdue: ").rstrip(".") for item in grouped
-        )
+        details = "; ".join(item.text.removeprefix("Overdue: ").rstrip(".") for item in grouped)
         group_item = BriefItem(
             id="open_commitments-also-overdue",
             text=f"Also overdue: {details}.",
@@ -808,9 +1108,7 @@ def _apply_severity_cap(
         overdue_of[group_item.id] = group_ranks
 
     sections[SectionKey.alerts] = [
-        item
-        for item in sections.get(SectionKey.alerts, [])
-        if item.id not in overdue_of
+        item for item in sections.get(SectionKey.alerts, []) if item.id not in overdue_of
     ]
     for items in sections.values():
         for idx, item in enumerate(items):
@@ -850,9 +1148,7 @@ def _drop_repeated_competitor_objections(
     retained: list[BriefItem] = []
     for objection in objections:
         objection_name = competitor_in(
-            " ".join(
-                [objection.text, *(citation.quote or "" for citation in objection.citations)]
-            )
+            " ".join([objection.text, *(citation.quote or "" for citation in objection.citations)])
         )
         repeats_watch_out = objection_name is not None and any(
             competitor_in(watch.text) == objection_name
@@ -922,6 +1218,50 @@ def _map_draft(
                 )
             )
     return sections, covered, overdue_of
+
+
+def _filter_cross_deal_draft(
+    draft: BriefDraft,
+    table: EvidenceTable,
+    *,
+    current_account_id: str,
+    account_names: Mapping[str, str],
+    meeting_account_ids: Mapping[str, str],
+) -> BriefDraft:
+    """Permit one tightly scoped cross-account Watch-outs sentence."""
+    sections: dict[SectionKey, list[Any]] = {}
+    accepted = False
+    names_to_ids = {name.casefold(): account_id for account_id, name in account_names.items()}
+    for key, draft_items in draft.sections.items():
+        kept: list[Any] = []
+        for item in draft_items:
+            refs = [table.get(evidence_id) for evidence_id in item.evidence_ids]
+            cited = [ref for ref in refs if ref is not None]
+            cross_refs = [ref for ref in cited if ref.kind == "cross_deal"]
+            if key == SectionKey.watch_outs and cross_refs:
+                match = re.match(r"^At\s+([^,]+),", item.text, re.IGNORECASE)
+                account_id = names_to_ids.get(match.group(1).strip().casefold()) if match else None
+                valid = (
+                    not accepted
+                    and bool(match)
+                    and len(item.text.split()) <= 40
+                    and len(cross_refs) == len(item.evidence_ids)
+                    and account_id is not None
+                    and account_id != current_account_id
+                    and all(ref.account_id == account_id for ref in cross_refs)
+                    and all(
+                        ref.meeting_id is not None
+                        and meeting_account_ids.get(ref.meeting_id) == account_id
+                        for ref in cross_refs
+                    )
+                )
+                if not valid:
+                    logger.info("brief.cross_deal_item_dropped reason=invalid_citations_or_text")
+                    continue
+                accepted = True
+            kept.append(item)
+        sections[key] = kept
+    return draft.model_copy(update={"sections": sections})
 
 
 def _overdue_item(
@@ -1001,7 +1341,7 @@ def _attendee_citation(
             source_type=SourceType.meeting,
             meeting_id=meeting.id,
             meeting_date=meeting_date,
-            label=f"{meeting.title} on {format_date(meeting_date)}",
+            label=_meeting_label(meeting, meeting_date),
             quote=truncate(quote, QUOTE_MAX_CHARS),
             memory_id=None,
         )
@@ -1021,9 +1361,51 @@ def assemble_brief(
     competitors: Sequence[str] = (),
     cross_contact_alerts: Sequence[BriefItem] = (),
     cross_deal_patterns: Sequence[BriefItem] = (),
+    deal_snapshot: Sequence[tuple[str, MemoryHit]] = (),
 ) -> Brief:
     known = {c.id for c in inputs.attendees}
+    account_names = {
+        account.id: account.name for account in [inputs.account, *inputs.other_accounts]
+    }
+    draft = _filter_cross_deal_draft(
+        draft,
+        table,
+        current_account_id=inputs.account.id,
+        account_names=account_names,
+        meeting_account_ids={meeting.id: meeting.account_id for meeting in inputs.all_meetings},
+    )
     sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
+
+    if mode == "memory" and deal_snapshot:
+        meeting_by_id = {meeting.id: meeting for meeting in inputs.all_meetings}
+        citations = [
+            Citation(
+                source_type=SourceType.meeting,
+                meeting_id=hit.meeting_id,
+                meeting_date=hit.meeting_date,
+                label=_meeting_label(meeting_by_id.get(hit.meeting_id or ""), hit.meeting_date),
+                quote=truncate(hit.text, QUOTE_MAX_CHARS),
+                memory_id=hit.memory_id,
+            )
+            for _, hit in deal_snapshot
+            if hit.meeting_id and hit.meeting_date and hit.text.strip()
+        ]
+        parts = [
+            text
+            for text, hit in deal_snapshot
+            if hit.meeting_id and hit.meeting_date and hit.text.strip()
+        ]
+        if parts and citations:
+            sections.setdefault(SectionKey.where_left_off, []).insert(
+                0,
+                BriefItem(
+                    id="where_left_off-deal-snapshot",
+                    text=" · ".join(parts),
+                    severity=Severity.info,
+                    contact_ids=[],
+                    citations=citations,
+                ),
+            )
 
     if mode == "memory" and competitors:
         competitor = next(
@@ -1045,7 +1427,7 @@ def assemble_brief(
             sections.setdefault(SectionKey.watch_outs, []).append(
                 BriefItem(
                     id="watch_outs-competitor",
-                    text=f"FinEdge has looked at {name}.",
+                    text=f"{inputs.account.name} has looked at {name}.",
                     severity=Severity.warning,
                     contact_ids=[],
                     citations=[
@@ -1053,7 +1435,12 @@ def assemble_brief(
                             source_type=SourceType.meeting,
                             meeting_id=hit.meeting_id,
                             meeting_date=hit.meeting_date,
-                            label=f"{hit.meeting_id} on {format_date(hit.meeting_date)}",
+                            label=_meeting_label(
+                                next(
+                                    (m for m in inputs.all_meetings if m.id == hit.meeting_id), None
+                                ),
+                                hit.meeting_date,
+                            ),
                             quote=truncate(hit.text, QUOTE_MAX_CHARS),
                             memory_id=hit.memory_id,
                         )
@@ -1124,9 +1511,7 @@ def assemble_brief(
 
 def _pinned_ask_item(ask_answer: AskAnswer) -> BriefItem | None:
     try:
-        answer = AskResponse.model_validate(
-            {"ask_answer_id": ask_answer.id, **ask_answer.answer}
-        )
+        answer = AskResponse.model_validate({"ask_answer_id": ask_answer.id, **ask_answer.answer})
     except PydanticValidationError:
         logger.warning("brief.pinned_ask_dropped ask_id=%s reason=invalid_output", ask_answer.id)
         return None
@@ -1200,7 +1585,7 @@ async def generate_brief(
     persona = load_persona()
     meetings = {
         m.id: MeetingInfo(id=m.id, title=m.title, date=_meeting_date(m))
-        for m in inputs.account_meetings
+        for m in inputs.all_meetings
     }
     timings.set("load", time.monotonic() - started)
 
@@ -1210,7 +1595,12 @@ async def generate_brief(
     cross_deal_patterns: Sequence[BriefItem] = ()
     if with_memory:
         context = await _gather_memory(
-            inputs, memory, today(), competitors=persona.competitors, timings=timings
+            inputs,
+            memory,
+            today(),
+            competitors=persona.competitors,
+            security_keywords=persona.security_keywords,
+            timings=timings,
         )
         gathered_at = time.monotonic()
         ingested = [
@@ -1223,14 +1613,15 @@ async def generate_brief(
             mental_model=context.mental_model,
             latest_ingested_meeting=meetings[latest.id] if latest else None,
             recall_sections=context.recall_sections,
-            objections=context.objections,
+            objection_hits=context.objection_hits,
+            cross_deal_hits=context.cross_deal_hits,
+            objections=(),
             commitments=inputs.open_commitments,
             meetings=meetings,
             today=today(),
         )
         competitor_hits = context.recall_sections[0] if context.recall_sections else []
         cross_contact_alerts = context.cross_contact_alerts
-        cross_deal_patterns = context.cross_deal_patterns
         logger.info(
             "brief.gathered meeting=%s evidence=%d duration_ms=%d",
             meeting_id,
@@ -1262,6 +1653,7 @@ async def generate_brief(
         competitors=persona.competitors if with_memory else (),
         cross_contact_alerts=cross_contact_alerts if with_memory else (),
         cross_deal_patterns=cross_deal_patterns if with_memory else (),
+        deal_snapshot=context.deal_snapshot if with_memory else (),
     )
     if with_memory and not brief.sections:
         # Never persist (and so never serve from the cache) a brief with nothing in it.
