@@ -439,3 +439,42 @@ def test_generate_passes_length_and_emphasis_to_p3(client: TestClient, llm: Scri
         "User's brief style: length: short; emphasise: watch_outs; "
         "de-emphasise: personal_touchpoints" in llm.calls[-1].prompt
     )
+
+
+def test_undo_after_many_collapses_is_one_up_or_more() -> None:
+    touch = SK.personal_touchpoints
+    assert derive_style_profile(rows((touch, "collapsed", 2))).hidden_sections == [touch]
+    assert derive_style_profile(rows((touch, "collapsed", 5))).hidden_sections == [touch]
+    for action in ("up", "more"):
+        undone = derive_style_profile(rows((touch, "collapsed", 5), (touch, action, 1)))
+        assert undone.hidden_sections == []
+
+
+def test_score_fold_is_chronological() -> None:
+    touch = SK.personal_touchpoints
+    seq = [Row(touch, "collapsed"), Row(touch, "up"), Row(touch, "collapsed")]
+    assert derive_style_profile(seq).hidden_sections == []
+    seq = [Row(touch, "up"), Row(touch, "collapsed"), Row(touch, "collapsed")]
+    assert derive_style_profile(seq).hidden_sections == []
+    seq = [Row(touch, "collapsed"), Row(touch, "collapsed"), Row(touch, "up"), Row(touch, "down")]
+    assert derive_style_profile(seq).hidden_sections == [touch]
+
+
+def test_score_ceiling_caps_ordering_growth() -> None:
+    # 10 ups clamp to +3, so 3 ups on agenda tie it and default order decides.
+    profile = derive_style_profile(rows((SK.watch_outs, "up", 10), (SK.agenda, "up", 3)))
+    assert profile.section_order[:2] == [SK.agenda, SK.watch_outs]
+    # after two downs the clamped section sits at +1, below a fresh two-up section
+    profile = derive_style_profile(
+        rows((SK.watch_outs, "up", 10), (SK.watch_outs, "down", 2), (SK.agenda, "up", 2))
+    )
+    assert profile.section_order[:2] == [SK.agenda, SK.watch_outs]
+
+
+def test_length_net_is_clamped() -> None:
+    lots_less = rows((SK.agenda, "less", 8))
+    assert derive_style_profile(lots_less).length == "short"
+    assert derive_style_profile(lots_less + rows((SK.agenda, "more", 1))).length == "short"
+    assert derive_style_profile(lots_less + rows((SK.agenda, "more", 2))).length == "standard"
+    lots_more = rows((SK.agenda, "more", 8))
+    assert derive_style_profile(lots_more + rows((SK.agenda, "less", 2))).length == "standard"

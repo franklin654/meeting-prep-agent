@@ -9,16 +9,19 @@ Everything here is plain code: no LLM, no Hindsight call on the read path.
   (length only changes a brief when it is generated, via `prompt_style_string`).
 - `record_feedback(...)` stores the row first, then retains one template sentence.
 
-Rules: section score = collapsed -1, down -1, up +1, more +1 (`less` only moves the
-length). Score <= -2 hides the section unless it holds a critical item (then it is
-collapsed instead). Positive scores sort earlier; ties keep the default order.
-Length: net(more - less) <= -2 short, >= 2 detailed, else standard.
+Rules: a section's score is a chronological FOLD over its feedback rows (oldest first,
+callers pass rows ordered by created_at then id): collapsed -1, down -1, up +1, more +1
+(`less` only moves the length), and the running score is clamped to [-2, +3] after every
+row. So one `up` or `more` always undoes any number of collapses (-2 -> -1). Score <= -2
+hides the section unless it holds a critical item (then it is collapsed instead).
+Positive scores sort earlier (higher first); ties keep the default order.
+Length: the same kind of fold over more (+1) and less (-1), the running net clamped to
+[-3, +3]; net <= -2 short, >= 2 detailed, else standard.
 """
 
 from __future__ import annotations
 
 import logging
-from collections import Counter
 from collections.abc import Iterable
 from typing import Any, Literal, Protocol
 
@@ -46,6 +49,8 @@ SECTION_TITLES: dict[SectionKey, str] = {
     SectionKey.your_questions: "Your questions",
 }
 
+SCORE_MIN, SCORE_MAX = -2, 3
+NET_MIN, NET_MAX = -3, 3
 HIDE_THRESHOLD = -2
 LENGTH_THRESHOLD = 2
 _SCORE = {"collapsed": -1, "down": -1, "up": 1, "more": 1, "less": 0}
@@ -71,13 +76,16 @@ def preference_sentence(section: SectionKey, action: str) -> str:
 def _scores(rows: Iterable[_FeedbackLike]) -> dict[SectionKey, int]:
     scores = dict.fromkeys(DEFAULT_SECTION_ORDER, 0)
     for row in rows:
-        scores[SectionKey(row.section)] += _SCORE.get(row.action, 0)
+        key = SectionKey(row.section)
+        scores[key] = max(SCORE_MIN, min(SCORE_MAX, scores[key] + _SCORE.get(row.action, 0)))
     return scores
 
 
 def _length(rows: Iterable[_FeedbackLike]) -> Literal["short", "standard", "detailed"]:
-    counts = Counter(row.action for row in rows)
-    net = counts["more"] - counts["less"]
+    net = 0
+    for row in rows:
+        delta = {"more": 1, "less": -1}.get(row.action, 0)
+        net = max(NET_MIN, min(NET_MAX, net + delta))
     if net <= -LENGTH_THRESHOLD:
         return "short"
     if net >= LENGTH_THRESHOLD:
