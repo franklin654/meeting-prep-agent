@@ -289,6 +289,28 @@ def filter_logistics(
     return kept, len(commitments) - len(kept)
 
 
+def _has_deliverable_term(text: str) -> bool:
+    return _has_term(f" {_normalize_name(text)} ", DELIVERABLE_ALLOW_TERMS)
+
+
+def _merged_quote_member(
+    kept: ExtractedCommitment,
+    item: ExtractedCommitment,
+    due: date | None,
+    position: Callable[[ExtractedCommitment], int],
+) -> ExtractedCommitment:
+    """Member whose quote and speaker a merged commitment keeps (see `consolidate_commitments`)."""
+    pool = [kept, item]
+    carriers = [m for m in pool if m.due_date is not None and m.due_date == due]
+    if len(carriers) == 1:
+        return carriers[0]
+    pool = carriers or pool
+    named = [m for m in pool if _has_deliverable_term(m.source_quote)]
+    if len(named) == 1:
+        return named[0]
+    return min(named or pool, key=position)  # min is stable: `kept` wins ties
+
+
 def consolidate_commitments(
     commitments: Sequence[ExtractedCommitment], normalized_transcript: str = ""
 ) -> tuple[list[ExtractedCommitment], int, int]:
@@ -298,9 +320,10 @@ def consolidate_commitments(
     deliverable. Items citing the same normalized `source_quote` are one promise.
 
     Returns `(kept, merged_count, capped_count)`. A merged group keeps the longer (more
-    specific) text, the quote that appears earliest in the transcript (extraction order if
-    positions tie or are unknown) and any due date (the earliest if several). Dated
-    commitments are kept first when capping, then extraction order.
+    specific) text and any due date (the earliest if several). Its quote comes from the member
+    that carries the kept due date; else from the member whose quote names a deliverable
+    (`DELIVERABLE_ALLOW_TERMS`); else the one earliest in the transcript (extraction order on
+    ties). Dated commitments are kept first when capping, then extraction order.
     """
 
     def position(item: ExtractedCommitment) -> int:
@@ -312,13 +335,15 @@ def consolidate_commitments(
     for item in filter_logistics(commitments)[0]:
         for idx, kept in enumerate(groups):
             if _is_near_duplicate(kept, item):
-                first, other = (kept, item) if position(kept) <= position(item) else (item, kept)
                 dues = [d for d in (kept.due_date, item.due_date) if d is not None]
-                groups[idx] = first.model_copy(
+                due = min(dues) if dues else None
+                chosen = _merged_quote_member(kept, item, due, position)
+                groups[idx] = chosen.model_copy(
                     update={
                         "text": max(kept.text, item.text, key=lambda t: len(t.strip())),
-                        "due_date": min(dues) if dues else None,
-                        "owner_person": first.owner_person or other.owner_person,
+                        "due_date": due,
+                        "owner_person": chosen.owner_person
+                        or (item if chosen is kept else kept).owner_person,
                     }
                 )
                 merged += 1
@@ -328,6 +353,154 @@ def consolidate_commitments(
     ordered = sorted(groups, key=lambda c: c.due_date is None)  # stable: dated first
     capped = max(0, len(ordered) - MAX_COMMITMENTS_PER_MEETING)
     return ordered[:MAX_COMMITMENTS_PER_MEETING], merged, capped
+
+
+# ---- quote refinement ----
+
+_MONTHS = (
+    ("jan", "january"),
+    ("feb", "february"),
+    ("mar", "march"),
+    ("apr", "april"),
+    ("may", "may"),
+    ("jun", "june"),
+    ("jul", "july"),
+    ("aug", "august"),
+    ("sep", "september"),
+    ("oct", "october"),
+    ("nov", "november"),
+    ("dec", "december"),
+)
+_RELATIVE_DATE_RE = re.compile(
+    r"(?i)\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|"
+    r"tonight|next week|this week|end of (?:the )?(?:day|week|month|quarter)|eod|eow)\b"
+)
+_UTTERANCE_RE = re.compile(
+    r"^\[[^\]]*\]\s*(?P<speaker>[^:(]+?)\s*(?:\([^)]*\))?\s*:\s*(?P<text>.+)$"
+)
+_STOP_WORDS = frozenset(
+    "a an and are as at be by for from has have i in is it its of on or our that the their "
+    "them then there this to us was we will with you your ll send share prepare put get make "
+    "also just".split()
+)
+
+
+def _explicit_date_patterns(due: date) -> list[re.Pattern[str]]:
+    """Month-name+day (either order, optional ordinal suffix and dot) and ISO forms of `due`."""
+    abbr, full = _MONTHS[due.month - 1]
+    names = "|".join(sorted({abbr, full, "sept" if abbr == "sep" else abbr}, key=len, reverse=True))
+    day = rf"0?{due.day}(?:st|nd|rd|th)?"
+    return [
+        re.compile(rf"(?i)\b(?:{names})\.?\s+{day}\b(?!\d)"),
+        re.compile(rf"(?i)(?<!\d)\b{day}\s+(?:of\s+)?(?:{names})\b"),
+        re.compile(rf"\b{due.isoformat()}\b"),
+    ]
+
+
+def _has_explicit_date(text: str, due: date) -> bool:
+    return any(p.search(text) for p in _explicit_date_patterns(due))
+
+
+def _carries_date_signal(quote: str, due: date) -> bool:
+    """True if `quote` states `due` (month+day / ISO / ordinal day) or a relative date phrase."""
+    if _has_explicit_date(quote, due):
+        return True
+    if re.search(rf"(?i)\b{due.day}(?:st|nd|rd|th)\b", quote):
+        return True
+    return bool(_RELATIVE_DATE_RE.search(quote))
+
+
+def _content_words(text: str) -> frozenset[str]:
+    return frozenset(
+        w for w in _normalize_name(text).split() if len(w) > 2 and w not in _STOP_WORDS
+    )
+
+
+def _names_match(a: str, b: str) -> bool:
+    """Name-only speaker comparison: equal, or one is a single token of the other."""
+    na, nb = _normalize_name(a), _normalize_name(b)
+    if not na or not nb:
+        return False
+    return na == nb or na in nb.split() or nb in na.split()
+
+
+def _utterances(transcript: str) -> list[tuple[str, str]]:
+    """`(speaker, text)` for each `[timestamp] Speaker (Role, Org): text` line, in order."""
+    found: list[tuple[str, str]] = []
+    for line in transcript.splitlines():
+        match = _UTTERANCE_RE.match(line.strip())
+        if match:
+            found.append((match.group("speaker").strip(), match.group("text").strip()))
+    return found
+
+
+def _utterance_quote(text: str, due: date) -> str:
+    """The full utterance if it fits in 200 chars, else the sentence carrying the date."""
+    if len(text) <= MAX_QUOTE_CHARS:
+        return text
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if _has_explicit_date(sentence, due):
+            return _clip(sentence)
+    return _clip(text)
+
+
+def refine_quotes(
+    commitments: Sequence[ExtractedCommitment],
+    transcript: str,
+    same_speaker: Callable[[str, str], bool] = _names_match,
+) -> tuple[list[ExtractedCommitment], int]:
+    """Re-point a dated commitment's quote at the sentence that carries its due date.
+
+    Only for commitments with a `due_date` whose `source_quote` has no date signal (see
+    `_carries_date_signal`). Searches the transcript in order for the earliest utterance by the
+    same speaker (`owner_person` via `same_speaker(owner_person, speaker)`, or the speaker of
+    the current quote) that (a) states the due date as month-name+day or ISO, (b) is not a
+    question (ends with "?") and (c) names a deliverable (`DELIVERABLE_ALLOW_TERMS`) or shares a
+    content word with the commitment text. Candidates sharing a content word win over ones with
+    only a deliverable term; among equals the earliest wins.
+    The replacement is verbatim from the transcript (<= 200 chars). Otherwise the quote is
+    kept. Text, owner and due date never change. Returns `(commitments, refined_count)`.
+    """
+    utterances = _utterances(transcript)
+    normalized = normalize_text(transcript)
+    result: list[ExtractedCommitment] = []
+    refined = 0
+    for item in commitments:
+        due = item.due_date
+        if due is None or _carries_date_signal(item.source_quote, due):
+            result.append(item)
+            continue
+        quote_norm = normalize_text(item.source_quote)
+        current_speaker = next(
+            (spk for spk, text in utterances if quote_norm in normalize_text(text)), None
+        )
+        words = _content_words(item.text)
+        shared: str | None = None  # earliest candidate sharing a content word with the text
+        named: str | None = None  # earliest candidate with only a deliverable term
+        for speaker, text in utterances:
+            speaker_ok = same_speaker(item.owner_person, speaker) or (
+                current_speaker is not None and _names_match(current_speaker, speaker)
+            )
+            if text.rstrip().endswith("?") or not speaker_ok or not _has_explicit_date(text, due):
+                continue  # a question is not a promise
+            has_shared_word = bool(_content_words(text) & words)
+            if not has_shared_word and not _has_deliverable_term(text):
+                continue
+            candidate = _utterance_quote(text, due)
+            if not is_verbatim(candidate, normalized):
+                continue
+            if has_shared_word:
+                shared = candidate
+                break
+            if named is None:
+                named = candidate
+        replacement = shared or named
+        if replacement is None:
+            result.append(item)
+        else:
+            result.append(item.model_copy(update={"source_quote": replacement}))
+            refined += 1
+    return result, refined
 
 
 # ---- entity resolution ----
@@ -572,6 +745,16 @@ async def _ingest(
     # 4. Entity resolution.
     for person in extraction.people:
         resolver.resolve(person)
+
+    def same_speaker(owner: str, speaker: str) -> bool:
+        a, b = resolver.find(owner), resolver.find(speaker)
+        return a.id == b.id if a is not None and b is not None else _names_match(owner, speaker)
+
+    verified.commitments, quote_refined = refine_quotes(
+        verified.commitments, transcript, same_speaker
+    )
+    if quote_refined:
+        logger.info("ingest commitments quote_refined=%d meeting=%s", quote_refined, meeting_id)
 
     # 5. P2, against open commitments from earlier meetings only.
     closed_ids: list[str] = []
