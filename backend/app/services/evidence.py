@@ -6,9 +6,11 @@ code-side table mapping each id back to what it may cite. The LLM only ever sees
 rendered lines; citations are built from the table, never from model output.
 
 Order: mental model, recall hits, reflect outputs, ledger rows, pinned Ask answers
-(none yet). Newest first within each group, capped at `EVIDENCE_CAP`. Mental model,
-ledger and Ask entries are never cut by the cap (open commitments must always reach
-the prompt); recall and reflect entries share what is left.
+(none yet). Recall and reflect entries keep the order they arrive in (Hindsight's
+relevance rank, section priority first), NOT recency. Capped at `EVIDENCE_CAP`: the mental
+model and the dated ledger rows are never cut; recall and reflect entries fill the rest.
+Ledger evidence is only overdue dated rows plus at most `MAX_UPCOMING_LEDGER_ROWS` dated
+upcoming ones; undated rows never reach the prompt.
 """
 
 from __future__ import annotations
@@ -27,10 +29,13 @@ from app.schemas.memory import MemoryHit
 
 logger = logging.getLogger(__name__)
 
-EVIDENCE_CAP = 40
+EVIDENCE_CAP = 25
+MAX_UPCOMING_LEDGER_ROWS = 5
+MAX_OVERDUE_EVIDENCE = 8
+MIN_RECALL = 8
 QUOTE_MAX_CHARS = 200
-PROMPT_TEXT_MAX_CHARS = 300
-PROMPT_MENTAL_MODEL_MAX_CHARS = 800
+PROMPT_TEXT_MAX_CHARS = 160
+PROMPT_MENTAL_MODEL_MAX_CHARS = 500
 
 
 # ---- R1 output model (prompt: reflect_objections.md) ----
@@ -127,20 +132,17 @@ def match_objection_sources(
     return pairs
 
 
-def _newest_first(refs: Sequence[EvidenceRef]) -> list[EvidenceRef]:
-    return sorted(refs, key=lambda r: r.meeting_date or date.min, reverse=True)
-
-
 def build_evidence(
     *,
     mental_model: MentalModelText | None,
     latest_done_meeting: MeetingInfo | None,
-    recall_hits: Sequence[MemoryHit],
+    recall_hits: Sequence[MemoryHit] = (),
     objections: Sequence[tuple[Objection, MemoryHit]],
     commitments: Sequence[Commitment],
     meetings: Mapping[str, MeetingInfo],
     today: date,
     cap: int = EVIDENCE_CAP,
+    recall_sections: Sequence[Sequence[MemoryHit]] | None = None,
 ) -> EvidenceTable:
     """Assemble the capped, numbered evidence table.
 
@@ -148,7 +150,20 @@ def build_evidence(
     must already be resolved (`MemoryService.resolve_sources`); any without a `meeting_id`
     are unusable as evidence and skipped. A meeting's date comes from SQLite when the
     meeting is known there, else from the hit.
+
+    `recall_sections` holds one hit list per recall section (watch-outs, then one per external
+    attendee), each in Hindsight rank order; `recall_hits` is a single-section shorthand.
+
+    Slot arithmetic (defaults: cap 25, mental model 1, overdue <= 8, upcoming <= 5, so the
+    protected entries are at most 14 and 11 slots remain):
+      * recall floor = max(sections with usable hits, min(MIN_RECALL, usable recall entries));
+        with the defaults 14 + 8 = 22 <= 25, so the floor always fits the cap;
+      * reflect (objection) entries take the slots left after the floor;
+      * recall then takes whatever remains (never fewer than its floor).
+    The floor takes each section's top hit first, then fills by section priority and rank.
+    Only with more than 11 recall sections could the total pass the cap.
     """
+    sections = list(recall_sections) if recall_sections is not None else [recall_hits]
     protected: list[EvidenceRef] = []
 
     if mental_model is not None and mental_model.content.strip() and latest_done_meeting:
@@ -166,25 +181,43 @@ def build_evidence(
             )
         )
 
-    recall_refs = _memory_refs(recall_hits, meetings, prefix=None)
+    section_refs: list[list[EvidenceRef]] = []
+    seen_ids: set[str] = set()
+    for hits in sections:
+        refs = [r for r in _memory_refs(hits, meetings, prefix=None) if r.memory_id not in seen_ids]
+        seen_ids.update(r.memory_id for r in refs if r.memory_id)
+        section_refs.append(refs)
     reflect_refs = _memory_refs(
         [hit for _, hit in objections],
         meetings,
         prefix=[
-            f"Unresolved concern ({o.raised_by}): {o.concern}" for o, _ in objections
+            f"Unresolved concern ({o.raised_by}): {truncate(o.concern, PROMPT_TEXT_MAX_CHARS)}"
+            for o, _ in objections
         ],
     )
-
     ledger_refs = _ledger_refs(commitments, meetings, today)
 
-    budget = max(0, cap - len(protected) - len(ledger_refs))
-    recall_kept = recall_refs[:budget]
-    reflect_kept = reflect_refs[: max(0, budget - len(recall_kept))]
-    if len(recall_refs) + len(reflect_refs) > budget:
+    recall_total = sum(len(r) for r in section_refs)
+    floor = max(sum(1 for r in section_refs if r), min(MIN_RECALL, recall_total))
+    available = max(0, cap - len(protected) - len(ledger_refs))
+    reflect_kept = reflect_refs[: max(0, available - floor)]
+    recall_kept = _pick_recall(section_refs, max(floor, available - len(reflect_kept)))
+    logger.debug(
+        "brief.evidence recall_in=%d recall_kept=%d reflect_in=%d reflect_kept=%d "
+        "ledger=%d total=%d",
+        sum(len(h) for h in sections),
+        len(recall_kept),
+        len(objections),
+        len(reflect_kept),
+        len(ledger_refs),
+        len(protected) + len(recall_kept) + len(reflect_kept) + len(ledger_refs),
+    )
+    dropped = recall_total + len(reflect_refs) - len(recall_kept) - len(reflect_kept)
+    if dropped > 0:
         logger.info(
             "brief.evidence_capped kept=%d dropped=%d",
             len(recall_kept) + len(reflect_kept),
-            len(recall_refs) + len(reflect_refs) - len(recall_kept) - len(reflect_kept),
+            dropped,
         )
 
     ordered = [*protected, *recall_kept, *reflect_kept, *ledger_refs]
@@ -201,6 +234,23 @@ def build_evidence(
         counters[p] += 1
         numbered.append(ref.model_copy(update={"key": f"{p}:{counters[p]}"}))
     return EvidenceTable(numbered)
+
+
+def _pick_recall(section_refs: Sequence[Sequence[EvidenceRef]], slots: int) -> list[EvidenceRef]:
+    """`slots` recall entries: each section's top hit first (the floor), then the rest by
+    section priority and rank. Output keeps section order, then rank within a section."""
+    chosen: set[tuple[int, int]] = {(si, 0) for si, refs in enumerate(section_refs) if refs}
+    for si, refs in enumerate(section_refs):
+        for pi in range(len(refs)):
+            if len(chosen) >= slots:
+                break
+            chosen.add((si, pi))
+    return [
+        refs[pi]
+        for si, refs in enumerate(section_refs)
+        for pi in range(len(refs))
+        if (si, pi) in chosen
+    ]
 
 
 def _memory_refs(
@@ -233,14 +283,27 @@ def _memory_refs(
                 label=label,
             )
         )
-    return _newest_first(refs)
+    return refs
 
 
 def _ledger_refs(
     commitments: Sequence[Commitment], meetings: Mapping[str, MeetingInfo], today: date
 ) -> list[EvidenceRef]:
+    dated = [c for c in commitments if c.due_date is not None]
+    # At most MAX_OVERDUE_EVIDENCE overdue rows go to the prompt: the most recently due (they
+    # are the freshest; ties broken by id so the choice is deterministic), shown oldest first.
+    # Any overdue row left out is still put in the brief by the forced-overdue appender.
+    overdue_all = [c for c in dated if c.due_date is not None and c.due_date < today]
+    latest_overdue = sorted(overdue_all, key=lambda c: (c.due_date or date.min, c.id), reverse=True)
+    overdue_rows = sorted(
+        latest_overdue[:MAX_OVERDUE_EVIDENCE], key=lambda c: (c.due_date or date.max, c.id)
+    )
+    upcoming_rows = sorted(
+        (c for c in dated if c.due_date is not None and c.due_date >= today),
+        key=lambda c: c.due_date or date.max,
+    )[:MAX_UPCOMING_LEDGER_ROWS]
     refs: list[EvidenceRef] = []
-    for c in commitments:
+    for c in [*overdue_rows, *upcoming_rows]:
         info = meetings.get(c.meeting_id)
         if info is None:
             continue
@@ -265,4 +328,4 @@ def _ledger_refs(
                 overdue=overdue,
             )
         )
-    return _newest_first(refs)
+    return refs

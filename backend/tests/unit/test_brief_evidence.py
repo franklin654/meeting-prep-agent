@@ -10,6 +10,9 @@ from app.schemas.brief import SourceType
 from app.schemas.enums import CommitmentStatus, Owner
 from app.schemas.memory import MemoryHit
 from app.services.evidence import (
+    EVIDENCE_CAP,
+    MAX_OVERDUE_EVIDENCE,
+    MIN_RECALL,
     MeetingInfo,
     Objection,
     ObjectionReport,
@@ -59,7 +62,7 @@ def test_ids_order_and_ledger_overdue_flag() -> None:
     assert [r.key for r in table.refs] == ["mm:1", "mem:1", "mem:2", "led:1", "led:2"]
     assert table.refs[0].source_type == SourceType.mental_model
     assert table.refs[0].meeting_id == "m9"
-    assert [r.memory_id for r in table.refs[1:3]] == ["h2", "h1"]  # newest meeting first
+    assert [r.memory_id for r in table.refs[1:3]] == ["h1", "h2"]  # rank order kept, not recency
     led = {r.commitment_id: r for r in table.refs if r.source_type == SourceType.ledger}
     assert led["c1"].overdue and not led["c2"].overdue
     assert "OPEN, OVERDUE: us -> do c1, due 2026-09-03" in led["c1"].text
@@ -111,22 +114,46 @@ def test_hit_date_falls_back_to_hit_when_meeting_unknown() -> None:
     assert table.refs[0].meeting_date == date(2026, 1, 2)
 
 
-def test_cap_keeps_ledger_and_truncates_recall_newest_first() -> None:
+def test_cap_keeps_dated_ledger_and_truncates_recall_in_rank_order() -> None:
     hits = [hit(i, f"m{1 + i % 9}") for i in range(60)]
     table = build_evidence(
         mental_model=None,
         latest_done_meeting=None,
         recall_hits=hits,
         objections=[],
-        commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", None)],
+        commitments=[commitment("c1", date(2026, 9, 3)), commitment("c2", date(2026, 10, 1))],
         meetings=MEETINGS,
         today=TODAY,
     )
 
-    assert len(table.refs) == 40
+    assert len(table.refs) == EVIDENCE_CAP == 25
     assert [r.key for r in table.refs if r.key.startswith("led")] == ["led:1", "led:2"]
-    dates = [r.meeting_date for r in table.refs if r.key.startswith("mem")]
-    assert dates == sorted(dates, reverse=True)  # type: ignore[type-var]
+    ids = [r.memory_id for r in table.refs if r.key.startswith("mem")]
+    assert ids == [f"h{i}" for i in range(23)]  # first N by rank
+
+
+def test_ledger_never_sends_undated_rows_and_caps_upcoming_at_five() -> None:
+    rows = [commitment(f"undated{i}", None) for i in range(79)]
+    rows += [commitment("late1", date(2026, 9, 3)), commitment("late2", date(2026, 8, 20))]
+    rows += [commitment(f"soon{i}", date(2026, 10, 1 + i)) for i in range(8)]
+    rows += [commitment("today", TODAY)]
+    table = build_evidence(
+        mental_model=None,
+        latest_done_meeting=None,
+        recall_hits=[],
+        objections=[],
+        commitments=rows,
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+
+    ids = [r.commitment_id for r in table.refs]
+    assert not any(i and i.startswith("undated") for i in ids)
+    assert ids[:2] == ["late2", "late1"]  # overdue first, oldest due date first
+    assert ids[2:] == ["today", "soon0", "soon1", "soon2", "soon3"]  # 5 upcoming, soonest first
+    assert [r.overdue for r in table.refs] == [True, True] + [False] * 5
+    # Far smaller than sending all 91 open rows.
+    assert len(table.render()) < 2000
 
 
 def test_quote_and_prompt_text_are_bounded() -> None:
@@ -185,3 +212,52 @@ def test_objection_matching_uses_unresolved_only_and_best_source() -> None:
     pairs = match_objection_sources(report, sources)
 
     assert [(o.raised_by, h.memory_id) for o, h in pairs] == [("Sneha", "s")]
+
+
+def test_recall_floor_and_overdue_cap_hold_together() -> None:
+    sections = [[hit(10 * si + j, "m1") for j in range(3)] for si in range(6)]
+    rows = [commitment(f"over{i:02d}", date(2026, 9, 1 + i)) for i in range(14)]
+    rows += [commitment(f"soon{i}", date(2026, 10, 1 + i)) for i in range(6)]
+    objections = [
+        (Objection(concern=f"c{i}", raised_by="x", raised_on=date(2026, 7, 1), resolved=False),
+         hit(100 + i, "m2"))
+        for i in range(6)
+    ]  # fmt: skip
+    table = build_evidence(
+        mental_model=MentalModelText(id="r", name="n", content="S", last_refreshed_at=None),
+        latest_done_meeting=MEETINGS["m9"],
+        recall_sections=sections,
+        objections=objections,
+        commitments=rows,
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+
+    led = [r.commitment_id for r in table.refs if r.commitment_id]
+    overdue = [c for c in led if c and c.startswith("over")]
+    assert len(overdue) == MAX_OVERDUE_EVIDENCE == 8
+    assert overdue == [f"over{i:02d}" for i in range(6, 14)]  # latest due dates, shown oldest first
+    recall_ids = [
+        r.memory_id for r in table.refs if r.memory_id and not r.memory_id.startswith("h1")
+    ]
+    recall = [r for r in table.refs if r.source_type == SourceType.meeting and r.memory_id]
+    per_section = {int(r.memory_id[1:]) // 10 for r in recall if int(r.memory_id[1:]) < 100}  # type: ignore[index]
+    assert per_section == set(range(6))  # every section keeps at least one entry
+    assert len([r for r in recall if int(r.memory_id[1:]) < 100]) >= MIN_RECALL  # type: ignore[index]
+    assert len(table.refs) <= EVIDENCE_CAP
+    assert recall_ids  # sanity
+
+
+def test_recall_floor_reserves_a_slot_per_section_even_beyond_min_recall() -> None:
+    sections = [[hit(10 * si + j, "m1") for j in range(2)] for si in range(10)]
+    table = build_evidence(
+        mental_model=None,
+        latest_done_meeting=None,
+        recall_sections=sections,
+        objections=[],
+        commitments=[],
+        meetings=MEETINGS,
+        today=TODAY,
+    )
+    firsts = {f"h{10 * si}" for si in range(10)}
+    assert firsts <= {r.memory_id for r in table.refs}
