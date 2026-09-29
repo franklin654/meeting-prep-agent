@@ -78,6 +78,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/meetings/{meeting_id}/capture/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Capture */
+        post: operations["preview_capture_api_meetings__meeting_id__capture_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capture/{draft_id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Capture */
+        post: operations["save_capture_api_capture__draft_id__save_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capture/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Capture */
+        delete: operations["delete_capture_api_capture__draft_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts": {
         parameters: {
             query?: never;
@@ -433,6 +484,62 @@ export interface components {
              */
             collapsed: boolean;
         };
+        /** CaptureDraftResponse */
+        CaptureDraftResponse: {
+            /** Draft Id */
+            draft_id: string;
+            /** Meeting Id */
+            meeting_id: string;
+            /** Items */
+            items: components["schemas"]["CaptureItem"][];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+        };
+        /** CaptureItem */
+        CaptureItem: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "commitment" | "closes" | "fact";
+            fact_kind?: components["schemas"]["FactKind"] | null;
+            /** Text */
+            text: string;
+            /** Owner */
+            owner?: string | null;
+            /** Contact */
+            contact?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Quote */
+            quote: string;
+            /**
+             * Badge
+             * @enum {string}
+             */
+            badge: "new" | "closes" | "duplicate" | "updates_due_date";
+            /** Target Commitment Id */
+            target_commitment_id?: string | null;
+            /**
+             * Checked
+             * @default true
+             */
+            checked: boolean;
+        };
+        /** CapturePreviewRequest */
+        CapturePreviewRequest: {
+            /** Transcript */
+            transcript: string;
+        };
+        /** CaptureSaveRequest */
+        CaptureSaveRequest: {
+            /** Unchecked Item Ids */
+            unchecked_item_ids?: string[];
+        };
         /** Citation */
         Citation: {
             source_type: components["schemas"]["SourceType"];
@@ -534,6 +641,7 @@ export interface components {
              */
             status: "pending" | "done" | "failed";
             learned?: components["schemas"]["LearnedSummary"] | null;
+            draft?: components["schemas"]["CaptureDraftResponse"] | null;
             /** Error */
             error?: string | null;
         };
@@ -881,6 +989,105 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_capture_api_meetings__meeting_id__capture_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meeting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapturePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_capture_api_capture__draft_id__save_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_capture_api_capture__draft_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

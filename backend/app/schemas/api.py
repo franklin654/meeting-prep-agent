@@ -82,6 +82,35 @@ class NotesRequest(BaseModel):  # POST /api/meetings/{id}/notes
     transcript: str = Field(min_length=50)
 
 
+class CapturePreviewRequest(BaseModel):
+    transcript: str = Field(min_length=50, max_length=200_000)
+
+
+class CaptureSaveRequest(BaseModel):
+    unchecked_item_ids: list[str] = Field(default_factory=list)
+
+
+class CaptureItem(BaseModel):
+    id: str
+    kind: Literal["commitment", "closes", "fact"]
+    fact_kind: FactKind | None = None
+    text: str
+    owner: str | None = None
+    contact: str | None = None
+    due_date: date | None = None
+    quote: str
+    badge: Literal["new", "closes", "duplicate", "updates_due_date"]
+    target_commitment_id: str | None = None
+    checked: bool = True
+
+
+class CaptureDraftResponse(BaseModel):
+    draft_id: str
+    meeting_id: str
+    items: list[CaptureItem]
+    counts: dict[str, int]
+
+
 class JobAccepted(BaseModel):  # 202 responses
     job_id: str
 
@@ -98,6 +127,7 @@ class JobStatus(BaseModel):  # GET /api/jobs/{id}
     kind: str
     status: Literal["pending", "done", "failed"]
     learned: LearnedSummary | None = None
+    draft: CaptureDraftResponse | None = None
     error: str | None = None
 
 

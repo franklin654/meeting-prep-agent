@@ -8,7 +8,7 @@ from datetime import date
 
 from fastapi import FastAPI
 
-from app.api import accounts, ask, briefs, contacts, feedback, jobs, meetings, nudges
+from app.api import accounts, ask, briefs, capture, contacts, feedback, jobs, meetings, nudges
 from app.api.deps import close_memory_service
 from app.config import settings
 from app.core.company import company_data
@@ -35,6 +35,7 @@ app = FastAPI(title="Meeting Prep Agent API", lifespan=lifespan)
 
 register_exception_handlers(app)
 app.include_router(meetings.router, prefix="/api")
+app.include_router(capture.router, prefix="/api")
 app.include_router(accounts.router, prefix="/api")
 app.include_router(ask.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")

@@ -281,6 +281,8 @@ def test_startup_does_not_build_memory_or_llm(
         assert started.get("/api/health").json() == {
             "status": "ok",
             "demo_today": "2026-09-28",
+            "ae_name": "Priya Nair",
+            "company_name": "Tracewise",
         }
     assert built == []
     engine.dispose()

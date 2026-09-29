@@ -10,7 +10,7 @@ from sqlmodel import Session
 from app.api.deps import get_session
 from app.core.errors import NotFoundError
 from app.db import repository
-from app.schemas.api import JobStatus, LearnedSummary
+from app.schemas.api import CaptureDraftResponse, JobStatus, LearnedSummary
 
 router = APIRouter()
 
@@ -23,7 +23,12 @@ def get_job(job_id: str, session: Annotated[Session, Depends(get_session)]) -> J
         raise NotFoundError(f"Job {job_id!r} not found.")
     learned = (
         LearnedSummary.model_validate(job.result)
-        if job.status == "done" and job.result is not None
+        if job.status == "done" and job.result is not None and "facts" in job.result
+        else None
+    )
+    draft = (
+        CaptureDraftResponse.model_validate(job.result["draft"])
+        if job.status == "done" and job.result is not None and "draft" in job.result
         else None
     )
     return JobStatus(
@@ -31,5 +36,6 @@ def get_job(job_id: str, session: Annotated[Session, Depends(get_session)]) -> J
         kind=job.kind,
         status=cast(Literal["pending", "done", "failed"], job.status),
         learned=learned,
+        draft=draft,
         error=job.error if job.status == "failed" else None,
     )
