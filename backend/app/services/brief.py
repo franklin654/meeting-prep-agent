@@ -44,11 +44,12 @@ from app.db.brief_repo import (
     new_brief_stamp,
     save_brief,
 )
-from app.db.models import Commitment, Contact, Meeting
+from app.db.models import AskAnswer, Commitment, Contact, Meeting
 from app.llm.client import LLMClient, get_llm_client
 from app.llm.prompt_loader import render_prompt
 from app.memory.memory_service import MemoryService, MentalModelText, _relationship_model_id
 from app.memory.tags import account_tag, contact_tag
+from app.schemas.ask import AskResponse
 from app.schemas.brief import (
     Brief,
     BriefDraft,
@@ -776,6 +777,14 @@ def assemble_brief(
     attendee_items = _attendee_items(inputs, mode=mode)
     if attendee_items:
         sections[SectionKey.attendees] = attendee_items
+    if mode == "memory":
+        pinned = [
+            item
+            for ask_answer in inputs.pinned_ask_answers
+            if (item := _pinned_ask_item(ask_answer)) is not None
+        ]
+        if pinned:
+            sections[SectionKey.your_questions] = pinned
 
     ordered = [
         BriefSection(key=key, title=SECTION_TITLES[key], items=sections[key])
@@ -796,6 +805,62 @@ def assemble_brief(
         sections=ordered,
         facts_used=len(cited),
         preferences_applied=[],
+    )
+
+
+def _pinned_ask_item(ask_answer: AskAnswer) -> BriefItem | None:
+    try:
+        answer = AskResponse.model_validate(
+            {"ask_answer_id": ask_answer.id, **ask_answer.answer}
+        )
+    except PydanticValidationError:
+        logger.warning("brief.pinned_ask_dropped ask_id=%s reason=invalid_output", ask_answer.id)
+        return None
+    if not answer.grounded or not answer.citations:
+        return None
+    return BriefItem(
+        id=f"ask-{ask_answer.id}",
+        text=f"Q: {ask_answer.question}\nA: {answer.answer}",
+        severity=Severity.info,
+        contact_ids=[],
+        citations=answer.citations,
+    )
+
+
+def add_pinned_ask_answer(brief: Brief, ask_answer: AskAnswer) -> Brief:
+    """Append one grounded pinned answer to an existing cached memory brief."""
+    item = _pinned_ask_item(ask_answer)
+    if item is None:
+        return brief
+    sections = list(brief.sections)
+    idx = next(
+        (i for i, section in enumerate(sections) if section.key == SectionKey.your_questions),
+        None,
+    )
+    if idx is None:
+        sections.append(
+            BriefSection(
+                key=SectionKey.your_questions,
+                title=SECTION_TITLES[SectionKey.your_questions],
+                items=[item],
+            )
+        )
+    else:
+        existing = sections[idx]
+        items = [entry for entry in existing.items if entry.id != item.id]
+        sections[idx] = existing.model_copy(update={"items": [*items, item]})
+    existing_facts = {
+        (citation.source_type, citation.meeting_id, citation.memory_id, citation.quote)
+        for section in brief.sections
+        for entry in section.items
+        for citation in entry.citations
+    }
+    new_facts = {
+        (citation.source_type, citation.meeting_id, citation.memory_id, citation.quote)
+        for citation in item.citations
+    } - existing_facts
+    return brief.model_copy(
+        update={"sections": sections, "facts_used": brief.facts_used + len(new_facts)}
     )
 
 

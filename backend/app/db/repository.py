@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.errors import NotFoundError
 from app.core.time import today
@@ -260,6 +260,15 @@ def pin_ask_answer(session: Session, ask_id: str, *, meeting_id: str) -> AskAnsw
     session.commit()
     session.refresh(ask_answer)
     return ask_answer
+
+
+def list_pinned_ask_answers_for_meeting(session: Session, meeting_id: str) -> list[AskAnswer]:
+    statement = (
+        select(AskAnswer)
+        .where(AskAnswer.pinned_to_meeting_id == meeting_id)
+        .order_by(col(AskAnswer.created_at), col(AskAnswer.id))
+    )
+    return list(session.exec(statement).all())
 
 
 # ---- Job ----

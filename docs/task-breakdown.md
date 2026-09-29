@@ -55,7 +55,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T20 | Reasoning: R2 contradictions after ingest, account alerts | BE-core | T12 | `services/reasoning.py`, prompt R2 | Acceptance 12 passes | Done: R2 runs after retain/idle; alerts require both cited meetings; fake-backed |
 | T21 | R1 objections and R3 cross-contact gaps in the brief | BE-brief | T14 | `services/brief.py`, prompts R1, R3 | Acceptance 13 passes | Not started |
 | T22 | R4 cross-deal patterns in the brief | BE-brief | T14, T11 | prompt R4 | Acceptance 16 passes | Not started |
-| T23 | Ask backend: R5, pin, Remember this, `ask_answers` | BE-brief | T06, T07 | `services/ask.py`, `api/ask.py` | Acceptance 18 (API parts) passes | Not started |
+| T23 | Ask backend: R5, pin, Remember this, `ask_answers` | BE-brief | T06, T07 | `services/ask.py`, `api/ask.py` | Acceptance 18 (API parts) passes | Done: scoped R5 answers/citations, pin section, note job; fake-backed |
 | T24 | AskPanel UI and P4 suggested questions | FE | T17, T23 | `components/AskPanel.tsx`, prompt P4 | Acceptance 18 passes in browser | Not started |
 | T25 | Stakeholder map and relationship health | FE | T06, T18 | `api/accounts.py`, components | Acceptance 14–15 pass | Not started |
 | T26 | Nudges API and digest | FE | T06, T16 | `api/nudges.py`, `NudgeDigest.tsx` | Acceptance 17 passes | Not started |
