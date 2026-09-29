@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.config import settings
@@ -48,6 +48,16 @@ def get_session() -> Generator[Session, None, None]:
 BRIEF_UNIQUE_INDEX = "ux_briefrecord_meeting_mode"
 
 
+def _has_unique_index(conn: Connection, table: str, columns: list[str]) -> bool:
+    """True if a unique index or constraint on exactly `columns` (any order) exists."""
+    for row in conn.execute(text(f"PRAGMA index_list({table})")).all():
+        if row[2]:  # unique
+            info = conn.execute(text(f"PRAGMA index_info({row[1]})")).all()
+            if sorted(c[2] for c in info) == sorted(columns):
+                return True
+    return False
+
+
 def ensure_brief_unique_index(target: Engine | None = None) -> None:
     """Idempotently enforce one `briefrecord` row per (meeting_id, mode).
 
@@ -74,12 +84,13 @@ def ensure_brief_unique_index(target: Engine | None = None) -> None:
                 )
                 conn.execute(text("DELETE FROM briefrecord WHERE id = :old"), {"old": row.id})
                 removed += 1
-        conn.execute(
-            text(
-                f"CREATE UNIQUE INDEX IF NOT EXISTS {BRIEF_UNIQUE_INDEX} "
-                "ON briefrecord (meeting_id, mode)"
+        if not _has_unique_index(conn, "briefrecord", ["meeting_id", "mode"]):
+            conn.execute(
+                text(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS {BRIEF_UNIQUE_INDEX} "
+                    "ON briefrecord (meeting_id, mode)"
+                )
             )
-        )
     logger.info("db.brief_unique_index rows=%d duplicates_removed=%d", len(rows), removed)
 
 

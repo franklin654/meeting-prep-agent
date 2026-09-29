@@ -463,17 +463,22 @@ def _apply_severity_cap(
 ) -> None:
     """At most MAX_CRITICAL_ITEMS critical items in the whole brief, all in open_commitments.
 
-    Candidates are open_commitments items citing an overdue ledger row, ranked us-owned first,
-    then most days overdue, then commitment id. The top ones stay critical; everything else that
-    would be critical (other overdue rows, customer-owned rows, any agenda/alerts/other-section
-    item citing or restating overdue rows, an LLM `critical` anywhere) becomes `warning`.
-    open_commitments is then ordered by severity, then rank.
+    Critical candidates are ONLY open_commitments items citing an overdue ledger row owned by
+    us, ranked most days overdue first, then commitment id; the top ones stay critical. A
+    customer-owned row is never critical. Everything else that would be critical (other overdue
+    rows, customer-owned rows, any agenda/alerts/other-section item citing or restating overdue
+    rows, an LLM `critical` anywhere) becomes `warning`. open_commitments is then ordered by
+    severity, then rank (us-owned overdue first, most overdue first).
     """
     commitments = sections.get(SectionKey.open_commitments, [])
     candidates = sorted(
         (i for i in commitments if i.id in overdue_of), key=lambda i: min(overdue_of[i.id])
     )
-    critical_ids = {i.id for i in candidates[:MAX_CRITICAL_ITEMS]}
+    us_candidates = sorted(
+        (i for i in commitments if any(not r[0] for r in overdue_of.get(i.id, []))),
+        key=lambda i: min(r for r in overdue_of[i.id] if not r[0]),
+    )
+    critical_ids = {i.id for i in us_candidates[:MAX_CRITICAL_ITEMS]}
     for items in sections.values():
         for idx, item in enumerate(items):
             if item.id in critical_ids:

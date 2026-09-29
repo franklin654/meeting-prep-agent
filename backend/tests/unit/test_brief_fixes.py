@@ -120,6 +120,55 @@ async def test_at_most_two_critical_items_us_owned_most_overdue_first(world: Wor
     assert citation.meeting_id == "m4_finedge" and citation.quote == DECK_QUOTE
 
 
+async def test_customer_owned_overdue_items_are_never_critical(world: World) -> None:
+    add_commitments(
+        world,
+        [
+            overdue_row("cm_them_a", Owner.them, date(2026, 8, 1)),
+            overdue_row("cm_them_b", Owner.them, date(2026, 8, 2)),
+        ],
+    )
+
+    brief, _ = await make(world)  # deck is the only us-owned overdue row
+
+    commitments = section(brief, SectionKey.open_commitments)
+    assert len(commitments) == 3
+    assert [i.severity for i in commitments] == [
+        Severity.critical,
+        Severity.warning,
+        Severity.warning,
+    ]
+    assert "pricing deck" in commitments[0].text  # us-owned outranks the older customer rows
+    assert len(critical_items(brief)) == 1
+
+
+async def test_zero_us_owned_overdue_means_zero_critical(world: World) -> None:
+    with Session(world.engine) as s:
+        s.delete(s.get(Commitment, "cm_deck"))
+        s.commit()
+    add_commitments(
+        world,
+        [
+            overdue_row("cm_them_a", Owner.them, date(2026, 8, 1)),
+            overdue_row("cm_them_b", Owner.them, date(2026, 8, 2)),
+        ],
+    )
+
+    def shouting(prompt: str) -> BriefDraft:
+        return BriefDraft(
+            sections={
+                SectionKey.open_commitments: [
+                    item("Their promise", evidence_ids(prompt, "cm_them_a"), Severity.critical)
+                ]
+            }
+        )
+
+    brief, _ = await make(world, shouting)
+
+    assert critical_items(brief) == []
+    assert len(section(brief, SectionKey.open_commitments)) == 2
+
+
 async def test_critical_cap_with_fewer_than_two_candidates(world: World) -> None:
     brief, _ = await make(world)  # only the deck is overdue
 
@@ -475,3 +524,44 @@ async def test_no_memory_with_nothing_generated_is_still_persisted(world: World)
 
     assert brief.sections == []
     assert [r.mode for r in rows(world)] == ["no_memory"]  # rule applies to memory mode only
+
+
+def _unique_indexes_on_brief_columns(engine: Any) -> list[str]:
+    with engine.connect() as conn:
+        found = []
+        for row in conn.execute(text("PRAGMA index_list(briefrecord)")).all():
+            if row[2]:
+                cols = sorted(c[2] for c in conn.execute(text(f"PRAGMA index_info({row[1]})")))
+                if cols == ["meeting_id", "mode"]:
+                    found.append(row[1])
+        return found
+
+
+def test_fresh_database_ends_with_exactly_one_unique_index(tmp_path: Path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'fresh.db'}")
+
+    create_db_and_tables(engine)
+    create_db_and_tables(engine)
+
+    assert len(_unique_indexes_on_brief_columns(engine)) == 1
+    engine.dispose()
+
+
+def test_old_schema_table_gets_exactly_one_unique_index(tmp_path: Path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'old2.db'}")
+    SQLModel.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE briefrecord"))
+        conn.execute(
+            text(
+                "CREATE TABLE briefrecord (id VARCHAR PRIMARY KEY, meeting_id VARCHAR, "
+                "mode VARCHAR, content JSON, created_at DATETIME)"
+            )
+        )
+    assert _unique_indexes_on_brief_columns(engine) == []
+
+    ensure_brief_unique_index(engine)
+    ensure_brief_unique_index(engine)
+
+    assert _unique_indexes_on_brief_columns(engine) == [BRIEF_UNIQUE_INDEX]
+    engine.dispose()
