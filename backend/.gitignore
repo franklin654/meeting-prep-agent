@@ -7,3 +7,6 @@ __pycache__/
 *.egg-info/
 app.db
 .env
+
+# seed progress log (data/scripts/seed.py)
+seed.log
