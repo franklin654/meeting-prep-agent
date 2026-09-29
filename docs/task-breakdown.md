@@ -60,7 +60,7 @@ Feature numbers (F#) refer to the Feature spec; acceptance numbers match the Acc
 | T25 | Stakeholder map and relationship health | FE | T06, T18 | `api/accounts.py`, components | Acceptance 14–15 pass | Not started |
 | T26 | Nudges API and digest | FE | T06, T16 | `api/nudges.py`, `NudgeDigest.tsx` | Acceptance 17 passes | Not started |
 | T27 | Golden tests G-1 to G-4 in throwaway banks | DATA | T11, T20, T21, T22 | `tests/golden/` | All four pass; phase 5 gate met | Not started |
-| T28 | Demo tooling: `demo-after-m6` snapshot, pre-generated briefs | DATA | T11 | `Makefile`, scripts | Snapshot restores in under 1 minute | Not started |
+| T28 | Demo tooling: `demo-after-m6` snapshot, pre-generated briefs | DATA | T11 | `Makefile`, scripts | Snapshot restores in under 1 minute | Done: snapshot captured; restore dry-run/refusals tested; scratch Hindsight check skipped |
 | T29 | AMI evaluation script (optional) | DATA | T12 | `data/scripts/eval_ami.py` | Recall and extraction scores reported | Not started |
 | T30 | UI polish: loading, empty and error states, visual pass | FE | T17 | `frontend/src/` | Performance budgets met; no layout breaks | Not started |
 | T31 | Demo script and rehearsals | DATA | T27, T28, T30 | `docs/demo-script.md` | Demo-readiness checklist complete | Not started |
