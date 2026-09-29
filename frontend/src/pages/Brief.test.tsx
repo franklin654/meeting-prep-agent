@@ -50,6 +50,17 @@ describe('Brief page', () => {
     expect(screen.queryByTestId('feedback-slot-where_left_off')).not.toBeInTheDocument()
   })
 
+  it('hoists contradiction alerts into Needs attention without duplicating them', async () => {
+    const f = mockFetch({ 'GET /api/meetings/mtg_1/brief': { body: {
+      id: 'br_alert', meeting_id: 'mtg_1', mode: 'memory', generated_at: '2026-09-29T10:00:00Z',
+      sections: [{ key: 'alerts', title: 'Alerts', collapsed: false, items: [{ id: 'alert_1', text: 'Budget contradiction: the forecast changed from $40K to $75K.', severity: 'warning', contact_ids: [], citations: [{ source_type: 'meeting', meeting_id: 'mtg_old', meeting_date: '2026-09-20', label: 'M4 · Sep 20', quote: 'The revised forecast is $75K.', memory_id: 'mem_1' }] }] }], facts_used: 1, preferences_applied: [],
+    } } })
+    renderRoutes(routes, { route: '/meetings/mtg_1' })
+    expect(await screen.findByRole('region', { name: 'Needs attention' })).toBeInTheDocument()
+    expect(screen.getAllByText(/Budget contradiction/)).toHaveLength(1)
+    expect(f.calls.every((call) => call.method === 'GET')).toBe(true)
+  })
+
   it('shows skeletons and disables generation while the cached brief is loading', async () => {
     const f = mockFetch({ 'GET /api/meetings/mtg_1/brief': { delayMs: 500, status: 404, body: { error: { code: 'not_found', message: 'No brief' } } } })
     renderRoutes(routes, { route: '/meetings/mtg_1' })
