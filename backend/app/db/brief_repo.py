@@ -25,7 +25,7 @@ from sqlmodel import Session, select
 from app.core.errors import NotFoundError
 from app.core.time import utcnow
 from app.db import repository
-from app.db.models import Account, BriefRecord, Commitment, Contact, Meeting
+from app.db.models import Account, AskAnswer, BriefRecord, Commitment, Contact, Meeting
 from app.schemas.brief import Brief
 from app.schemas.enums import CommitmentStatus
 
@@ -47,6 +47,7 @@ class BriefInputs:
     account_meetings: list[Meeting]
     attendee_ids_by_meeting: dict[str, set[str]]  # for every account meeting
     open_commitments: list[Commitment]
+    pinned_ask_answers: list[AskAnswer]
 
 
 def load_brief_inputs(
@@ -87,6 +88,11 @@ def load_brief_inputs(
             account_meetings=account_meetings,
             attendee_ids_by_meeting=attendee_ids_by_meeting,
             open_commitments=open_commitments,
+            pinned_ask_answers=(
+                repository.list_pinned_ask_answers_for_meeting(session, meeting_id)
+                if include_ledger
+                else []
+            ),
         )
 
 
