@@ -665,7 +665,7 @@ async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
 
     brief, _ = await make(world)
 
-    assert len(world.memory.reflect_calls) == 2
+    assert len(world.memory.reflect_calls) == 3
     assert set(world.memory.get_memory_calls) >= {"o_sec", "o_security_gap_m5"}
     alerts = section(brief, SectionKey.alerts)
     assert alerts, (world.memory.reflect_calls, world.memory.get_memory_calls)
@@ -679,6 +679,139 @@ async def test_r3_builds_cited_b5_alert_from_attendance_and_recorded_output(
     )
     assert "Anita Desai" in r3_query and "Rahul Mehta" in r3_query
     assert r3_tags == [account_tag("acc_finedge")]
+
+
+async def test_r4_uses_resolved_other_account_sources_only(world: World) -> None:
+    from app.db.brief_repo import load_brief_inputs
+    from app.memory.tags import account_tag, meeting_tag
+    from app.schemas.brief import BriefDraft
+    from app.services.brief import _cross_deal_patterns, assemble_brief
+    from app.services.evidence import EvidenceTable
+    from tests.fakes.fake_memory_service import FakeMemoryService
+
+    memory = FakeMemoryService()
+    memory.seed_fact(
+        "veda_v2_objection",
+        "Farah says SOC 2 Type II and patient data handling are must-haves.",
+        tags=[account_tag("acc_veda"), meeting_tag("v2_veda")],
+        meeting_id="v2_veda",
+        meeting_date=date(2026, 4, 7),
+    )
+    memory.seed_fact(
+        "nimbus_n2_objection",
+        "Deepak says SOC 2 Type II and India data residency are blockers.",
+        tags=[account_tag("acc_nimbus"), meeting_tag("n2_nimbus")],
+        meeting_id="n2_nimbus",
+        meeting_date=date(2026, 3, 24),
+    )
+    memory.seed_fact(
+        "nimbus_n3_resolution",
+        "Deepak confirmed access to the trust portal and the pen-test summary resolved "
+        "SOC 2 concerns.",
+        tags=[account_tag("acc_nimbus"), meeting_tag("n3_nimbus")],
+        meeting_id="n3_nimbus",
+        meeting_date=date(2026, 4, 14),
+    )
+    memory.seed_fact(
+        "finedge_m3_objection",
+        "SOC 2 security objection from Farah.",
+        tags=[account_tag("acc_finedge"), meeting_tag("m3_finedge")],
+        meeting_id="m3_finedge",
+        meeting_date=date(2026, 8, 12),
+    )
+    memory.seed_fact(
+        "finedge_m4_resolution",
+        "The trust portal and pen-test summary resolved the SOC 2 security objection.",
+        tags=[account_tag("acc_finedge"), meeting_tag("m4_finedge")],
+        meeting_id="m4_finedge",
+        meeting_date=date(2026, 8, 27),
+    )
+    memory.queue_reflect_response(
+        ReflectResult(
+            text="resolved pattern",
+            structured={
+                "patterns": [{
+                    "objection": "SOC 2 Type II requirement",
+                    "other_account": "Nimbus Logistics",
+                    "what_worked": "trust portal access and pen-test summary",
+                    "resolved_on": "April 14, 2026",
+                    "extra": "ignored",
+                }]
+            },
+            sources=[
+                MemoryHit(
+                    memory_id="veda_v2_objection",
+                    text="Farah says SOC 2 Type II and patient data handling are must-haves.",
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="nimbus_n2_objection",
+                    text="Deepak says SOC 2 Type II and India data residency are blockers.",
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="nimbus_n3_resolution",
+                    text=(
+                        "Deepak confirmed access to the trust portal and the pen-test summary "
+                        "resolved SOC 2 concerns."
+                    ),
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="finedge_m3_objection",
+                    text="SOC 2 security objection from Farah.",
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+                MemoryHit(
+                    memory_id="finedge_m4_resolution",
+                    text=(
+                        "The trust portal and pen-test summary resolved the SOC 2 security "
+                        "objection."
+                    ),
+                    meeting_id=None,
+                    meeting_date=None,
+                    tags=[],
+                ),
+            ],
+            structured_error=None,
+        )
+    )
+
+    items = await _cross_deal_patterns(memory, account_id="acc_veda", deal_stage="discovery")
+
+    assert len(items) == 1
+    assert items[0].severity == Severity.warning
+    assert {citation.meeting_id for citation in items[0].citations} == {
+        "n2_nimbus",
+        "n3_nimbus",
+    }
+    assert all(citation.meeting_id != "v2_veda" for citation in items[0].citations)
+    assert "trust portal" in items[0].text and "pen-test summary" in items[0].text
+    assert memory.reflect_calls[0][1:] == ([], "high")
+    assert "discovery" in memory.reflect_calls[0][0]
+    brief = assemble_brief(
+        BriefDraft(sections={}),
+        EvidenceTable([]),
+        mode="memory",
+        inputs=load_brief_inputs(world.session_factory, M6),
+        meetings={},
+        brief_id="br_r4_test",
+        generated_at=datetime(2026, 9, 29, tzinfo=UTC),
+        cross_deal_patterns=items,
+    )
+    pattern_item = section(brief, SectionKey.watch_outs)[0]
+    assert {citation.meeting_id for citation in pattern_item.citations} == {
+        "n2_nimbus",
+        "n3_nimbus",
+    }
 
 
 # ---- cache ------------------------------------------------------------------------------
