@@ -458,48 +458,77 @@ def _contact_mentioned(text: str, contacts: Sequence[Contact]) -> Contact | None
     )
 
 
+_DISCOVERY_SUMMARY = re.compile(
+    r"^\s*(?:the |this |a |an )?(?:[\w-]+ ){0,3}(?:meeting|call|session)\b"
+    r"|\bdiscovery (?:meeting|call)\b|\bled (?:a |the )?discovery\b",
+    re.IGNORECASE,
+)
+_LEADING_DATE = re.compile(r"^\s*on \d{4}-\d{2}-\d{2},?\s+", re.IGNORECASE)
+_RAISED_VERB = re.compile(
+    r"\b(raised?|requested|requests?|asked|wants?|wanted|concern|require[sd]?|must|blocker|"
+    r"mandatory|insist(?:ed)?|need(?:s|ed)?)\b",
+    re.IGNORECASE,
+)
+
+
+def _fact_subject(text: str, contacts: Sequence[Contact]) -> Contact | None:
+    """The account contact a fact is about: the one whose name opens the fact text.
+
+    Hindsight facts read "<Person> requested on <date> ...". A meeting/discovery summary or a
+    fact that only mentions a contact later on has no subject, so it is never used.
+    """
+    if _DISCOVERY_SUMMARY.search(text[:160]):
+        return None
+    body = _LEADING_DATE.sub("", text).lstrip().casefold()
+    for contact in contacts:
+        if contact.account_id is None:
+            continue
+        names = [contact.name, *contact.aliases, contact.name.split()[0]]
+        if any(n and re.match(re.escape(n.casefold()) + r"\b", body) for n in names):
+            return contact
+    return None
+
+
 def _b5_alerts(
     inputs: BriefInputs,
     security_hits: Sequence[MemoryHit],
     absence_hits: Sequence[MemoryHit],
     keywords: Sequence[str],
 ) -> list[BriefItem]:
+    """At most one security-gap item: the earliest call where a customer contact raised a
+    security topic that some customer-side attendee of the upcoming meeting missed."""
     meetings = {meeting.id: meeting for meeting in inputs.all_meetings}
     upcoming = [contact for contact in inputs.attendees if contact.account_id is not None]
-    grouped: dict[str, list[MemoryHit]] = {}
+    candidates: list[tuple[date, str, MemoryHit, Contact]] = []
     for hit in security_hits:
         if (
             hit.meeting_id
             and hit.meeting_date
+            and hit.meeting_id != inputs.meeting.id
             and hit.meeting_id in meetings
-            and _security_concern_hit(hit.text, keywords)
+            and hit.meeting_id in inputs.attendee_ids_by_meeting
+            and _security_hit(hit.text, keywords)
+            and _RAISED_VERB.search(hit.text)
+            and (raiser := _fact_subject(hit.text, inputs.account_contacts)) is not None
         ):
-            grouped.setdefault(hit.meeting_id, []).append(hit)
-
-    output: list[BriefItem] = []
-    for meeting_id, hits in grouped.items():
-        call_attendees = inputs.attendee_ids_by_meeting.get(meeting_id, set())
-        absent = [contact for contact in upcoming if contact.id not in call_attendees]
+            candidates.append((hit.meeting_date, hit.memory_id, hit, raiser))
+    for meeting_date, _, source_hit, raiser in sorted(candidates, key=lambda c: c[:2]):
+        meeting_id = source_hit.meeting_id
+        assert meeting_id is not None
+        call_attendees = inputs.attendee_ids_by_meeting[meeting_id]
+        absent = [
+            contact
+            for contact in upcoming
+            if contact.id not in call_attendees and contact.id != raiser.id
+        ]
         if not absent:
             continue
-        raised = next(
-            (
-                (hit, raiser)
-                for hit in hits
-                if (raiser := _contact_mentioned(hit.text, inputs.account_contacts)) is not None
-            ),
-            None,
-        )
-        if raised is None or raised[1] is None:
-            continue
-        source_hit, raiser = raised
-        assert source_hit.meeting_date is not None
         citations = [
             Citation(
                 source_type=SourceType.meeting,
                 meeting_id=meeting_id,
-                meeting_date=source_hit.meeting_date,
-                label=_meeting_label(meetings[meeting_id], source_hit.meeting_date),
+                meeting_date=meeting_date,
+                label=_meeting_label(meetings[meeting_id], meeting_date),
                 quote=truncate(source_hit.text, QUOTE_MAX_CHARS),
                 memory_id=source_hit.memory_id,
             )
@@ -510,43 +539,42 @@ def _b5_alerts(
                 hit.meeting_id
                 and hit.meeting_id != meeting_id
                 and hit.meeting_date
+                and hit.meeting_id in meetings
                 and any(name in hit.text.casefold() for name in absent_names)
                 and "security" in hit.text.casefold()
                 and re.search(r"has(?:n't| not) been in", hit.text, re.IGNORECASE)
             ):
-                source_meeting = meetings.get(hit.meeting_id)
-                if source_meeting is not None:
-                    citations.append(
-                        Citation(
-                            source_type=SourceType.meeting,
-                            meeting_id=hit.meeting_id,
-                            meeting_date=hit.meeting_date,
-                            label=_meeting_label(source_meeting, hit.meeting_date),
-                            quote=truncate(hit.text, QUOTE_MAX_CHARS),
-                            memory_id=hit.memory_id,
-                        )
+                citations.append(
+                    Citation(
+                        source_type=SourceType.meeting,
+                        meeting_id=hit.meeting_id,
+                        meeting_date=hit.meeting_date,
+                        label=_meeting_label(meetings[hit.meeting_id], hit.meeting_date),
+                        quote=truncate(hit.text, QUOTE_MAX_CHARS),
+                        memory_id=hit.memory_id,
                     )
-                    break
-        names = ", ".join(contact.name for contact in absent)
+                )
+                break
+        names = " and ".join(contact.name for contact in absent)
         topics = [
             keyword
             for keyword in keywords
             if keyword.casefold() != "security" and _security_hit(source_hit.text, [keyword])
         ]
         topic_text = " and ".join(topics) or "security"
-        output.append(
+        return [
             BriefItem(
                 id=f"b5-{meeting_id}-{source_hit.memory_id}",
                 text=(
                     f"{raiser.name} raised a {topic_text} concern on "
-                    f"{format_date(source_hit.meeting_date)}; {names} was not on that call."
+                    f"{meeting_date:%b} {meeting_date.day}; {names} was not on that call."
                 ),
                 severity=Severity.warning,
                 contact_ids=[contact.id for contact in absent],
                 citations=citations,
             )
-        )
-    return output
+        ]
+    return []
 
 
 async def _recall_objection_hits(
@@ -1625,12 +1653,14 @@ def assemble_brief(
             )
         _drop_repeated_competitor_objections(sections, competitors)
 
-    if mode == "memory" and cross_contact_alerts:
-        sections.setdefault(SectionKey.alerts, []).extend(
+    if mode == "memory":
+        # The alerts section is owned by the code-built security-gap item (_b5_alerts). Any
+        # LLM-drafted alert (e.g. an unrelated decision-date warning) is dropped here.
+        sections[SectionKey.alerts] = [
             item
             for item in cross_contact_alerts
             if item.citations and all(_is_citable(c) for c in item.citations)
-        )
+        ]
 
     if mode == "memory" and cross_deal_patterns:
         sections.setdefault(SectionKey.watch_outs, []).extend(
