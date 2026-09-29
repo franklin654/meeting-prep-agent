@@ -13,6 +13,7 @@ from app.core.time import utcnow
 from app.db import brief_repo, ingest_repo, repository
 from app.db.brief_repo import SessionFactory
 from app.db.models import AskAnswer
+from app.llm.client import LLMClient
 from app.llm.prompt_loader import render_prompt
 from app.memory.memory_service import MemoryService
 from app.memory.tags import account_tag, contact_tag, meeting_tag
@@ -22,14 +23,43 @@ from app.schemas.ask import (
     AskResponse,
     NoteRequest,
     ReflectAnswer,
+    SuggestedQuestions,
 )
 from app.schemas.brief import Citation, SourceType
 from app.schemas.enums import ScopeType
 from app.schemas.memory import MemoryHit
-from app.services.brief import add_pinned_ask_answer
+from app.services.brief import add_pinned_ask_answer, get_cached_brief
 from app.services.evidence import QUOTE_MAX_CHARS, format_date, truncate
 
 logger = logging.getLogger(__name__)
+
+
+async def suggest_questions(
+    meeting_id: str,
+    *,
+    llm: LLMClient,
+    session_factory: SessionFactory,
+) -> SuggestedQuestions:
+    """Generate P4 suggestions from an existing cached memory brief only."""
+    brief = await get_cached_brief(meeting_id, "memory", session_factory=session_factory)
+    if brief is None:
+        raise NotFoundError(f"No cached memory brief for meeting {meeting_id!r}.")
+    with session_factory() as session:
+        meeting = repository.get_meeting(session, meeting_id)
+        if meeting is None:
+            raise NotFoundError(f"Meeting {meeting_id!r} not found.")
+        account = repository.get_account(session, meeting.account_id)
+        if account is None:
+            raise NotFoundError(f"Account {meeting.account_id!r} not found.")
+        account_name = account.name
+    prompt = render_prompt(
+        "suggest_questions",
+        account_name=account_name,
+        brief_json=brief.model_dump_json(exclude={"generated_at"}),
+    )
+    result = await llm.complete_json(prompt, SuggestedQuestions, temperature=0.3)
+    questions = [q.strip() for q in result.questions if q.strip()][:3]
+    return SuggestedQuestions(questions=questions or ["What changed since the last meeting?"])
 
 
 def _scope_tags(request: AskRequest, session_factory: SessionFactory) -> list[str]:

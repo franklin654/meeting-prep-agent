@@ -7,12 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlmodel import Session
 
-from app.api.deps import get_memory_service, get_session, get_session_factory
+from app.api.deps import get_brief_llm, get_memory_service, get_session, get_session_factory
 from app.db import ingest_repo
+from app.llm.client import LLMClient
 from app.memory.memory_service import MemoryService
 from app.schemas.api import JobAccepted
-from app.schemas.ask import AskRequest, AskResponse, NoteRequest, PinRequest
-from app.services.ask import ask_question, pin_answer, run_note_job
+from app.schemas.ask import AskRequest, AskResponse, NoteRequest, PinRequest, SuggestedQuestions
+from app.services.ask import ask_question, pin_answer, run_note_job, suggest_questions
 from app.services.ingest import SessionFactory
 
 router = APIRouter()
@@ -20,6 +21,16 @@ router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 MemoryDep = Annotated[MemoryService, Depends(get_memory_service)]
 SessionFactoryDep = Annotated[SessionFactory, Depends(get_session_factory)]
+LlmDep = Annotated[LLMClient, Depends(get_brief_llm)]
+
+
+@router.get("/meetings/{meeting_id}/suggested-questions", response_model=SuggestedQuestions)
+async def get_suggested_questions(
+    meeting_id: str,
+    llm: LlmDep,
+    session_factory: SessionFactoryDep,
+) -> SuggestedQuestions:
+    return await suggest_questions(meeting_id, llm=llm, session_factory=session_factory)
 
 
 @router.post("/ask", response_model=AskResponse)

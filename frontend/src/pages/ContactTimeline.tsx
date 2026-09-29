@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useContactTimeline } from '@/api/hooks'
+import { AskPanel } from '@/components/AskPanel'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,5 +44,6 @@ export function ContactTimeline() {
       </ol>
       {entries.length > PREVIEW_COUNT && <button type="button" className="ml-8 rounded-full border px-3 py-1.5 text-sm text-primary hover:bg-primary/5" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Show fewer facts' : `Show all ${entries.length} facts`}</button>}
     </>}
+    {id && <AskPanel scopeType="contact" scopeId={id} meetingId={entries.find((entry) => entry.citation.meeting_id)?.citation.meeting_id ?? undefined} />}
   </section>
 }

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useBrief, useGenerateBrief, useSubmitFeedback, useStyle, type Brief as BriefData } from '@/api/hooks'
 import type { components } from '@/api/schema'
 import { HeaderControls } from '@/components/Layout'
+import { AskPanel } from '@/components/AskPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -144,6 +145,7 @@ export function Brief() {
       <div id="with-memory"><ModePanel meetingId={id ?? ''} mode="memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'no_memory'} hiddenSections={hiddenSections} /></div>
       <div id="without-memory"><ModePanel meetingId={id ?? ''} mode="no_memory" onGenerate={setConfirmMode} disabled={loading || !!pendingMode} active={viewMode !== 'memory'} hiddenSections={[]} /></div>
     </div>
+    {id && <AskPanel scopeType="meeting" scopeId={id} meetingId={id} />}
     {confirmMode && <div role="alertdialog" aria-labelledby="regenerate-title" className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-lg"><h2 id="regenerate-title" className="font-semibold">Regenerate this brief?</h2><p className="mt-2 text-sm text-muted-foreground">This can take up to a minute. The cached {confirmMode === 'memory' ? 'memory' : 'no-memory'} brief will be replaced.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={!!pendingMode} onClick={() => setConfirmMode(undefined)}>Cancel</Button><Button disabled={!!pendingMode || loading} onClick={() => void confirmGenerate()}>{pendingMode ? 'Generating…' : 'Confirm regenerate'}</Button></div></div></div>}
   </section>
 }

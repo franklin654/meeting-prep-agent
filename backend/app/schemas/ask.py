@@ -58,3 +58,7 @@ class NoteRequest(BaseModel):
     text: str = Field(min_length=3, max_length=1000)
     scope_type: ScopeType
     scope_id: str
+
+
+class SuggestedQuestions(BaseModel):
+    questions: list[str] = Field(min_length=1, max_length=3)
