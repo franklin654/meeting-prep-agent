@@ -15,7 +15,11 @@ from datetime import date
 
 from pydantic import BaseModel
 
-from app.memory.memory_service import MemoryService, MentalModelText
+from app.memory.memory_service import (
+    MemoryService,
+    MentalModelText,
+    require_deletable_bank_id,
+)
 from app.memory.tags import (
     MemoryKind,
     account_tag,
@@ -35,6 +39,9 @@ class _RetainedItem:
     tags: list[str]
     meeting_id: str | None = None
     meeting_date: date | None = None
+    document_id: str | None = None
+    title: str | None = None
+    source: str | None = None
 
 
 class FakeMemoryService(MemoryService):
@@ -48,6 +55,7 @@ class FakeMemoryService(MemoryService):
         self._reflect_queue: list[ReflectResult | Exception] = []
         self.reflect_calls: list[tuple[str, list[str], str]] = []
         self.closed = False
+        self.deleted_banks: list[str] = []
         self.bank_ensured = False
         self._next_id = 0
 
@@ -103,13 +111,19 @@ class FakeMemoryService(MemoryService):
         tags.extend(contact_tag(cid) for cid in contact_ids)
         tags.append(meeting_tag(meeting_id))
         tags.append(kind_tag(MemoryKind.transcript))
+        document_id = f"meeting-{meeting_id}"
+        # Same document id replaces the earlier retain, as Hindsight does.
+        self.items = [i for i in self.items if i.document_id != document_id]
         self.items.append(
             _RetainedItem(
-                memory_id=f"meeting-{meeting_id}",
+                memory_id=document_id,
                 text=transcript,
                 tags=tags,
                 meeting_id=meeting_id,
                 meeting_date=meeting_date,
+                document_id=document_id,
+                title=title,
+                source=source,
             )
         )
 
@@ -170,6 +184,13 @@ class FakeMemoryService(MemoryService):
 
     async def wait_until_idle(self, timeout_s: float = 60.0) -> bool:
         return True
+
+    async def delete_bank(self, bank_id: str) -> None:
+        require_deletable_bank_id(bank_id)
+        self.items = []
+        self.mental_models = {}
+        self.bank_ensured = False
+        self.deleted_banks.append(bank_id)
 
 
 def _all_strict(item_tags: list[str], required_tags: list[str]) -> bool:
