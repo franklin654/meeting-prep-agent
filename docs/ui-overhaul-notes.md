@@ -9,7 +9,7 @@
 | A1 | complete | implementation `ecd34d9` |
 | A2 | complete | `f5f7585` |
 | A3 | complete | `4599067` |
-| A4 | complete | pending commit |
+| A4 | complete | implementation `532f731` |
 | A5 | planned | — |
 | A6 | planned | — |
 | A7 | planned | — |
