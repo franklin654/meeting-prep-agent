@@ -328,6 +328,25 @@ class Job(SQLModel, table=True):
     error: str | None = None
     created_at: datetime
     finished_at: datetime | None = None
+
+class ExtractedFact(SQLModel, table=True):
+    id: str; account_id: str; meeting_id: str; contact_id: str | None
+    kind: FactKind; text: str; source_quote: str; created_at: datetime
+
+class CaptureDraft(SQLModel, table=True):
+    id: str; meeting_id: str; transcript: str
+    extraction: dict; items: list[dict]
+    status: str  # open | saved | discarded
+    created_at: datetime
+
+class MeetingPrepared(SQLModel, table=True):
+    meeting_id: str  # primary key
+    prepared_at: datetime
+
+class MemoryOverride(SQLModel, table=True):
+    id: str; target_type: str  # fact | memory
+    target_id: str; action: str  # hidden | corrected
+    corrected_text: str | None; created_at: datetime
 ```
 
 Overdue is computed, never stored: `status == open and due_date < settings.demo_today`.
