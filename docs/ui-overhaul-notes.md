@@ -18,7 +18,8 @@
 | B3 | complete | `2cc2f06` |
 | B4 | complete | `27c69a0` |
 | B5 | complete | `f341ef0` |
-| Sandbox guard | complete | pending |
+| Sandbox guard | complete | committed |
+| First-meeting brief | complete | committed |
 | C1 | planned | — |
 | C2 | planned | — |
 | C3 | planned | — |
@@ -40,10 +41,10 @@
 
 | Operation | Calls | Prompt tokens | Completion tokens | Notes |
 | --- | ---: | ---: | ---: | --- |
-| App LLM | 20 logical P1 calls (19 completed + 1 earlier interrupted), 1 P2, 3 P3, 1 pattern refresh = 25 logical calls | partial total: 6,819 | partial total: 6,097 | Existing 3,442/1,485 probe totals plus the checkpoint calls below. The 15-call A3 backfill and two original Sandbox-W previews remain unknown. Three current temperature fallbacks succeeded. |
+| App LLM | 20 logical P1 calls (19 completed + 1 earlier interrupted), 1 P2, 5 P3, 1 pattern refresh = 27 logical calls | partial total: 8,101 | partial total: 7,207 | Existing 3,442/1,485 probe totals plus the checkpoint calls below. The 15-call A3 backfill and two original Sandbox-W previews remain unknown. Five current temperature fallbacks succeeded. |
 | Hindsight retain | 3 attempts (2 reached service and completed; 1 connection-refused before a write) | unavailable | unavailable | The two accepted writes are both in `ae-overhaul-test`, at the original cap; the refused attempt never reached Hindsight. |
 | Hindsight reflect | 0 | — | — | — |
-| Brief generation | 3 total (1 Sandbox-W, 2 Sandbox-R; one Sandbox-R run used the wrong bank and is not valid gate evidence) | 3,161 | 4,572 | P3 calls only; counts/tokens for current checkpoint calls are broken down below. |
+| Brief generation | 5 total (3 Sandbox-W first-meeting calls, 2 Sandbox-R; one Sandbox-R run used the wrong bank and is not valid gate evidence) | 4,443 | 5,682 | P3 calls only; the two latest Sandbox-W checks are broken down below. |
 | Pattern refresh | 1 Sandbox-W | 216 | 40 | Returned no cited patterns. |
 
 ## A3 backfill completion
@@ -146,3 +147,10 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 
 - Added executable `scripts/sandbox_w.sh` and `scripts/sandbox_r.sh`. Each exports its sandbox SQLite URL, expected `DEMO_USER_ID`, and memory mode; resolves and prints the effective `DATABASE_URL`, `BANK_ID`, and `MEMORY_READ_ONLY`; refuses any unexpected values before launching. W binds only :8001 with `ae-overhaul-test` and writes enabled; R binds only :8002 with `ae-user-demo-thomas` and read-only enabled. `--check` performs the same guards without starting a server.
 - Guard tests cover expected settings and refusal of the wrong DB, bank, or read/write mode. `bash -n` and all 8 `test_sandbox_scripts.py` tests passed; Ruff passed. From now on use these scripts for sandbox starts, not hand-written uvicorn commands.
+
+### Checkpoint 2 accepted fixes — group 1: first-meeting brief
+
+- Root cause: the empty-evidence P3 instructions contradicted themselves, and `_map_draft` then dropped every memory-mode item without a citation. With no evidence, that left the first-meeting brief empty and therefore intentionally uncached.
+- P3 now has an explicit first-meeting instruction. Only first-meeting `agenda` and `your_questions` suggestions with empty evidence IDs may be uncited; claims and every other memory-mode item still require citations. A deterministic fallback guarantees a short agenda and 2–3 generic planning questions when P3 returns empty/partial output. The Attendees section is retained even when the meeting has no recorded attendees, and nonempty first-meeting output is persisted. The existing UI labels it “No history yet”.
+- FakeLLM regression test forces an empty draft and verifies Attendees, 3 agenda items, 3 questions, no citations on suggestions, no Hindsight recalls, and a subsequent cache hit. Backend gates: 702 passed, 1 skipped, 6 deselected; Ruff and mypy passed.
+- Sandbox-W live check initially showed Attendees empty because the scheduled attendee had no prior meeting citation. Narrowed the first-meeting exception to display current, account-side scheduled attendees without history citations; internal attendees remain excluded. The one allowed retry on `m_c2266acc` succeeded in 5.58 s with 641 prompt / 580 completion tokens (temperature fallback succeeded); cached brief `br_5c3700ca` has 1 attendee, 3 agenda items, 3 questions, zero memory use, and `first_meeting=true`. The earlier call on this meeting used 641 / 530 tokens and returned zero attendee rows; both first-meeting call slots are now spent.

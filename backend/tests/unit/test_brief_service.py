@@ -177,12 +177,25 @@ async def test_first_meeting_memory_brief_uses_empty_evidence_without_memory_cal
         session.commit()
     memory_calls = len(world.memory.recall_calls)
 
-    brief, _ = await make(world, lambda prompt: good_draft(prompt), memory=world.memory)
+    brief, llm = await make(
+        world, lambda _prompt: BriefDraft(sections={}), memory=world.memory
+    )
 
     assert brief.first_meeting is True
     assert len(world.memory.recall_calls) == memory_calls
     assert brief.you_owe == []
     assert brief.objections == []
+    agenda = section(brief, SectionKey.agenda)
+    questions = section(brief, SectionKey.your_questions)
+    assert 3 <= len(agenda) <= 5
+    assert 2 <= len(questions) <= 3
+    assert all(not item.citations for item in [*agenda, *questions])
+    attendees = section(brief, SectionKey.attendees)
+    assert any(item.text == "Rahul Mehta, VP Engineering" for item in attendees)
+    assert all(not item.citations for item in attendees)
+    assert "FIRST MEETING" in llm.calls[0].prompt
+    cached = await get_cached_brief(M6, "memory", session_factory=world.session_factory)
+    assert cached is not None and cached.first_meeting
 
 
 async def test_hidden_fact_and_memory_overrides_are_excluded_from_brief(world: World) -> None:

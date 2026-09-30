@@ -1236,7 +1236,21 @@ def render_brief_prompt(
         attendees=attendees or "(none recorded)",
         evidence=evidence_text,
         style_profile=style_profile,
-        section_keys=", ".join(k.value for k in LLM_SECTION_KEYS),
+        section_keys=", ".join(
+            k.value
+            for k in (
+                [*LLM_SECTION_KEYS, SectionKey.your_questions]
+                if inputs.first_meeting
+                else LLM_SECTION_KEYS
+            )
+        ),
+        first_meeting_note=(
+            "FIRST MEETING: there is no account history. Provide a short agenda and 2-3 "
+            "useful questions using only the meeting title and attendee roles. These are "
+            "planning suggestions, not remembered facts; use empty evidence_ids."
+            if inputs.first_meeting
+            else ""
+        ),
     )
 
 
@@ -1390,6 +1404,7 @@ def _map_draft(
     *,
     mode: BriefMode,
     known_contact_ids: set[str],
+    first_meeting: bool = False,
 ) -> tuple[dict[SectionKey, list[BriefItem]], set[str], dict[str, list[_OverdueRank]]]:
     """Draft -> items with citations.
 
@@ -1399,7 +1414,10 @@ def _map_draft(
     sections: dict[SectionKey, list[BriefItem]] = {}
     covered: set[str] = set()
     overdue_of: dict[str, list[_OverdueRank]] = {}
-    for key in LLM_SECTION_KEYS:
+    draft_keys = (
+        [*LLM_SECTION_KEYS, SectionKey.your_questions] if first_meeting else LLM_SECTION_KEYS
+    )
+    for key in draft_keys:
         for n, draft_item in enumerate(draft.sections.get(key, []), start=1):
             refs: list[EvidenceRef] = []
             for evidence_id in draft_item.evidence_ids:
@@ -1408,7 +1426,12 @@ def _map_draft(
                     refs.append(ref)
             citations = [c for c in (_citation(r) for r in refs) if _is_citable(c)]
             if mode == "memory":
-                if not citations:
+                first_meeting_suggestion = (
+                    first_meeting
+                    and key in {SectionKey.agenda, SectionKey.your_questions}
+                    and not draft_item.evidence_ids
+                )
+                if not citations and not first_meeting_suggestion:
                     logger.info("brief.item_dropped section=%s reason=no_citation", key.value)
                     continue
             else:
@@ -1506,7 +1529,9 @@ def _overdue_item(
     )
 
 
-def _attendee_items(inputs: BriefInputs, *, mode: BriefMode) -> list[BriefItem]:
+def _attendee_items(
+    inputs: BriefInputs, *, mode: BriefMode, first_meeting: bool = False
+) -> list[BriefItem]:
     """The attendees section, built in code (never by the LLM)."""
     this_date = _meeting_date(inputs.meeting)
     prior = sorted(
@@ -1526,9 +1551,9 @@ def _attendee_items(inputs: BriefInputs, *, mode: BriefMode) -> list[BriefItem]:
         citations: list[Citation] = []
         if mode == "memory":
             citation = _attendee_citation(contact, prior, inputs)
-            if citation is None:
+            if citation is None and not first_meeting:
                 continue  # never met: nothing to cite, so the item is dropped
-            citations = [citation]
+            citations = [citation] if citation is not None else []
         items.append(
             BriefItem(
                 id=f"{SectionKey.attendees.value}-{contact.id}",
@@ -1589,7 +1614,13 @@ def assemble_brief(
         account_names=account_names,
         meeting_account_ids={meeting.id: meeting.account_id for meeting in inputs.all_meetings},
     )
-    sections, covered, overdue_of = _map_draft(draft, table, mode=mode, known_contact_ids=known)
+    sections, covered, overdue_of = _map_draft(
+        draft,
+        table,
+        mode=mode,
+        known_contact_ids=known,
+        first_meeting=first_meeting,
+    )
 
     visible_facts = [
         fact for fact in inputs.extracted_facts if fact.id not in inputs.hidden_fact_ids
@@ -1706,9 +1737,44 @@ def assemble_brief(
     if mode == "memory" and objections:
         sections[SectionKey.unresolved_objections] = []
 
-    attendee_items = _attendee_items(inputs, mode=mode)
+    attendee_items = _attendee_items(inputs, mode=mode, first_meeting=first_meeting)
     if attendee_items:
         sections[SectionKey.attendees] = attendee_items
+    if first_meeting:
+        agenda = sections.setdefault(SectionKey.agenda, [])
+        for text in (
+            f"Agree on the goals for {inputs.meeting.title}.",
+            "Understand what each attendee hopes to accomplish.",
+            "Close by agreeing on owners and next steps.",
+        ):
+            if len(agenda) >= 3:
+                break
+            agenda.append(
+                BriefItem(
+                    id=f"agenda-first-meeting-{len(agenda) + 1}",
+                    text=text,
+                    severity=Severity.info,
+                    contact_ids=[],
+                    citations=[],
+                )
+            )
+        questions = sections.setdefault(SectionKey.your_questions, [])
+        for text in (
+            "What would make this meeting useful for you?",
+            "What outcome are you hoping to achieve?",
+            "What should we make sure to cover before we wrap up?",
+        ):
+            if len(questions) >= 3:
+                break
+            questions.append(
+                BriefItem(
+                    id=f"your_questions-first-meeting-{len(questions) + 1}",
+                    text=text,
+                    severity=Severity.info,
+                    contact_ids=[],
+                    citations=[],
+                )
+            )
     if mode == "memory":
         pinned = [
             item
@@ -1719,9 +1785,9 @@ def assemble_brief(
             sections[SectionKey.your_questions] = pinned
 
     ordered = [
-        BriefSection(key=key, title=SECTION_TITLES[key], items=sections[key])
+        BriefSection(key=key, title=SECTION_TITLES[key], items=sections.get(key, []))
         for key in DEFAULT_SECTION_ORDER
-        if sections.get(key)
+        if sections.get(key) or (first_meeting and key == SectionKey.attendees)
     ]
     cited = {
         (c.source_type, c.meeting_id, c.memory_id, c.quote)
