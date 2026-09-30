@@ -4,6 +4,7 @@ import { Brief } from '@/pages/Brief'
 import { ComingSoon } from '@/pages/ComingSoon'
 import { Dashboard } from '@/pages/Dashboard'
 import { Capture } from '@/pages/Capture'
+import { Ask } from '@/pages/Ask'
 import { Contacts } from '@/pages/Contacts'
 
 /**
@@ -19,7 +20,7 @@ export const routes: RouteObject[] = [
       { path: 'meetings/:id', element: <Brief /> },
       { path: 'contacts', element: <Contacts /> },
       { path: 'contacts/:id', element: <Contacts /> },
-      { path: 'ask', element: <ComingSoon title="Ask" /> },
+      { path: 'ask', element: <Ask /> },
       { path: 'capture', element: <Capture /> },
       { path: 'memory', element: <ComingSoon title="Memory inspector" /> },
     ],
