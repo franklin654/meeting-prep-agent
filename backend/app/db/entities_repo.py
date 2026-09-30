@@ -103,7 +103,10 @@ def meeting_metrics(session: Session, meeting: Meeting) -> tuple[int, int, bool]
             Commitment.status == CommitmentStatus.open,
         )
     ).all()
-    return len(open_followups), len(prior_done), bool(prior_done)
+    has_history = any(
+        item.status == "done" for item in list_account_meetings(session, meeting.account_id)
+    )
+    return len(open_followups), len(prior_done), has_history
 
 
 def cancel_meeting(session: Session, meeting_id: str) -> None:

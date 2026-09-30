@@ -7,7 +7,7 @@ import { mockFetch } from '@/test/mockFetch'
 describe('routing', () => {
   it('renders the dashboard at /', () => {
     renderRoutes(routes, { route: '/' })
-    expect(screen.getByRole('heading', { name: 'Upcoming meetings' })).toBeInTheDocument()
+    expect(screen.getByText('TODAY')).toBeInTheDocument()
   })
 
   it('renders the brief route at /meetings/:id', () => {

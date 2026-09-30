@@ -1,103 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
 import {
   useContacts,
-  useJob,
+  useDemoDate,
   useMeetings,
   useStyle,
-  useSubmitNotes,
 } from '@/api/hooks'
 import type { MeetingSummary } from '@/api/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NudgeDigest } from '@/components/NudgeDigest'
 import { ScheduleMeetingDialog } from '@/components/ScheduleMeetingDialog'
-import { Textarea } from '@/components/ui/textarea'
 import { HeaderControls } from '@/components/Layout'
-
-function NotesDialog({
-  meetings,
-  initialMeetingId,
-  onClose,
-}: {
-  meetings: MeetingSummary[]
-  initialMeetingId?: string
-  onClose: () => void
-}) {
-  const [meetingId, setMeetingId] = useState(initialMeetingId ?? '')
-  const [transcript, setTranscript] = useState('')
-  const [jobId, setJobId] = useState<string>()
-  const completedJobId = useRef<string | undefined>(undefined)
-  const submit = useSubmitNotes(meetingId)
-  const job = useJob(jobId)
-
-  useEffect(() => {
-    if (job.data?.status !== 'done' || !job.data.learned || !jobId || completedJobId.current === jobId) return
-    completedJobId.current = jobId
-    const learned = job.data.learned
-    toast.success('Memory updated', {
-      description: [learned.facts.length ? learned.facts.join(' · ') : `${learned.new_commitments} new commitments learned`, learned.alerts.length ? `Alerts: ${learned.alerts.join(' · ')}` : ''].filter(Boolean).join(' · '),
-    })
-    onClose()
-  }, [job.data, jobId, onClose])
-
-  const ready = transcript.trim().length >= 50 && meetingId.length > 0
-  async function handleSubmit() {
-    if (!ready) return
-    try {
-      const accepted = await submit.mutateAsync(transcript.trim())
-      setJobId(accepted.job_id)
-    } catch {
-      toast.error('Could not submit notes', { description: 'Check the connection and try again.' })
-    }
-  }
-
-  return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Log meeting notes</DialogTitle>
-        <DialogDescription>Save the transcript so the agent can update its account memory.</DialogDescription>
-      </DialogHeader>
-      {jobId ? (
-        <div role="status" className="space-y-3 rounded-lg border p-4 text-sm">
-          <p className="font-medium">{job.data?.status === 'failed' ? 'Learning failed' : 'Updating account memory…'}</p>
-          <p className="text-muted-foreground">{job.data?.status === 'failed' ? job.data.error ?? 'Please try again.' : 'You can keep this window open while the meeting is processed.'}</p>
-          {job.isLoading && <Skeleton className="h-2 w-full" />}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <label className="grid gap-2 text-sm font-medium">
-            Meeting
-            <select aria-label="Choose meeting" value={meetingId} onChange={(event) => setMeetingId(event.target.value)} className="h-11 rounded-md border bg-background px-3 font-normal">
-              <option value="">Choose a meeting</option>
-              {meetings.map((meeting) => <option key={meeting.id} value={meeting.id}>{meeting.account_name} · {meeting.title}</option>)}
-            </select>
-          </label>
-          <label htmlFor="transcript" className="grid gap-2 text-sm font-medium">Meeting transcript
-            <Textarea id="transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} rows={8} placeholder="Paste the meeting transcript…" />
-          </label>
-          <p className="text-xs text-muted-foreground">{transcript.trim().length}/50 characters minimum</p>
-        </div>
-      )}
-      <DialogFooter>
-        {jobId ? <Button variant="outline" onClick={onClose}>Close</Button> : <>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!ready || submit.isPending} onClick={() => void handleSubmit()}>{submit.isPending ? 'Submitting…' : 'Start learning'}</Button>
-        </>}
-      </DialogFooter>
-    </DialogContent>
-  )
-}
 
 function SearchBox({ meetings }: { meetings: MeetingSummary[] }) {
   const [query, setQuery] = useState('')
@@ -151,23 +66,23 @@ function StyleCard() {
 function MeetingCard({
   meeting,
   isHero,
-  onLogNotes,
 }: {
   meeting: MeetingSummary
   isHero: boolean
-  onLogNotes: (meetingId: string) => void
 }) {
+  const customerAttendees = meeting.attendees.filter((person) => !['c_priya', 'c_arjun'].includes(person.id) && !['Priya Nair', 'Arjun Menon'].includes(person.name))
   return (
     <article className={`rounded-[10px] border bg-card p-4 shadow-card sm:p-5 ${isHero ? 'border-2 border-primary' : 'border-border'}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">{new Date(meeting.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · {meeting.account_name}</p>
           <h3 className="mt-1 text-lg font-semibold">{meeting.title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{meeting.attendees.map((person) => `${person.name}${person.role ? ` · ${person.role}` : ''}`).join(' · ') || 'No attendees listed'}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{customerAttendees.map((person) => `${person.name}${person.role ? ` (${person.role})` : ''}`).join(' · ') || 'No attendees listed'}</p>
         </div>
         <div className="flex flex-wrap gap-2" aria-label={`${meeting.title} status`}>
           {meeting.brief_ready ? <Badge>Brief ready</Badge> : null}
-          {meeting.open_followups > 0 ? <Badge variant="warning">{meeting.open_followups} open follow-ups</Badge> : null}
+          {meeting.overdue_followups > 0 ? <Badge variant="warning">{meeting.overdue_followups} overdue</Badge> : null}
+          {meeting.open_followups - meeting.overdue_followups > 0 ? <Badge variant="outline">{meeting.open_followups - meeting.overdue_followups} other open</Badge> : null}
           {meeting.past_meetings > 0 ? <Badge variant="outline">{meeting.past_meetings} past meetings</Badge> : null}
           {!meeting.has_history ? <Badge variant="outline">No history yet</Badge> : null}
         </div>
@@ -175,7 +90,7 @@ function MeetingCard({
       {!meeting.has_history && <p className="mt-3 text-sm text-muted-foreground">Generic brief · no past meeting memory is available yet.</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild><Link to={`/meetings/${meeting.id}`}>{meeting.brief_ready ? 'Open brief' : 'Generate brief'}</Link></Button>
-        <Button type="button" variant="outline" onClick={() => onLogNotes(meeting.id)}>Log notes</Button>
+        <Button asChild variant="outline"><Link to={`/capture?meeting=${meeting.id}`}>Log notes</Link></Button>
       </div>
     </article>
   )
@@ -183,8 +98,8 @@ function MeetingCard({
 
 export function Dashboard() {
   const meetings = useMeetings()
+  const demoDate = useDemoDate()
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [notesMeetingId, setNotesMeetingId] = useState<string>()
   const upcoming = (meetings.data ?? []).filter((meeting) => meeting.status === 'upcoming')
 
   return (
@@ -198,8 +113,8 @@ export function Dashboard() {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-primary">Your account memory, ready before the next call</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Upcoming meetings</h1>
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary">TODAY</p>
+          <p className="mt-1 text-sm text-muted-foreground">Your account memory, ready before the next call · {demoDate.data ? new Date(`${demoDate.data}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Demo date'}</p>
         </div>
         <Button onClick={() => setScheduleOpen(true)}>Schedule meeting</Button>
       </div>
@@ -209,7 +124,7 @@ export function Dashboard() {
           {meetings.isLoading ? <div role="status" aria-label="Loading meetings" className="space-y-3"><Skeleton className="h-36" /><Skeleton className="h-36" /></div> : null}
           {meetings.isError ? <p role="alert" className="rounded-[10px] border bg-card p-5 text-sm">Meetings could not be loaded. Refresh to try again.</p> : null}
           {!meetings.isLoading && !meetings.isError && upcoming.length === 0 ? <div className="rounded-[10px] border border-dashed bg-card px-6 py-12 text-center"><h2 className="font-semibold">No upcoming meetings</h2><p className="mt-2 text-sm text-muted-foreground">Schedule a meeting to see its prep and account context here.</p><Button className="mt-4" onClick={() => setScheduleOpen(true)}>Schedule meeting</Button></div> : null}
-          {upcoming.map((meeting, index) => <MeetingCard key={meeting.id} meeting={meeting} isHero={index === 0} onLogNotes={setNotesMeetingId} />)}
+          {upcoming.map((meeting, index) => <MeetingCard key={meeting.id} meeting={meeting} isHero={index === 0} />)}
         </section>
 
         <aside className="grid gap-4">
@@ -219,9 +134,6 @@ export function Dashboard() {
       </div>
 
       {scheduleOpen ? <ScheduleMeetingDialog open={scheduleOpen} onOpenChange={setScheduleOpen} /> : null}
-      <Dialog open={Boolean(notesMeetingId)} onOpenChange={(open) => { if (!open) setNotesMeetingId(undefined) }}>
-        {notesMeetingId ? <NotesDialog key={notesMeetingId} meetings={meetings.data ?? []} initialMeetingId={notesMeetingId} onClose={() => setNotesMeetingId(undefined)} /> : null}
-      </Dialog>
     </section>
   )
 }

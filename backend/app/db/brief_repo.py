@@ -79,12 +79,7 @@ def load_brief_inputs(
             raise NotFoundError(f"Account {meeting.account_id!r} not found.")
 
         account_meetings = repository.list_meetings_for_account(session, account.id)
-        first_meeting = not any(
-            prior.id != meeting.id
-            and prior.status == "done"
-            and prior.scheduled_at < meeting.scheduled_at
-            for prior in account_meetings
-        )
+        first_meeting = not any(prior.status == "done" for prior in account_meetings)
         read_memory_evidence = include_ledger and not first_meeting
         accounts = repository.list_accounts(session)
         other_accounts = [candidate for candidate in accounts if candidate.id != account.id]

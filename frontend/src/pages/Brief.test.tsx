@@ -5,6 +5,23 @@ import { renderRoutes } from '@/test/renderWithProviders'
 import { routes } from '@/routes'
 
 describe('Brief page', () => {
+  it('keeps ranked objections to three until expanded', async () => {
+    mockFetch({
+      'GET /api/meetings/mtg_1/brief': { body: {
+        id: 'brf_objections', meeting_id: 'mtg_1', mode: 'memory', generated_at: '2026-09-29T10:00:00Z',
+        sections: [], facts_used: 0, preferences_applied: [], memory_used: { facts: 0, meetings: 0 },
+        objections: ['Price', 'Security', 'Timing', 'Legal', 'Staffing'].map((topic) => ({ topic, count: 1, dates: ['2026-09-20'], citations: [] })),
+      } },
+    })
+    renderRoutes(routes, { route: '/meetings/mtg_1' })
+    expect(await screen.findByText('Price')).toBeInTheDocument()
+    expect(screen.getByText('Show 2 more')).toBeInTheDocument()
+    expect(screen.queryByText('Legal')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 more' }))
+    expect(screen.getByText('Legal')).toBeInTheDocument()
+    expect(screen.getByText('Staffing')).toBeInTheDocument()
+  })
+
   it('loads cached memory counts from memory_used without duplicate counters', async () => {
     const f = mockFetch({
       'GET /api/meetings/mtg_1/brief': { body: {

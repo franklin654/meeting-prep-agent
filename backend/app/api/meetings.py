@@ -39,6 +39,7 @@ def list_meetings(
     output: list[MeetingSummary] = []
     for row in meetings_repo.list_meeting_rows(session, status):
         followups, past, has_history = entities_repo.meeting_metrics(session, row.meeting)
+        overdue = repository.list_overdue_commitments(session, account_id=row.meeting.account_id)
         output.append(
             MeetingSummary(
                 id=row.meeting.id,
@@ -53,6 +54,8 @@ def list_meetings(
                 open_followups=followups,
                 past_meetings=past,
                 has_history=has_history,
+                overdue_followups=len(overdue),
+                has_notes=bool(row.meeting.transcript and row.meeting.transcript.strip()),
             )
         )
     return output
@@ -87,6 +90,8 @@ def schedule_meeting(body: MeetingCreate, session: SessionDep) -> MeetingSummary
         open_followups=0,
         past_meetings=0,
         has_history=False,
+        overdue_followups=0,
+        has_notes=False,
     )
 
 

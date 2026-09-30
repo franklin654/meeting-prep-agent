@@ -3,23 +3,25 @@ import { describe, expect, it } from 'vitest'
 import { Capture } from './Capture'
 import { mockFetch } from '@/test/mockFetch'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { renderRoutes } from '@/test/renderWithProviders'
+import { routes } from '@/routes'
 
 const MEETINGS = [
   {
     id: 'm_up', account_id: 'acc_1', account_name: 'FinEdge', title: 'Pilot decision',
     scheduled_at: '2026-10-01T10:00:00Z', status: 'upcoming',
     attendees: [{ id: 'c_anita', name: 'Anita Desai', role: 'CFO' }], brief_ready: false,
-    prepared: false, open_followups: 0, past_meetings: 1, has_history: true,
+    prepared: false, open_followups: 0, overdue_followups: 0, past_meetings: 1, has_history: true, has_notes: false,
   },
   {
     id: 'm_recent', account_id: 'acc_1', account_name: 'FinEdge', title: 'Budget review',
     scheduled_at: '2026-09-29T10:00:00Z', status: 'done', attendees: [], brief_ready: true,
-    prepared: false, open_followups: 0, past_meetings: 0, has_history: true,
+    prepared: false, open_followups: 0, overdue_followups: 0, past_meetings: 0, has_history: true, has_notes: true,
   },
   {
     id: 'm_old', account_id: 'acc_1', account_name: 'FinEdge', title: 'Discovery',
     scheduled_at: '2026-09-15T10:00:00Z', status: 'done', attendees: [], brief_ready: true,
-    prepared: false, open_followups: 0, past_meetings: 0, has_history: true,
+    prepared: false, open_followups: 0, overdue_followups: 0, past_meetings: 0, has_history: true, has_notes: false,
   },
 ]
 
@@ -34,6 +36,25 @@ const DRAFT = {
 }
 
 describe('Capture page', () => {
+  it('defaults to the latest meeting without notes and shows sizing and disabled guidance', async () => {
+    mockFetch({ 'GET /api/meetings': { body: MEETINGS } })
+    renderWithProviders(<Capture />)
+    const meetingSelect = await screen.findByRole('combobox', { name: 'Choose meeting' })
+    await waitFor(() => expect(meetingSelect).toHaveValue('m_up'))
+    expect(screen.getByLabelText('Upload transcript file')).toHaveClass('h-11')
+    expect(meetingSelect).toHaveClass('h-11')
+    expect(screen.getByText('Choose a meeting and paste at least 50 characters')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Extract memories' })).toBeDisabled()
+    expect(screen.queryByRole('heading', { name: 'Capture notes' })).not.toBeInTheDocument()
+  })
+
+  it('preselects the meeting from the query string', async () => {
+    mockFetch({ 'GET /api/meetings': { body: MEETINGS } })
+    renderRoutes(routes, { route: '/capture?meeting=m_recent' })
+    const meetingSelect = await screen.findByRole('combobox', { name: 'Choose meeting' })
+    await waitFor(() => expect(meetingSelect).toHaveValue('m_recent'))
+  })
+
   it('sorts meetings newest-first, reviews a draft, allows duplicate re-check, and saves', async () => {
     const fetchMock = mockFetch({
       'GET /api/meetings': { body: MEETINGS },

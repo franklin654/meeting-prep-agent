@@ -438,6 +438,7 @@ class MeetingSummary(BaseModel):          # GET /api/meetings
     brief_ready: bool
     prepared: bool = False; open_followups: int = 0
     past_meetings: int = 0; has_history: bool = False
+    overdue_followups: int = 0; has_notes: bool = False
 
 # DELETE /api/meetings/{id} cancels an upcoming meeting without a transcript.
 
@@ -504,6 +505,7 @@ class Nudge(BaseModel):                   # GET /api/nudges
     ]
     text: str
     link: str                             # frontend route
+    critical: bool = False                # true only when a cached brief marks this overdue item critical
 
 class ErrorBody(BaseModel):
     code: str

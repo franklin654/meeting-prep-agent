@@ -1012,6 +1012,16 @@ export interface components {
              * @default false
              */
             has_history: boolean;
+            /**
+             * Overdue Followups
+             * @default 0
+             */
+            overdue_followups: number;
+            /**
+             * Has Notes
+             * @default false
+             */
+            has_notes: boolean;
         };
         /** MemoryCorrectionRequest */
         MemoryCorrectionRequest: {
@@ -1045,6 +1055,11 @@ export interface components {
             text: string;
             /** Link */
             link: string;
+            /**
+             * Critical
+             * @default false
+             */
+            critical: boolean;
         };
         /** OwedItem */
         OwedItem: {

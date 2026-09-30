@@ -35,6 +35,17 @@ def _overdue_nudges(
     for row in upcoming:
         earliest_meeting.setdefault(row.meeting.account_id, row.meeting.id)
 
+    critical_texts: set[str] = set()
+    briefs = repository.list_brief_records_for_meetings(
+        session, [row.meeting.id for row in upcoming]
+    )
+    for brief in briefs:
+        for item in brief.content.get("you_owe", []):
+            if isinstance(item, dict) and item.get("severity") == "critical":
+                text = item.get("text")
+                if isinstance(text, str):
+                    critical_texts.add(text.casefold())
+                    critical_texts.add(_commitment_label(text).casefold())
     rows: list[tuple[Commitment, str]] = []
     for commitment in repository.list_overdue_commitments(session):
         account = accounts.get(commitment.account_id)
@@ -60,6 +71,10 @@ def _overdue_nudges(
                 link=f"/meetings/{earliest_meeting[commitment.account_id]}"
                 if commitment.account_id in earliest_meeting
                 else "/",
+                critical=(
+                    commitment.text.casefold() in critical_texts
+                    or _commitment_label(commitment.text).casefold() in critical_texts
+                ),
             )
         )
     return output
@@ -122,11 +137,7 @@ def _no_history_nudges(
         if (
             account is None
             or account.stage in {"closed_won", "closed_lost"}
-            or any(
-                previous.meeting.account_id == account_id
-                and previous.meeting.scheduled_at < row.meeting.scheduled_at
-                for previous in done
-            )
+            or any(previous.meeting.account_id == account_id for previous in done)
             or account_id in seen_accounts
         ):
             continue

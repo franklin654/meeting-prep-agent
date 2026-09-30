@@ -5,7 +5,8 @@ import { mockFetch } from '@/test/mockFetch'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 const NUDGES = [
-  { kind: 'overdue_commitment', text: 'Pricing deck is 25 days overdue (FinEdge)', link: '/meetings/m6_finedge' },
+  { kind: 'overdue_commitment', text: 'Pricing deck is 25 days overdue (FinEdge)', link: '/meetings/m6_finedge', critical: true },
+  { kind: 'overdue_commitment', text: 'Security report is 2 days overdue (FinEdge)', link: '/meetings/m6_finedge', critical: false },
   { kind: 'they_owe_overdue', text: 'Waiting on the vendor shortlist (FinEdge)', link: '/meetings/m6_finedge' },
   { kind: 'no_history', text: 'No history yet: Northstar\'s first meeting is coming up', link: '/meetings/m_first' },
   { kind: 'brief_ready', text: 'Brief ready: Pilot decision - FinEdge, Sep 29', link: '/meetings/m6_finedge' },
@@ -27,6 +28,8 @@ describe('NudgeDigest', () => {
     for (const nudge of NUDGES) {
       expect(screen.getByRole('link', { name: nudge.text })).toHaveAttribute('href', nudge.link)
     }
+    expect(screen.getByRole('link', { name: NUDGES[0].text })).toHaveClass('border-alert-critical/25')
+    expect(screen.getByRole('link', { name: NUDGES[1].text })).toHaveClass('border-alert-warning/40')
     expect(fetchMock.calls.map((call) => call.method)).toEqual(['GET'])
   })
 

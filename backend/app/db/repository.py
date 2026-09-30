@@ -276,6 +276,13 @@ def get_brief_record(session: Session, brief_id: str) -> BriefRecord | None:
     return session.get(BriefRecord, brief_id)
 
 
+def list_brief_records_for_meetings(session: Session, meeting_ids: list[str]) -> list[BriefRecord]:
+    if not meeting_ids:
+        return []
+    statement = select(BriefRecord).where(col(BriefRecord.meeting_id).in_(meeting_ids))
+    return list(session.exec(statement).all())
+
+
 # ---- Feedback ----
 
 

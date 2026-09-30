@@ -24,7 +24,7 @@ export function NudgeDigest() {
   return <section aria-label="Nudge digest" className="rounded-xl border bg-card p-4 shadow-card">
     <h2 className="mb-3 text-sm font-semibold">Needs your attention</h2>
     <ul className="space-y-2">{nudges.data.map((nudge, index) => <li key={`${nudge.kind}-${nudge.link}-${index}`}>
-      <Link to={nudge.link} className={`block rounded-lg border px-3 py-2.5 text-sm transition-colors hover:brightness-[0.98] ${TONE[nudge.kind]}`}>
+      <Link to={nudge.link} className={`block rounded-lg border px-3 py-2.5 text-sm transition-colors hover:brightness-[0.98] ${nudge.kind === 'overdue_commitment' && !nudge.critical ? TONE.they_owe_overdue : TONE[nudge.kind]}`}>
         {nudge.text}
       </Link>
     </li>)}</ul>

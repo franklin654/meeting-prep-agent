@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +27,9 @@ from app.api.deps import (
 from app.config import Settings
 from app.core.errors import LLMTimeoutError
 from app.db import repository as repo
-from app.db.models import Account, BriefRecord, Contact, Meeting
+from app.db.models import Account, BriefRecord, Commitment, Contact, Meeting
 from app.schemas.api import JobAccepted, JobStatus, LearnedSummary, MeetingSummary, NotesRequest
+from app.schemas.enums import CommitmentStatus, Owner
 from app.schemas.extraction import MeetingExtraction
 from tests.fakes.fake_llm import FakeLLM
 from tests.fakes.fake_memory_service import FakeMemoryService
@@ -170,6 +171,40 @@ def test_list_meetings_sorted_with_attendees_and_brief_ready(client: TestClient)
     assert by_id["m4_finedge"].brief_ready is False
     assert by_id["m_old"].attendees == []
     assert by_id["m6_finedge"].has_history is False
+
+
+def test_history_counts_completed_current_meeting_not_open_followups(
+    client: TestClient, engine: Engine
+) -> None:
+    with Session(engine) as session:
+        session.add(
+            Commitment(
+                id="cm_leftover",
+                account_id="acc_finedge",
+                meeting_id="m4_finedge",
+                owner=Owner.us,
+                text="Retry the pending proposal",
+                due_date=date(2026, 9, 30),
+                status=CommitmentStatus.open,
+                source_quote="I will retry the proposal",
+            )
+        )
+        session.commit()
+    before = {row["id"]: row for row in client.get("/api/meetings").json()}["m6_finedge"]
+    assert before["has_history"] is False
+    assert before["open_followups"] == 1
+
+    with Session(engine) as session:
+        meeting = repo.get_meeting(session, "m4_finedge")
+        assert meeting is not None
+        meeting.status = "done"
+        meeting.transcript = "Completed transcript"
+        session.add(meeting)
+        session.commit()
+    after = {row["id"]: row for row in client.get("/api/meetings").json()}
+    assert after["m6_finedge"]["has_history"] is True
+    assert after["m6_finedge"]["past_meetings"] == 1
+    assert after["m4_finedge"]["has_notes"] is True
 
 
 def test_entity_and_schedule_endpoints(client: TestClient) -> None:

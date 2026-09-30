@@ -169,7 +169,7 @@ async def test_first_meeting_memory_brief_uses_empty_evidence_without_memory_cal
     with Session(world.engine) as session:
         meeting = session.get(Meeting, "m6_finedge")
         assert meeting is not None
-        meeting.status = "done"
+        meeting.status = "upcoming"
         session.add(meeting)
         # Remove prior meetings to model a genuinely new account.
         for old in session.exec(select(Meeting).where(Meeting.id != "m6_finedge")):

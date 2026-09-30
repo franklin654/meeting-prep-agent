@@ -83,6 +83,8 @@ class MeetingSummary(BaseModel):  # GET /api/meetings
     open_followups: int = 0
     past_meetings: int = 0
     has_history: bool = False
+    overdue_followups: int = 0
+    has_notes: bool = False
 
 
 class NotesRequest(BaseModel):  # POST /api/meetings/{id}/notes
@@ -249,6 +251,7 @@ class Nudge(BaseModel):  # GET /api/nudges
     ]
     text: str
     link: str  # frontend route
+    critical: bool = False
 
 
 class ErrorBody(BaseModel):

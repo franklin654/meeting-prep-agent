@@ -156,6 +156,12 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - The header counter reads the cached `memory_used` object; internal AE/Arjun attendees and contact cards are excluded; contact-card meetings are limited to past meetings, newest first, max three. Feedback uses monochrome accessible icon controls in section headers. Prepared can be set and undone with the existing POST/DELETE endpoints. Heading uses the meeting title without “Brief for”.
 - Added cached-brief regression coverage for memory counts, due dates/order/density, internal attendees, empty Alerts, past-only contact meetings, accessible icon feedback and prepared undo. Focused Brief tests passed (10); lint and TypeScript passed. Broader frontend checks are rerun at final checkpoint.
 
+### Accepted Checkpoint 2 fixes — group 4: Today/Capture/Brief polish
+
+- Nudges now identify critical overdue items from cached brief enrichment and render other overdue reminders amber. “No history yet” is based on whether the account has any completed meeting (not only an earlier-scheduled one); first-meeting brief detection uses the same rule. Meeting summaries now expose `overdue_followups` and `has_notes` for the UI.
+- Today excludes Priya Nair and Arjun Menon from attendee lines, formats customer attendees as `Name (role)`, shows overdue/other-open chips consistently, routes “Log notes” to `/capture?meeting=<id>`, and uses the demo-date chip with the compact Today label. Capture honors that meeting query, otherwise defaults to the newest meeting without notes; its selector/upload fields are equal height and the disabled extraction hint is explicit. The Capture page uses a compact label/subtitle, and cached objections cap at three with “Show N more”.
+- Updated schema docs and generated API declarations offline from `app.openapi()` (28 paths); no live LLM/Hindsight calls. Tests: backend 705 passed, 1 skipped, 6 deselected; Ruff/mypy passed. Frontend lint/typecheck passed; 60 Vitest tests passed; production build passed with the existing >500 kB bundle advisory.
+
 ### Accepted Checkpoint 2 fixes — contacts group (2026-09-30)
 
 - Contact list defaults to confirmed customer-side contacts only; `include_unconfirmed=true` adds needs-review customer contacts but never account-less internal people. Added the “Show unconfirmed (N)” toggle/chip and a confirmation PATCH that updates name/role and clears `needs_review`. The schema doc and offline OpenAPI client were updated in this commit.

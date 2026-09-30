@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   useDiscardCapture,
@@ -113,6 +113,7 @@ function ReviewItem({
 
 export function Capture() {
   const meetings = useMeetings()
+  const [searchParams] = useSearchParams()
   const [meetingId, setMeetingId] = useState('')
   const [transcript, setTranscript] = useState('')
   const [fileError, setFileError] = useState<string>()
@@ -126,8 +127,14 @@ export function Capture() {
       .sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at)),
     [meetings.data],
   )
-  const meeting = availableMeetings.find((item) => item.id === meetingId)
-  const preview = usePreviewCapture(meetingId)
+  const requestedMeeting = searchParams.get('meeting')
+  const selectedMeetingId = availableMeetings.some((item) => item.id === meetingId)
+    ? meetingId
+    : requestedMeeting && availableMeetings.some((item) => item.id === requestedMeeting)
+      ? requestedMeeting
+      : availableMeetings.find((item) => !item.has_notes)?.id || ''
+  const meeting = availableMeetings.find((item) => item.id === selectedMeetingId)
+  const preview = usePreviewCapture(selectedMeetingId)
   const previewJob = useJob(previewJobId)
   const draft = previewJob.data?.draft
   const save = useSaveCapture(draft?.draft_id ?? '')
@@ -166,7 +173,7 @@ export function Capture() {
 
   async function handlePreview() {
     setFormError(undefined)
-    if (!meetingId || transcript.trim().length < 50) return
+    if (!selectedMeetingId || transcript.trim().length < 50) return
     try {
       const accepted = await preview.mutateAsync(transcript.trim())
       setPreviewJobId(accepted.job_id)
@@ -217,7 +224,6 @@ export function Capture() {
     <section className="mx-auto max-w-4xl space-y-6">
       <header>
         <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary">Post-meeting workflow</p>
-        <h1 className="mt-1 text-2xl font-semibold">Capture notes</h1>
         <p className="mt-1 text-sm text-muted-foreground">Review what was learned before it updates your account ledger.</p>
       </header>
 
@@ -227,7 +233,7 @@ export function Capture() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-medium">
             Meeting
-            <select aria-label="Choose meeting" value={meetingId} onChange={(event) => changeMeeting(event.target.value)} disabled={meetings.isLoading || meetings.isError} className="h-11 rounded-md border border-input bg-background px-3 font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <select aria-label="Choose meeting" value={selectedMeetingId} onChange={(event) => changeMeeting(event.target.value)} disabled={meetings.isLoading || meetings.isError} className="h-11 rounded-md border border-input bg-background px-3 font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Choose an upcoming or recent meeting</option>
               {availableMeetings.filter((item) => item.status === 'upcoming').length ? <optgroup label="Upcoming meetings">{availableMeetings.filter((item) => item.status === 'upcoming').map((item) => <option key={item.id} value={item.id}>{item.account_name} · {item.title} · {new Date(item.scheduled_at).toLocaleDateString()}</option>)}</optgroup> : null}
               {availableMeetings.filter((item) => item.status === 'done').length ? <optgroup label="Recent meetings">{availableMeetings.filter((item) => item.status === 'done').map((item) => <option key={item.id} value={item.id}>{item.account_name} · {item.title} · {new Date(item.scheduled_at).toLocaleDateString()}</option>)}</optgroup> : null}
@@ -238,7 +244,7 @@ export function Capture() {
           </label>
           <label className="grid gap-1.5 text-sm font-medium">
             Upload a .txt or .md file
-            <input aria-label="Upload transcript file" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleFile(event)} className="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1" />
+            <input aria-label="Upload transcript file" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleFile(event)} className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1" />
           </label>
         </div>
 
@@ -258,7 +264,8 @@ export function Capture() {
         {previewJob.isError ? <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">{describeError(previewJob.error)}</p> : null}
 
         <div className="flex justify-end">
-          <Button disabled={!meetingId || transcript.trim().length < 50 || transcript.length > MAX_TRANSCRIPT_CHARS || preview.isPending || previewPending} onClick={() => void handlePreview()}>
+          {(!selectedMeetingId || transcript.trim().length < 50) && <p className="mr-auto self-center text-xs text-muted-foreground">Choose a meeting and paste at least 50 characters</p>}
+          <Button disabled={!selectedMeetingId || transcript.trim().length < 50 || transcript.length > MAX_TRANSCRIPT_CHARS || preview.isPending || previewPending} onClick={() => void handlePreview()}>
             {preview.isPending || previewPending ? 'Extracting…' : 'Extract memories'}
           </Button>
         </div>

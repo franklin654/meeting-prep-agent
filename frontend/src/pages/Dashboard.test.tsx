@@ -8,8 +8,8 @@ import { renderRoutes, renderWithProviders } from '@/test/renderWithProviders'
 const EMPTY_STYLE = { section_order: [], hidden_sections: [], length: 'standard', notes: [] }
 
 describe('Dashboard', () => {
-  it('lists upcoming meetings and enforces the notes minimum before submitting', async () => {
-    const fetchMock = mockFetch({
+  it('shows customer attendees and follow-up chips, and links notes to the meeting capture form', async () => {
+    mockFetch({
       'GET /api/nudges': { body: [] },
       'GET /api/contacts': { body: [] },
       'GET /api/style': { body: EMPTY_STYLE },
@@ -17,49 +17,24 @@ describe('Dashboard', () => {
         body: [{
           id: 'mtg_1', account_id: 'acct_1', account_name: 'FinEdge', title: 'Pilot decision',
           scheduled_at: '2026-09-29T13:00:00Z', status: 'upcoming',
-          attendees: [{ id: 'c_1', name: 'Anita Rao', role: 'CFO' }], brief_ready: true,
+          attendees: [
+            { id: 'c_priya', name: 'Priya Nair', role: 'Account Executive' },
+            { id: 'c_arjun', name: 'Arjun Menon', role: 'Sales Engineer' },
+            { id: 'c_1', name: 'Anita Rao', role: 'CFO' },
+          ], brief_ready: true, prepared: false, open_followups: 3, overdue_followups: 1,
+          past_meetings: 2, has_history: true, has_notes: false,
         }],
       },
     })
     renderWithProviders(<Dashboard />)
     expect(await screen.findByText('Pilot decision')).toBeInTheDocument()
-    expect(screen.getByText(/Anita Rao · CFO/)).toBeInTheDocument()
+    expect(screen.getByText(/Anita Rao \(CFO\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/Priya Nair/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Arjun Menon/)).not.toBeInTheDocument()
     expect(screen.getByText('Brief ready')).toBeInTheDocument()
-    fireEvent.click(screen.getAllByRole('button', { name: /log notes/i })[0])
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    const submit = screen.getByRole('button', { name: /start learning/i })
-    expect(submit).toBeDisabled()
-    fireEvent.change(screen.getByLabelText(/meeting transcript/i), { target: { value: 'short' } })
-    expect(submit).toBeDisabled()
-    expect(fetchMock.calls.filter((call) => call.path === '/api/nudges')).toHaveLength(1)
-    expect(fetchMock.calls.every((call) => call.method === 'GET')).toBe(true)
-  })
-
-  it('submits only valid notes and shows the learned summary when the job finishes', async () => {
-    const transcript = 'A'.repeat(50)
-    const fetchMock = mockFetch({
-      'GET /api/nudges': { body: [] },
-      'GET /api/contacts': { body: [] },
-      'GET /api/style': { body: EMPTY_STYLE },
-      'GET /api/meetings': { body: [{
-        id: 'mtg_1', account_id: 'acct_1', account_name: 'FinEdge', title: 'Pilot decision',
-        scheduled_at: '2026-09-29T13:00:00Z', status: 'upcoming', attendees: [], brief_ready: false,
-      }] },
-      'POST /api/meetings/mtg_1/notes': { status: 202, body: { job_id: 'job_1' } },
-      'GET /api/jobs/job_1': {
-        body: { id: 'job_1', kind: 'ingest', status: 'done', learned: { facts: ['Budget is $75K'], new_commitments: 1, closed_commitments: 0, alerts: ['Contradiction: budget changed.'] } },
-      },
-    })
-    renderWithProviders(<Dashboard />)
-    await screen.findByText('Pilot decision')
-    fireEvent.click(screen.getAllByRole('button', { name: /log notes/i })[0])
-    fireEvent.change(screen.getByLabelText(/meeting transcript/i), { target: { value: transcript } })
-    fireEvent.change(screen.getByLabelText(/choose meeting/i), { target: { value: 'mtg_1' } })
-    fireEvent.click(screen.getByRole('button', { name: /start learning/i }))
-    expect(await screen.findByText(/Budget is \$75K.*Alerts: Contradiction/)).toBeInTheDocument()
-    expect(await screen.findByText(/Alerts: Contradiction: budget changed\./)).toBeInTheDocument()
-    expect(fetchMock.calls.filter((call) => call.path === '/api/nudges')).toHaveLength(1)
-    expect(fetchMock.calls.map((call) => call.method)).toContain('POST')
+    expect(screen.getByText('1 overdue')).toHaveClass('border-alert-warning/40')
+    expect(screen.getByText('2 other open')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log notes' })).toHaveAttribute('href', '/capture?meeting=mtg_1')
   })
 
   it('searches meetings and contacts client-side', async () => {
