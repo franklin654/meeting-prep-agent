@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { routes } from '@/routes'
 import { mockFetch } from '@/test/mockFetch'
@@ -32,12 +32,30 @@ describe('Contact profile page', () => {
     expect(await screen.findByText('No timeline items yet.')).toBeInTheDocument()
   })
 
-  it('disables pattern refresh until facts span two meetings', async () => {
+  it('hides the empty patterns card and keeps refresh gated inside the control card', async () => {
     mockFetch({ 'GET /api/contacts/c_anita/profile': { body: profile('Anita Rao') } })
     renderRoutes(routes, { route: '/contacts/c_anita' })
-    const refresh = await screen.findByRole('button', { name: 'Refresh' })
+    await screen.findByRole('heading', { name: 'Anita Rao' })
+    expect(screen.queryByRole('heading', { name: 'What I have learned' })).not.toBeInTheDocument()
+    const controlHeading = screen.getByRole('heading', { name: 'You stay in control' })
+    const controlCard = controlHeading.closest('article')
+    expect(controlCard).not.toBeNull()
+    const refresh = within(controlCard as HTMLElement).getByRole('button', { name: 'Refresh patterns' })
     expect(refresh).toBeDisabled()
     expect(refresh).toHaveAttribute('title', 'Needs facts from at least 2 meetings')
+  })
+
+  it('shows cached patterns and an enabled compact refresh link in the control card', async () => {
+    const base = profile('Karan Shah')
+    const secondFact = { ...base.facts[0], id: 'fact_2', citation: { ...base.facts[0].citation, meeting_id: 'mtg_m5' } }
+    const withPatterns = { ...base, facts: [...base.facts, secondFact], patterns: [{ text: 'Prefers concrete rollout plans.', citations: [base.facts[0].citation] }] }
+    mockFetch({ 'GET /api/contacts/c_anita/profile': { body: withPatterns } })
+    renderRoutes(routes, { route: '/contacts/c_anita' })
+    expect(await screen.findByText('Prefers concrete rollout plans.')).toBeInTheDocument()
+    const controlHeading = screen.getByRole('heading', { name: 'You stay in control' })
+    const controlCard = controlHeading.closest('article')
+    expect(controlCard).not.toBeNull()
+    expect(within(controlCard as HTMLElement).getByRole('button', { name: 'Refresh patterns' })).toBeEnabled()
   })
 
   it('confirms an unconfirmed contact with the edited name and role', async () => {

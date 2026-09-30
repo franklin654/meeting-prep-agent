@@ -199,6 +199,10 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Full backend gates: 708 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Frontend: 65 Vitest tests passed, lint and TypeScript passed, production build passed (existing 594 kB main-chunk advisory).
 - Responsive classes use single-column layouts below `lg` and compact wrapping at mobile widths. No browser/viewport automation is available in this environment, so actual 1280/1024/390 visual inspection remains a manual verification item; no screenshots are claimed for this ticket.
 
+### Stage C follow-up — contact pattern card
+
+- Hide “What I have learned” when no cached patterns exist. Move Refresh into “You stay in control” as a compact link-style button, disabled with the existing two-distinct-meeting hint until eligible. Tests cover both no-pattern/threshold and cached-pattern/eligible states; focused contact profile tests: 6 passed; full frontend gates rerun for C4.
+
 ### Stage C ticket C4 — verification / handover (blocked)
 
 - Sandbox-R guard check resolved `DATABASE_URL=sqlite:///./app.sandbox-r.db`, bank `ae-user-demo-thomas`, `MEMORY_READ_ONLY=true`; Hindsight health was healthy before calls. Three authorized Ask reflects completed sequentially (no brief generation, retain, or Hindsight write): (1) Anita budget, 13.81 s, grounded to `Budget and process · Jul 28, 2026`; about $40K and first-year cost including onboarding; (2) same-thread follow-up on the ROI one-pager, 13.06 s, grounded to the same meeting; include total first-year cost, visible assumptions, current-system comparison, and deadline; (3) Rahul favourite food, 11.32 s, fixed “Nothing in memory covers that yet.” with no citations. Reflect token counts were not available in the API response. Sandbox-W Karan refresh had zero cited patterns, so both conditional real-DB pattern refreshes were correctly skipped.
