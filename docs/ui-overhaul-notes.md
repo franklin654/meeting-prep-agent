@@ -150,6 +150,12 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Tests first: same-meeting facts skip without LLM; two-meeting facts invoke FakeLLM once and retain valid citations. Frontend threshold tooltip regression added. Backend: 702 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Frontend: lint and TypeScript passed; Vitest 55 passed.
 - Sandbox-W was restarted using `scripts/sandbox_w.sh` (DB `app.sandbox.db`, bank `ae-overhaul-test`, read-only false). Karan Shah has six meetings but the five visible facts all cite `m2_finedge`; the one requested refresh returned `patterns: []`, reason `Needs facts from at least 2 meetings`, and made no LLM call. No fact payload was sent.
 
+### Stage C ticket C0 — cached Brief page (2026-09-30)
+
+- Frontend/read-time only; no LLM or Hindsight calls. The cached M6 page now prioritizes critical items before amber alerts, sorts owed rows critical/overdue/date, caps each list at three with a show-more control, formats dates for display, shows overdue age and Watch only for overdue rows, omits empty sections, and removes the separate Memory-used card/duplicate facts count.
+- The header counter reads the cached `memory_used` object; internal AE/Arjun attendees and contact cards are excluded; contact-card meetings are limited to past meetings, newest first, max three. Feedback uses monochrome accessible icon controls in section headers. Prepared can be set and undone with the existing POST/DELETE endpoints. Heading uses the meeting title without “Brief for”.
+- Added cached-brief regression coverage for memory counts, due dates/order/density, internal attendees, empty Alerts, past-only contact meetings, accessible icon feedback and prepared undo. Focused Brief tests passed (10); lint and TypeScript passed. Broader frontend checks are rerun at final checkpoint.
+
 ### Checkpoint 2 accepted fixes — group 0: sandbox guard
 
 - Added executable `scripts/sandbox_w.sh` and `scripts/sandbox_r.sh`. Each exports its sandbox SQLite URL, expected `DEMO_USER_ID`, and memory mode; resolves and prints the effective `DATABASE_URL`, `BANK_ID`, and `MEMORY_READ_ONLY`; refuses any unexpected values before launching. W binds only :8001 with `ae-overhaul-test` and writes enabled; R binds only :8002 with `ae-user-demo-thomas` and read-only enabled. `--check` performs the same guards without starting a server.

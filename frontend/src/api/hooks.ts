@@ -252,10 +252,16 @@ export function useSubmitFeedback(meetingId: string, briefId: string) {
 export function useMarkPrepared(meetingId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async () => {
-      await api.POST('/api/meetings/{meeting_id}/prepared', {
-        params: { path: { meeting_id: meetingId } },
-      })
+    mutationFn: async (prepared: boolean = true) => {
+      if (prepared) {
+        await api.POST('/api/meetings/{meeting_id}/prepared', {
+          params: { path: { meeting_id: meetingId } },
+        })
+      } else {
+        await api.DELETE('/api/meetings/{meeting_id}/prepared', {
+          params: { path: { meeting_id: meetingId } },
+        })
+      }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.meetingsAll() }),
   })
