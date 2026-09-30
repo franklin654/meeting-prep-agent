@@ -74,6 +74,8 @@ def test_post_ask_returns_grounded_answer_with_citation(
     assert response.status_code == 200
     assert response.json()["grounded"] is True
     assert response.json()["citations"][0]["meeting_id"] == "m2_finedge"
+    assert response.json()["citations"][0]["label"] == "Budget and process · Jul 28, 2026"
+    assert "m2_finedge" not in response.json()["citations"][0]["label"]
 
 
 def test_post_note_returns_job_and_retains_note(

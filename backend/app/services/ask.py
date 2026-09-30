@@ -90,7 +90,9 @@ def _render_query(request: AskRequest) -> str:
     return render_prompt("reflect_answer", history=history, question=request.question)
 
 
-def _citations(sources: list[MemoryHit]) -> list[Citation]:
+def _citations(
+    sources: list[MemoryHit], meeting_titles: dict[str, str]
+) -> list[Citation]:
     citations: list[Citation] = []
     seen: set[tuple[str, str, str]] = set()
     for source in sources:
@@ -105,7 +107,10 @@ def _citations(sources: list[MemoryHit]) -> list[Citation]:
                 source_type=SourceType.meeting,
                 meeting_id=source.meeting_id,
                 meeting_date=source.meeting_date,
-                label=f"{source.meeting_id} on {format_date(source.meeting_date)}",
+                label=(
+                    f"{meeting_titles.get(source.meeting_id, 'Meeting')} · "
+                    f"{format_date(source.meeting_date)}"
+                ),
                 quote=truncate(source.text, QUOTE_MAX_CHARS),
                 memory_id=source.memory_id,
             )
@@ -165,7 +170,14 @@ async def ask_question(
             )
         ]
     citations = await memory.resolve_sources(source_rows) if answer and answer.confident else []
-    mapped = _citations(citations)
+    with session_factory() as session:
+        meeting_titles = {
+            meeting_id: meeting.title
+            for meeting_id in {source.meeting_id for source in citations}
+            if meeting_id is not None
+            and (meeting := repository.get_meeting(session, meeting_id)) is not None
+        }
+    mapped = _citations(citations, meeting_titles)
     grounded = bool(answer and answer.confident and answer.answer.strip() and mapped)
     response = AskResponse(
         ask_answer_id=f"ask_{uuid.uuid4().hex[:8]}",

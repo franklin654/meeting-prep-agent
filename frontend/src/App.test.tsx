@@ -34,12 +34,12 @@ describe('routing', () => {
 
   it('registers the new shell routes', () => {
     renderRoutes(routes, { route: '/ask' })
-    expect(screen.getByRole('heading', { name: 'Ask' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ask your memory' })).toBeInTheDocument()
   })
 
   it('registers the Contacts list route', () => {
     renderRoutes(routes, { route: '/contacts' })
-    expect(screen.getByRole('heading', { name: 'Contacts' })).toBeInTheDocument()
+    expect(screen.getByText('CONTACTS', { selector: 'p' })).toBeInTheDocument()
   })
 
   it('shows the signed-in identity and exposes collapsible navigation', async () => {

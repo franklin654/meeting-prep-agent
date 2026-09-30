@@ -114,7 +114,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary">TODAY</p>
-          <p className="mt-1 text-sm text-muted-foreground">Your account memory, ready before the next call · {demoDate.data ? new Date(`${demoDate.data}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Demo date'}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2"><p className="text-sm text-muted-foreground">Your account memory, ready before the next call</p><Badge variant="outline">{demoDate.data ? new Date(`${demoDate.data}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Demo date'}</Badge></div>
         </div>
         <Button onClick={() => setScheduleOpen(true)}>Schedule meeting</Button>
       </div>

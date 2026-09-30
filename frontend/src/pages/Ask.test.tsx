@@ -14,7 +14,7 @@ describe('Ask page', () => {
     })
     renderWithProviders(<Ask />)
     fireEvent.click(await screen.findByRole('button', { name: /change scope/i }))
-    fireEvent.click(await screen.findByRole('tab', { name: 'contact' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'contact' }))
     fireEvent.click(await screen.findByRole('option', { name: /Anita Rao/i }))
     expect(screen.getByRole('button', { name: /Anita Rao/i })).toHaveTextContent('contact')
     expect(screen.getByRole('button', { name: /What have they said about priorities/i })).toBeInTheDocument()
@@ -38,5 +38,29 @@ describe('Ask page', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Question' }), { target: { value: 'What is Rahul favourite food?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
     expect(await screen.findByRole('note')).toHaveTextContent('Not found in memory')
+  })
+
+  it('shows explicit loading and keeps sources attached to the selected answer', async () => {
+    let answerCount = 0
+    mockFetch({
+      'GET /api/accounts': { body: [{ id: 'acc_1', name: 'FinEdge', industry: 'Fintech', stage: 'evaluation' }] },
+      'GET /api/contacts': { body: [] },
+      'GET /api/meetings': { body: [{ id: 'm1', account_id: 'acc_1', account_name: 'FinEdge', title: 'Budget review', scheduled_at: '2026-09-20T10:00:00Z', status: 'done', attendees: [], brief_ready: true, prepared: false, open_followups: 0, past_meetings: 1, has_history: true, has_notes: true }] },
+      'POST /api/ask': () => {
+        answerCount += 1
+        return { body: { ask_answer_id: `ans_${answerCount}`, answer: `Answer ${answerCount}`, grounded: true, citations: [{ source_type: 'meeting', meeting_id: 'm1', meeting_date: '2026-09-20', label: 'Budget review · Sep 20, 2026', quote: `Quote ${answerCount}`, memory_id: `mem_${answerCount}` }] } }
+      },
+    })
+    renderWithProviders(<Ask />)
+    await screen.findByRole('button', { name: /change scope/i })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question' }), { target: { value: 'First question?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await screen.findByText('Answer 1')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question' }), { target: { value: 'Second question?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await screen.findByText('Answer 2')
+    fireEvent.click(screen.getByRole('button', { name: 'View sources for answer: First question?' }))
+    expect(screen.getByRole('complementary', { name: 'Sources for this answer' })).toHaveTextContent('Quote 1')
+    expect(screen.getByRole('button', { name: 'View sources for answer: First question?' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
