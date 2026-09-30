@@ -78,13 +78,13 @@ export function useAccounts() {
   })
 }
 
-export function useContacts(accountId?: string, enabled = true) {
+export function useContacts(accountId?: string, enabled = true, includeUnconfirmed = false) {
   return useQuery({
     queryKey: queryKeys.contacts(accountId),
     enabled,
     queryFn: async (): Promise<ContactSummary[]> => {
       const { data } = await api.GET('/api/contacts', {
-        params: { query: accountId ? { account_id: accountId } : {} },
+        params: { query: { ...(accountId ? { account_id: accountId } : {}), ...(includeUnconfirmed ? { include_unconfirmed: true } : {}) } },
       })
       return data as ContactSummary[]
     },

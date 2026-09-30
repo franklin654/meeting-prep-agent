@@ -21,4 +21,24 @@ describe('Contacts list', () => {
     expect(screen.queryByText('Anita Rao')).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'FinEdge Payments' })).toBeInTheDocument()
   })
+
+  it('shows confirmed contacts by default and lets the user reveal unconfirmed contacts', async () => {
+    const fetchMock = mockFetch({
+      'GET /api/contacts': { body: [
+        { id: 'c_rahul', name: 'Rahul Mehta', role: 'CTO', account_id: 'acc_finedge', account_name: 'FinEdge Payments', needs_review: false, meetings_count: 2, open_followups: 0, last_meeting_date: null },
+      ] },
+      'GET /api/contacts?include_unconfirmed=true': { body: [
+        { id: 'c_rahul', name: 'Rahul Mehta', role: 'CTO', account_id: 'acc_finedge', account_name: 'FinEdge Payments', needs_review: false, meetings_count: 2, open_followups: 0, last_meeting_date: null },
+        { id: 'c_ananya', name: 'Ananya', role: null, account_id: 'acc_finedge', account_name: 'FinEdge Payments', needs_review: true, meetings_count: 1, open_followups: 0, last_meeting_date: null },
+      ] },
+      'GET /api/accounts': { body: [] },
+    })
+    renderRoutes(routes, { route: '/contacts' })
+    expect(await screen.findByText('Rahul Mehta')).toBeInTheDocument()
+    expect(screen.queryByText('Ananya')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Show unconfirmed/ }))
+    expect(await screen.findByText('Ananya')).toBeInTheDocument()
+    expect(screen.getByText('Unconfirmed')).toBeInTheDocument()
+    expect(fetchMock.calls.some((call) => call.search.includes('include_unconfirmed=true'))).toBe(true)
+  })
 })

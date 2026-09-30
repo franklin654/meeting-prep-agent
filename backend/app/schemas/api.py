@@ -27,6 +27,7 @@ class ContactRef(BaseModel):
     id: str
     name: str
     role: str | None
+    needs_review: bool = False
 
 
 class AccountCreate(BaseModel):
@@ -47,6 +48,11 @@ class ContactCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     role: str | None = Field(default=None, max_length=200)
     aliases: list[str] = Field(default_factory=list)
+
+
+class ContactConfirmRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    role: str | None = Field(default=None, max_length=200)
 
 
 class ContactSummary(ContactRef):

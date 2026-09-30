@@ -390,6 +390,8 @@ Overdue is computed, never stored: `status == open and due_date < settings.demo_
 
 Contact profile/control contracts: `GET /api/contacts/{contact_id}/profile` reads the SQLite contact, account, facts, commitments, app-side overrides, and cached patterns. `POST /api/contacts/{contact_id}/patterns/refresh` explicitly derives and caches up to four fact-cited patterns (one app LLM call, only when at least three visible facts exist and facts span at least two distinct meetings). If fewer than two meetings are represented, the response is `{patterns: [...], reason: "Needs facts from at least 2 meetings"}`; if there are at least two meetings but fewer than three visible facts, `reason` is `"Needs at least 3 visible facts"`. Eligible responses use `reason: null`. `POST /api/memories/{id}/hide` and `DELETE /api/memories/{id}/hide` hide/unhide in this app; `POST /api/memories/{id}/correct` hides the original and retains the correction through the existing note path. `PATCH /api/commitments/{id}` edits status, due date, or text; `DELETE` removes the ledger row. No Hindsight memory-delete operation is available.
 
+Contact confirmation contracts: `GET /api/contacts` lists only confirmed customer-side contacts by default; `include_unconfirmed=true` includes those needing review while still excluding internal contacts with no account. Contact list/profile references include `needs_review`. `PATCH /api/contacts/{contact_id}` accepts `ContactConfirmRequest` (`name`, nullable `role`) and confirms the contact by setting `needs_review=false`; contacts are never deleted by this operation.
+
 ## API models, jobs and errors
 
 Request and response bodies for the endpoints in the Technical design; routes return these models directly so the OpenAPI spec, and the generated frontend client, stay exact.
@@ -403,7 +405,7 @@ draft. No new application error codes are introduced.
 
 ```python
 class ContactRef(BaseModel):
-    id: str; name: str; role: str | None
+    id: str; name: str; role: str | None; needs_review: bool = False
 
 # POST/GET /api/accounts
 class AccountCreate(BaseModel):
@@ -414,13 +416,16 @@ class AccountResponse(BaseModel):
     id: str; name: str; industry: str
     stage: Literal["discovery", "evaluation", "closed_won", "closed_lost"]
 
-# POST/GET /api/contacts; GET supports query and account_id filters.
+# POST/GET /api/contacts; GET supports query, account_id, include_unconfirmed filters.
 class ContactCreate(BaseModel):
     account_id: str; name: str; role: str | None; aliases: list[str]
 
 class ContactSummary(ContactRef):
     account_id: str | None; account_name: str | None
     meetings_count: int; open_followups: int; last_meeting_date: date | None
+
+class ContactConfirmRequest(BaseModel):
+    name: str; role: str | None = None
 
 # POST /api/meetings; POST/DELETE /api/meetings/{id}/prepared
 class MeetingCreate(BaseModel):

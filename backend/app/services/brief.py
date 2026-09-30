@@ -1926,6 +1926,8 @@ def _contact_cards(
     cards: list[ContactCard] = []
     current_attendee_ids = {contact.id for contact in inputs.attendees}
     for contact in inputs.account_contacts:
+        if contact.account_id != inputs.account.id:
+            continue
         if contact.id not in current_attendee_ids:
             continue
         citations = [

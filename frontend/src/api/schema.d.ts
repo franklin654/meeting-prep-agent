@@ -165,6 +165,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Confirm Contact */
+        patch: operations["confirm_contact_api_contacts__contact_id__patch"];
+        trace?: never;
+    };
     "/api/meetings/{meeting_id}/suggested-questions": {
         parameters: {
             query?: never;
@@ -771,6 +788,13 @@ export interface components {
              */
             open_follow_ups: number;
         };
+        /** ContactConfirmRequest */
+        ContactConfirmRequest: {
+            /** Name */
+            name: string;
+            /** Role */
+            role?: string | null;
+        };
         /** ContactCreate */
         ContactCreate: {
             /** Account Id */
@@ -840,6 +864,11 @@ export interface components {
             name: string;
             /** Role */
             role: string | null;
+            /**
+             * Needs Review
+             * @default false
+             */
+            needs_review: boolean;
         };
         /** ContactSummary */
         ContactSummary: {
@@ -849,6 +878,11 @@ export interface components {
             name: string;
             /** Role */
             role: string | null;
+            /**
+             * Needs Review
+             * @default false
+             */
+            needs_review: boolean;
             /** Account Id */
             account_id: string | null;
             /** Account Name */
@@ -1514,6 +1548,7 @@ export interface operations {
             query?: {
                 query?: string | null;
                 account_id?: string | null;
+                include_unconfirmed?: boolean;
             };
             header?: never;
             path?: never;
@@ -1551,6 +1586,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ContactCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_contact_api_contacts__contact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactConfirmRequest"];
             };
         };
         responses: {

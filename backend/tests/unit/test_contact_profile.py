@@ -13,6 +13,7 @@ import app.main as main_module
 from app.api.deps import get_brief_llm, get_memory_service, get_session, get_session_factory
 from app.db import overrides_repo
 from app.db.facts_repo import replace_meeting_facts
+from app.db.models import Contact
 from app.schemas.enums import FactKind
 from app.schemas.patterns import ContactPatternDraft, ContactPatternSuggestion
 from tests.fakes.fake_llm import FakeLLM
@@ -81,6 +82,44 @@ def test_profile_groups_sqlite_facts_and_followups(client: TestClient, world: Wo
     assert any(row["title"] == "Technical deep dive" for row in profile["timeline"])
     assert any(item["kind"] == "commitment" for row in profile["timeline"] for item in row["items"])
     assert profile["follow_ups"][0]["id"] == "cm_deck"
+
+
+def test_contacts_hide_unconfirmed_and_internal_by_default_and_allow_confirmation(
+    client: TestClient, world: World
+) -> None:
+    with Session(world.engine) as session:
+        session.add(
+            Contact(
+                id="c_unconfirmed",
+                account_id="acc_finedge",
+                name="Ananya",
+                role=None,
+                needs_review=True,
+            )
+        )
+        session.add(
+            Contact(id="c_internal", account_id=None, name="Priya Nair", role="AE")
+        )
+        session.commit()
+
+    default_contacts = client.get("/api/contacts").json()
+    assert "c_unconfirmed" not in {row["id"] for row in default_contacts}
+    assert "c_internal" not in {row["id"] for row in default_contacts}
+    unconfirmed = client.get("/api/contacts?include_unconfirmed=true").json()
+    assert "c_unconfirmed" in {row["id"] for row in unconfirmed}
+    assert "c_internal" not in {row["id"] for row in unconfirmed}
+    profile = client.get("/api/contacts/c_unconfirmed/profile").json()
+    assert profile["contact"]["needs_review"] is True
+
+    response = client.patch(
+        "/api/contacts/c_unconfirmed", json={"name": "Ananya Sharma", "role": "CFO"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["needs_review"] is False
+    assert response.json()["name"] == "Ananya Sharma"
+    assert response.json()["role"] == "CFO"
+    profile = client.get("/api/contacts/c_unconfirmed/profile").json()
+    assert profile["contact"]["needs_review"] is False
 
 
 def test_hide_and_unhide_fact_updates_profile(client: TestClient, world: World) -> None:

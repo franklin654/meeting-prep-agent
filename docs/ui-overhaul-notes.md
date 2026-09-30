@@ -156,6 +156,13 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - The header counter reads the cached `memory_used` object; internal AE/Arjun attendees and contact cards are excluded; contact-card meetings are limited to past meetings, newest first, max three. Feedback uses monochrome accessible icon controls in section headers. Prepared can be set and undone with the existing POST/DELETE endpoints. Heading uses the meeting title without “Brief for”.
 - Added cached-brief regression coverage for memory counts, due dates/order/density, internal attendees, empty Alerts, past-only contact meetings, accessible icon feedback and prepared undo. Focused Brief tests passed (10); lint and TypeScript passed. Broader frontend checks are rerun at final checkpoint.
 
+### Accepted Checkpoint 2 fixes — contacts group (2026-09-30)
+
+- Contact list defaults to confirmed customer-side contacts only; `include_unconfirmed=true` adds needs-review customer contacts but never account-less internal people. Added the “Show unconfirmed (N)” toggle/chip and a confirmation PATCH that updates name/role and clears `needs_review`. The schema doc and offline OpenAPI client were updated in this commit.
+- Contact timeline headings use “title · Mon D, YYYY”; kind labels are sentence-case chips, and source chips link to meetings. Fact and follow-up rows now expose keyboard-operable `…` menus; follow-up actions include mark/reopen, edit date, and confirmed delete. Contact cards defensively exclude internal contacts.
+- Live correction-only retain: Hindsight `/health` was healthy (`database=connected`) before the call; guarded Sandbox-W printed bank `ae-overhaul-test`, DB `app.sandbox.db`, read-only false. Corrected one fact through `POST /api/memories/{id}/correct`; its note job completed with no error, and the contact profile showed the original hidden. This was the one newly authorized Hindsight retain; no other live retain was made.
+- Gates: backend 703 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Frontend lint and typecheck passed; 58 Vitest tests passed; production build passed (existing large-chunk warning only).
+
 ### Checkpoint 2 accepted fixes — group 0: sandbox guard
 
 - Added executable `scripts/sandbox_w.sh` and `scripts/sandbox_r.sh`. Each exports its sandbox SQLite URL, expected `DEMO_USER_ID`, and memory mode; resolves and prints the effective `DATABASE_URL`, `BANK_ID`, and `MEMORY_READ_ONLY`; refuses any unexpected values before launching. W binds only :8001 with `ae-overhaul-test` and writes enabled; R binds only :8002 with `ae-user-demo-thomas` and read-only enabled. `--check` performs the same guards without starting a server.

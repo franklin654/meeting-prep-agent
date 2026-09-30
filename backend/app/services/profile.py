@@ -159,7 +159,12 @@ def build_contact_profile(contact_id: str, *, session_factory: SessionFactory) -
         cached = repository.get_contact_pattern_cache(session, contact_id)
         patterns = [ContactPattern.model_validate(row) for row in cached.patterns] if cached else []
         return ContactProfile(
-            contact=ContactRef(id=contact.id, name=contact.name, role=contact.role),
+            contact=ContactRef(
+                id=contact.id,
+                name=contact.name,
+                role=contact.role,
+                needs_review=contact.needs_review,
+            ),
             account=AccountResponse(
                 id=account.id,
                 name=account.name,
