@@ -1,10 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { Brief } from '@/pages/Brief'
-import { ComingSoon } from '@/pages/ComingSoon'
 import { Dashboard } from '@/pages/Dashboard'
 import { Capture } from '@/pages/Capture'
 import { Ask } from '@/pages/Ask'
+import { Memory } from '@/pages/Memory'
 import { Contacts } from '@/pages/Contacts'
 
 /**
@@ -22,7 +22,7 @@ export const routes: RouteObject[] = [
       { path: 'contacts/:id', element: <Contacts /> },
       { path: 'ask', element: <Ask /> },
       { path: 'capture', element: <Capture /> },
-      { path: 'memory', element: <ComingSoon title="Memory inspector" /> },
+      { path: 'memory', element: <Memory /> },
     ],
   },
 ]

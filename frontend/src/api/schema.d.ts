@@ -498,6 +498,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memory/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Memory Overview */
+        get: operations["read_memory_overview_api_memory_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -537,6 +554,15 @@ export interface components {
              * @enum {string}
              */
             stage: "discovery" | "evaluation" | "closed_won" | "closed_lost";
+        };
+        /** AccountMemoryGrowth */
+        AccountMemoryGrowth: {
+            /** Account Id */
+            account_id: string;
+            /** Account Name */
+            account_name: string;
+            /** Points */
+            points: components["schemas"]["MemoryGrowthPoint"][];
         };
         /** AccountResponse */
         AccountResponse: {
@@ -925,6 +951,37 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HiddenMemoryItem */
+        HiddenMemoryItem: {
+            /** Target Id */
+            target_id: string;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "fact" | "memory";
+            /** Text */
+            text: string;
+            /** Meeting Id */
+            meeting_id?: string | null;
+            /** Meeting Title */
+            meeting_title?: string | null;
+            /** Meeting Date */
+            meeting_date?: string | null;
+        };
+        /** HindsightBankStats */
+        HindsightBankStats: {
+            /** Total Nodes */
+            total_nodes: number;
+            /** Total Documents */
+            total_documents: number;
+            /** Nodes By Fact Type */
+            nodes_by_fact_type: {
+                [key: string]: number;
+            };
+            /** Total Observations */
+            total_observations?: number | null;
+        };
         /** JobAccepted */
         JobAccepted: {
             /** Job Id */
@@ -1030,6 +1087,35 @@ export interface components {
             scope_type?: components["schemas"]["ScopeType"] | null;
             /** Scope Id */
             scope_id?: string | null;
+        };
+        /** MemoryGrowthPoint */
+        MemoryGrowthPoint: {
+            /** Meeting Id */
+            meeting_id: string;
+            /** Meeting Title */
+            meeting_title: string;
+            /**
+             * Meeting Date
+             * Format: date
+             */
+            meeting_date: string;
+            /** Fact Count */
+            fact_count: number;
+        };
+        /** MemoryOverview */
+        MemoryOverview: {
+            /** Facts By Kind */
+            facts_by_kind: {
+                [key: string]: number;
+            };
+            /** Growth */
+            growth: components["schemas"]["AccountMemoryGrowth"][];
+            /** Hidden Item Count */
+            hidden_item_count: number;
+            /** Hidden Items */
+            hidden_items: components["schemas"]["HiddenMemoryItem"][];
+            style_rules: components["schemas"]["StyleProfile"];
+            hindsight_stats?: components["schemas"]["HindsightBankStats"] | null;
         };
         /** NoteRequest */
         NoteRequest: {
@@ -2260,6 +2346,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Nudge"][];
+                };
+            };
+        };
+    };
+    read_memory_overview_api_memory_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOverview"];
                 };
             };
         };

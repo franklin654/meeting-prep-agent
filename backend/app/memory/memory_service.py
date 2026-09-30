@@ -195,6 +195,10 @@ class MemoryService(abc.ABC):
         """Read a mental model by its stable id. `None` if it doesn't exist."""
         raise NotImplementedError
 
+    async def get_bank_stats(self, *, timeout_s: float = 2.0) -> dict[str, Any] | None:
+        """Return cached read-only bank counts, or None when stats are unavailable."""
+        return None
+
     @abc.abstractmethod
     async def timeline(self, contact_id: str) -> list[MemoryHit]:
         """Recall everything tagged `contact:<id>`, `any_strict`, budget `low`,
@@ -522,6 +526,34 @@ class HindsightMemoryService(MemoryService):
             content=model.content or "",
             last_refreshed_at=model.last_refreshed_at,
         )
+
+    async def get_bank_stats(self, *, timeout_s: float = 2.0) -> dict[str, Any] | None:
+        """Read the cached stats endpoint; never requests a recomputation."""
+        started = time.perf_counter()
+        try:
+            async with asyncio.timeout(timeout_s):
+                response = await self._client.banks.get_agent_stats(
+                    bank_id=BANK_ID,
+                    refresh=False,
+                    _request_timeout=timeout_s,
+                )
+        except Exception as exc:
+            logger.info(
+                "hindsight.bank_stats status=unavailable error=%s duration_ms=%d",
+                type(exc).__name__,
+                round((time.perf_counter() - started) * 1000),
+            )
+            return None
+        logger.info(
+            "hindsight.bank_stats status=ok duration_ms=%d",
+            round((time.perf_counter() - started) * 1000),
+        )
+        return {
+            "total_nodes": response.total_nodes,
+            "total_documents": response.total_documents,
+            "nodes_by_fact_type": dict(response.nodes_by_fact_type),
+            "total_observations": response.total_observations,
+        }
 
     async def timeline(self, contact_id: str) -> list[MemoryHit]:
         try:

@@ -74,6 +74,7 @@ class FakeMemoryService(MemoryService):
         self.recall_calls: list[tuple[str, list[str], FactKind | None]] = []
         self.recall_timeouts: list[float | None] = []
         self.read_only = read_only
+        self.bank_stats: dict[str, Any] | None = None
 
     def _require_writable(self, operation: str) -> None:
         if self.read_only:
@@ -265,6 +266,10 @@ class FakeMemoryService(MemoryService):
 
     async def get_mental_model(self, name: str) -> MentalModelText | None:
         return self.mental_models.get(name)
+
+    async def get_bank_stats(self, *, timeout_s: float = 2.0) -> dict[str, Any] | None:
+        del timeout_s
+        return self.bank_stats
 
     async def timeline(self, contact_id: str) -> list[MemoryHit]:
         tag = contact_tag(contact_id)

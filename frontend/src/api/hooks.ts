@@ -14,6 +14,7 @@ export type StyleProfile = components['schemas']['StyleProfile']
 export type Nudge = components['schemas']['Nudge']
 export type Account = components['schemas']['AccountResponse']
 export type ContactSummary = components['schemas']['ContactSummary']
+export type MemoryOverview = components['schemas']['MemoryOverview']
 
 export function useHealth() {
   return useQuery({
@@ -48,6 +49,42 @@ export function useDemoDate() {
       return data.demo_today
     },
     staleTime: 60 * 60 * 1000,
+  })
+}
+
+export function useMemoryOverview() {
+  return useQuery({
+    queryKey: ['memory-overview'],
+    queryFn: async (): Promise<MemoryOverview> => {
+      const { data, error } = await api.GET('/api/memory/overview')
+      if (error || !data) throw new Error('Memory overview unavailable')
+      return data as MemoryOverview
+    },
+  })
+}
+
+export function useUnhideMemory() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (targetId: string) => {
+      await api.DELETE('/api/memories/{memory_id}/hide', { params: { path: { memory_id: targetId } } })
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: ['memory-overview'] }),
+  })
+}
+
+export function useResetStyle() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await api.POST('/api/style/reset')
+      if (error || !data) throw new Error('Style rules could not be reset')
+      return data
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['memory-overview'] })
+      void client.invalidateQueries({ queryKey: queryKeys.style() })
+    },
   })
 }
 

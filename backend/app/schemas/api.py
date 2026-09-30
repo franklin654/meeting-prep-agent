@@ -241,6 +241,44 @@ class StyleProfile(BaseModel):
     notes: list[str]  # plain-language rules shown in the UI
 
 
+class MemoryGrowthPoint(BaseModel):
+    meeting_id: str
+    meeting_title: str
+    meeting_date: date
+    fact_count: int
+
+
+class AccountMemoryGrowth(BaseModel):
+    account_id: str
+    account_name: str
+    points: list[MemoryGrowthPoint]
+
+
+class HiddenMemoryItem(BaseModel):
+    target_id: str
+    target_type: Literal["fact", "memory"]
+    text: str
+    meeting_id: str | None = None
+    meeting_title: str | None = None
+    meeting_date: date | None = None
+
+
+class HindsightBankStats(BaseModel):
+    total_nodes: int
+    total_documents: int
+    nodes_by_fact_type: dict[str, int]
+    total_observations: int | None = None
+
+
+class MemoryOverview(BaseModel):  # GET /api/memory/overview
+    facts_by_kind: dict[FactKind, int]
+    growth: list[AccountMemoryGrowth]
+    hidden_item_count: int
+    hidden_items: list[HiddenMemoryItem]
+    style_rules: StyleProfile
+    hindsight_stats: HindsightBankStats | None = None
+
+
 class Nudge(BaseModel):  # GET /api/nudges
     kind: Literal[
         "overdue_commitment",

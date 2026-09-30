@@ -19,6 +19,7 @@ from app.api import (
     jobs,
     meetings,
     memories,
+    memory_overview,
     nudges,
 )
 from app.api.deps import close_memory_service
@@ -57,6 +58,7 @@ app.include_router(contacts.router, prefix="/api")
 app.include_router(memories.router, prefix="/api")
 app.include_router(commitments.router, prefix="/api")
 app.include_router(nudges.router, prefix="/api")
+app.include_router(memory_overview.router, prefix="/api")
 
 
 @app.get("/api/health")

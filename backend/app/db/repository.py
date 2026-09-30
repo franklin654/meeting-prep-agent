@@ -31,10 +31,12 @@ from app.db.models import (
     Commitment,
     Contact,
     ContactPatternCache,
+    ExtractedFact,
     Feedback,
     Job,
     Meeting,
     MeetingAttendee,
+    MemoryOverride,
 )
 from app.schemas.enums import CommitmentStatus
 
@@ -117,6 +119,23 @@ def get_meeting(session: Session, meeting_id: str) -> Meeting | None:
 
 def list_meetings_for_account(session: Session, account_id: str) -> list[Meeting]:
     statement = select(Meeting).where(Meeting.account_id == account_id)
+    return list(session.exec(statement).all())
+
+
+def list_all_meetings(session: Session) -> list[Meeting]:
+    statement = select(Meeting).order_by(col(Meeting.scheduled_at), col(Meeting.id))
+    return list(session.exec(statement).all())
+
+
+def list_all_extracted_facts(session: Session) -> list[ExtractedFact]:
+    statement = select(ExtractedFact).order_by(col(ExtractedFact.created_at), col(ExtractedFact.id))
+    return list(session.exec(statement).all())
+
+
+def list_all_memory_overrides(session: Session) -> list[MemoryOverride]:
+    statement = select(MemoryOverride).order_by(
+        col(MemoryOverride.created_at), col(MemoryOverride.id)
+    )
     return list(session.exec(statement).all())
 
 

@@ -170,3 +170,27 @@ async def test_fake_scripted_idle_polls() -> None:
     assert await fake.wait_until_idle() is True
     fake.idle_polls = [True, False, True, False]
     assert await fake.wait_until_idle() is False
+
+
+async def test_bank_stats_uses_cached_read_only_short_timeout() -> None:
+    calls: list[dict[str, Any]] = []
+
+    class Banks:
+        async def get_agent_stats(self, **kwargs: Any) -> Any:
+            calls.append(kwargs)
+            return SimpleNamespace(
+                total_nodes=12,
+                total_documents=3,
+                nodes_by_fact_type={"world": 10, "observation": 2},
+                total_observations=2,
+            )
+
+    result = await _service(SimpleNamespace(banks=Banks())).get_bank_stats(timeout_s=2.0)
+    assert result == {
+        "total_nodes": 12,
+        "total_documents": 3,
+        "nodes_by_fact_type": {"world": 10, "observation": 2},
+        "total_observations": 2,
+    }
+    assert calls[0]["refresh"] is False
+    assert calls[0]["_request_timeout"] == 2.0
