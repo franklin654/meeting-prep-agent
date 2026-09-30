@@ -12,6 +12,7 @@ artifacts/
 backend/app.sandbox.db
 backend/app.sandbox-r.db
 backend/app.sandbox*.db
+deliverables/
 
 # Python bytecode
 __pycache__/
