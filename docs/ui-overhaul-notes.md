@@ -18,6 +18,7 @@
 | B3 | complete | `2cc2f06` |
 | B4 | complete | `27c69a0` |
 | B5 | complete | `f341ef0` |
+| Sandbox guard | complete | pending |
 | C1 | planned | — |
 | C2 | planned | — |
 | C3 | planned | — |
@@ -140,3 +141,8 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Current checkpoint tokens: Sandbox-W P3 573/629; Sandbox-W pattern 216/40; misconfigured Sandbox-R P3 721/1,372; corrected real-bank Sandbox-R P3 1,867/2,571. Added 3,377 prompt / 4,612 completion to the earlier partially known totals, now 6,819 / 6,097. A3 backfill usage and earlier unlogged calls remain unknown.
 - Screenshots saved (ignored): `artifacts/overhaul/checkpoint2-contacts-list.png`, `artifacts/overhaul/checkpoint2-contact-profile.png`. No real DB generation or write was performed. Sandbox-R's brief cache is in its copy only.
 - Checkpoint 2 is **not green**: the Sandbox-W brief was empty, refresh produced no patterns, live correct was blocked by the retain cap, and no Brief screenshot was captured. Stop here for user direction; do not retry or exceed any call/retain cap.
+
+### Checkpoint 2 accepted fixes — group 0: sandbox guard
+
+- Added executable `scripts/sandbox_w.sh` and `scripts/sandbox_r.sh`. Each exports its sandbox SQLite URL, expected `DEMO_USER_ID`, and memory mode; resolves and prints the effective `DATABASE_URL`, `BANK_ID`, and `MEMORY_READ_ONLY`; refuses any unexpected values before launching. W binds only :8001 with `ae-overhaul-test` and writes enabled; R binds only :8002 with `ae-user-demo-thomas` and read-only enabled. `--check` performs the same guards without starting a server.
+- Guard tests cover expected settings and refusal of the wrong DB, bank, or read/write mode. `bash -n` and all 8 `test_sandbox_scripts.py` tests passed; Ruff passed. From now on use these scripts for sandbox starts, not hand-written uvicorn commands.
