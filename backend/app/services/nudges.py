@@ -35,17 +35,6 @@ def _overdue_nudges(
     for row in upcoming:
         earliest_meeting.setdefault(row.meeting.account_id, row.meeting.id)
 
-    critical_texts: set[str] = set()
-    briefs = repository.list_brief_records_for_meetings(
-        session, [row.meeting.id for row in upcoming]
-    )
-    for brief in briefs:
-        for item in brief.content.get("you_owe", []):
-            if isinstance(item, dict) and item.get("severity") == "critical":
-                text = item.get("text")
-                if isinstance(text, str):
-                    critical_texts.add(text.casefold())
-                    critical_texts.add(_commitment_label(text).casefold())
     rows: list[tuple[Commitment, str]] = []
     for commitment in repository.list_overdue_commitments(session):
         account = accounts.get(commitment.account_id)
@@ -57,6 +46,16 @@ def _overdue_nudges(
         ):
             rows.append((commitment, account.name))
     rows.sort(key=lambda pair: (pair[0].due_date, pair[0].id))
+    # Brief enrichment is deliberately read-time only and may not be persisted.
+    # Match _enriched_commitments: the oldest overdue AE commitment per account
+    # is the single critical item; later overdue rows remain amber.
+    # Rows are globally due-date sorted; choose one oldest row per account.
+    seen_accounts: set[str] = set()
+    critical_ids: set[str] = set()
+    for commitment, _account_name in rows:
+        if commitment.account_id not in seen_accounts:
+            critical_ids.add(commitment.id)
+            seen_accounts.add(commitment.account_id)
 
     output: list[Nudge] = []
     for commitment, account_name in rows[:3]:
@@ -71,10 +70,7 @@ def _overdue_nudges(
                 link=f"/meetings/{earliest_meeting[commitment.account_id]}"
                 if commitment.account_id in earliest_meeting
                 else "/",
-                critical=(
-                    commitment.text.casefold() in critical_texts
-                    or _commitment_label(commitment.text).casefold() in critical_texts
-                ),
+                critical=commitment.id in critical_ids,
             )
         )
     return output

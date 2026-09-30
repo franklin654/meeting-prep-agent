@@ -251,6 +251,15 @@ def test_nudges_order_caps_and_exclusions(client: TestClient, engine: object) ->
     assert "Customer task" in rows[3]["text"]
 
 
+def test_critical_overdue_nudge_is_derived_when_cached_brief_has_no_enrichment(
+    client: TestClient, engine: object
+) -> None:
+    _seed(engine, extras=False)
+    rows = client.get("/api/nudges").json()
+    overdue = [row for row in rows if row["kind"] == "overdue_commitment"]
+    assert [row["critical"] for row in overdue] == [True, False, False]
+
+
 def test_silent_contacts_capped_at_two_and_upcoming_attendee_excluded(
     client: TestClient, engine: object
 ) -> None:
