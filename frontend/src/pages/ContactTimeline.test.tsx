@@ -29,4 +29,12 @@ describe('Contact profile page', () => {
     renderRoutes(routes, { route: '/contacts/c_empty' })
     expect(await screen.findByText('No timeline items yet.')).toBeInTheDocument()
   })
+
+  it('disables pattern refresh until facts span two meetings', async () => {
+    mockFetch({ 'GET /api/contacts/c_anita/profile': { body: profile('Anita Rao') } })
+    renderRoutes(routes, { route: '/contacts/c_anita' })
+    const refresh = await screen.findByRole('button', { name: 'Refresh' })
+    expect(refresh).toBeDisabled()
+    expect(refresh).toHaveAttribute('title', 'Needs facts from at least 2 meetings')
+  })
 })

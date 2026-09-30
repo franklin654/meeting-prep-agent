@@ -12,7 +12,7 @@ from app.db.brief_repo import SessionFactory
 from app.llm.client import LLMClient
 from app.memory.memory_service import MemoryService
 from app.schemas.api import ContactProfile, ContactTimeline
-from app.schemas.patterns import ContactPattern
+from app.schemas.patterns import PatternRefreshResponse
 from app.services.profile import build_contact_profile, refresh_contact_patterns
 from app.services.timeline import build_timeline
 
@@ -37,8 +37,10 @@ def contact_profile(contact_id: str, session_factory: FactoryDep) -> ContactProf
     return build_contact_profile(contact_id, session_factory=session_factory)
 
 
-@router.post("/contacts/{contact_id}/patterns/refresh", response_model=list[ContactPattern])
+@router.post(
+    "/contacts/{contact_id}/patterns/refresh", response_model=PatternRefreshResponse
+)
 async def refresh_patterns(
     contact_id: str, llm: LlmDep, session_factory: FactoryDep
-) -> list[ContactPattern]:
+) -> PatternRefreshResponse:
     return await refresh_contact_patterns(contact_id, llm=llm, session_factory=session_factory)

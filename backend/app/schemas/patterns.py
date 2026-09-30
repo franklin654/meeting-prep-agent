@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.brief import Citation
@@ -24,3 +26,10 @@ class ContactPattern(BaseModel):
     text: str
     fact_ids: list[str]
     citations: list[Citation]
+
+
+class PatternRefreshResponse(BaseModel):
+    patterns: list[ContactPattern]
+    reason: Literal[
+        "Needs facts from at least 2 meetings", "Needs at least 3 visible facts"
+    ] | None = None

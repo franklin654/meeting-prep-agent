@@ -26,7 +26,7 @@ from app.schemas.api import (
 )
 from app.schemas.brief import Citation, SourceType
 from app.schemas.enums import CommitmentStatus, FactKind
-from app.schemas.patterns import ContactPattern, ContactPatternDraft
+from app.schemas.patterns import ContactPattern, ContactPatternDraft, PatternRefreshResponse
 from app.services.evidence import QUOTE_MAX_CHARS, truncate
 
 logger = logging.getLogger(__name__)
@@ -211,13 +211,28 @@ async def refresh_contact_patterns(
     *,
     llm: LLMClient,
     session_factory: SessionFactory,
-) -> list[ContactPattern]:
+) -> PatternRefreshResponse:
     contact, account, facts = _visible_contact_facts(contact_id, session_factory)
     facts = facts[-40:]
+    if len({fact.meeting_id for fact in facts}) < 2:
+        with session_factory() as session:
+            cached = repository.get_contact_pattern_cache(session, contact_id)
+        cached_patterns = (
+            [ContactPattern.model_validate(row) for row in cached.patterns] if cached else []
+        )
+        return PatternRefreshResponse(
+            patterns=cached_patterns,
+            reason="Needs facts from at least 2 meetings",
+        )
     if len(facts) < 3:
         with session_factory() as session:
-            repository.save_contact_pattern_cache(session, contact_id, [], utcnow())
-        return []
+            cached = repository.get_contact_pattern_cache(session, contact_id)
+        cached_patterns = (
+            [ContactPattern.model_validate(row) for row in cached.patterns] if cached else []
+        )
+        return PatternRefreshResponse(
+            patterns=cached_patterns, reason="Needs at least 3 visible facts"
+        )
     facts_by_id = {fact.id: fact for fact in facts}
     prompt = render_prompt(
         "derive_patterns",
@@ -262,4 +277,4 @@ async def refresh_contact_patterns(
         len(facts),
         len(patterns),
     )
-    return patterns
+    return PatternRefreshResponse(patterns=patterns)

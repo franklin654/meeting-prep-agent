@@ -143,6 +143,13 @@ All 15 fact-bearing meetings have at least 2 facts (133 total). The audit used S
 - Screenshots saved (ignored): `artifacts/overhaul/checkpoint2-contacts-list.png`, `artifacts/overhaul/checkpoint2-contact-profile.png`. No real DB generation or write was performed. Sandbox-R's brief cache is in its copy only.
 - Checkpoint 2 is **not green**: the Sandbox-W brief was empty, refresh produced no patterns, live correct was blocked by the retain cap, and no Brief screenshot was captured. Stop here for user direction; do not retry or exceed any call/retain cap.
 
+### Follow-up Group 2 — pattern threshold (2026-09-30)
+
+- `POST /api/contacts/{contact_id}/patterns/refresh` now requires three visible facts across at least two distinct meetings before making its single app LLM call. Below either threshold it returns cached patterns plus a stable `reason`, without calling the LLM or overwriting the cache. The OpenAPI client was regenerated offline from `app.openapi()`; the schema response is documented above.
+- Contacts profile Refresh is always visible but disabled unless visible facts span two meetings, with the requested tooltip. A returned threshold reason or request error is shown inline.
+- Tests first: same-meeting facts skip without LLM; two-meeting facts invoke FakeLLM once and retain valid citations. Frontend threshold tooltip regression added. Backend: 702 passed, 1 skipped, 6 deselected; Ruff and mypy passed. Frontend: lint and TypeScript passed; Vitest 55 passed.
+- Sandbox-W was restarted using `scripts/sandbox_w.sh` (DB `app.sandbox.db`, bank `ae-overhaul-test`, read-only false). Karan Shah has six meetings but the five visible facts all cite `m2_finedge`; the one requested refresh returned `patterns: []`, reason `Needs facts from at least 2 meetings`, and made no LLM call. No fact payload was sent.
+
 ### Checkpoint 2 accepted fixes — group 0: sandbox guard
 
 - Added executable `scripts/sandbox_w.sh` and `scripts/sandbox_r.sh`. Each exports its sandbox SQLite URL, expected `DEMO_USER_ID`, and memory mode; resolves and prints the effective `DATABASE_URL`, `BANK_ID`, and `MEMORY_READ_ONLY`; refuses any unexpected values before launching. W binds only :8001 with `ae-overhaul-test` and writes enabled; R binds only :8002 with `ae-user-demo-thomas` and read-only enabled. `--check` performs the same guards without starting a server.

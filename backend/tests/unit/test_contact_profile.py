@@ -50,7 +50,9 @@ def client(world: World, llm: FakeLLM, memory: FakeMemoryService) -> Iterator[Te
     overrides.clear()
 
 
-def add_rahul_facts(world: World, count: int = 3) -> list[str]:
+def add_rahul_facts(
+    world: World, count: int = 3, *, meeting_id: str = "m3_finedge"
+) -> list[str]:
     rows = [
         (
             "c_rahul",
@@ -61,7 +63,7 @@ def add_rahul_facts(world: World, count: int = 3) -> list[str]:
         for index in range(count)
     ]
     with Session(world.engine) as session:
-        facts = replace_meeting_facts(session, "m3_finedge", "acc_finedge", rows)
+        facts = replace_meeting_facts(session, meeting_id, "acc_finedge", rows)
     return [fact.id for fact in facts]
 
 
@@ -136,12 +138,15 @@ def test_commitment_patch_and_delete(client: TestClient) -> None:
 def test_pattern_refresh_uses_one_call_and_drops_invalid_citations(
     client: TestClient, world: World, llm: FakeLLM
 ) -> None:
-    fact_ids = add_rahul_facts(world, 3)
+    fact_ids = add_rahul_facts(world, 2, meeting_id="m2_finedge") + add_rahul_facts(
+        world, 1, meeting_id="m3_finedge"
+    )
     llm.queue_response(
         ContactPatternDraft(
             patterns=[
                 ContactPatternSuggestion(
-                    text="Rahul likes concise technical reviews", fact_ids=[fact_ids[0], "invalid"]
+                    text="Rahul likes concise technical reviews",
+                    fact_ids=[fact_ids[0], fact_ids[-1], "invalid"],
                 ),
                 ContactPatternSuggestion(text="Uncited claim", fact_ids=["invalid-only"]),
             ]
@@ -153,16 +158,25 @@ def test_pattern_refresh_uses_one_call_and_drops_invalid_citations(
     assert response.status_code == 200, response.text
     assert len(llm.calls) == 1
     assert len(llm.calls[0].prompt) < 5000
-    assert response.json()[0]["text"] == "Rahul likes concise technical reviews"
-    assert response.json()[0]["citations"][0]["meeting_id"] == "m3_finedge"
-    assert client.get("/api/contacts/c_rahul/profile").json()["patterns"] == response.json()
+    assert response.json()["reason"] is None
+    patterns = response.json()["patterns"]
+    assert patterns[0]["text"] == "Rahul likes concise technical reviews"
+    assert {citation["meeting_id"] for citation in patterns[0]["citations"]} == {
+        "m2_finedge",
+        "m3_finedge",
+    }
+    assert client.get("/api/contacts/c_rahul/profile").json()["patterns"] == patterns
 
 
 def test_pattern_refresh_below_three_facts_makes_no_llm_call(
-    client: TestClient, llm: FakeLLM
+    client: TestClient, world: World, llm: FakeLLM
 ) -> None:
+    add_rahul_facts(world, 3, meeting_id="m3_finedge")
     response = client.post("/api/contacts/c_rahul/patterns/refresh")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {
+        "patterns": [],
+        "reason": "Needs facts from at least 2 meetings",
+    }
     assert llm.calls == []

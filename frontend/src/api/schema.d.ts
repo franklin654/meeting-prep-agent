@@ -1036,6 +1036,13 @@ export interface components {
          * @enum {string}
          */
         Owner: "us" | "them";
+        /** PatternRefreshResponse */
+        PatternRefreshResponse: {
+            /** Patterns */
+            patterns: components["schemas"]["ContactPattern"][];
+            /** Reason */
+            reason?: ("Needs facts from at least 2 meetings" | "Needs at least 3 visible facts") | null;
+        };
         /** PinRequest */
         PinRequest: {
             /** Meeting Id */
@@ -1981,7 +1988,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ContactPattern"][];
+                    "application/json": components["schemas"]["PatternRefreshResponse"];
                 };
             };
             /** @description Validation Error */
